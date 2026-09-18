@@ -93,6 +93,9 @@ pub enum EdgeKind {
     /// A parameter of this symbol has this type; name and position on the edge.
     Param,
     Returns,
+    /// A lint was switched off. Crate-wide is the strong form: it hides every
+    /// future occurrence, including ones nobody has written yet.
+    Silences,
     // --- effect edges: few, dangerous, and the default view ---
     Spawns,
     ReadsEnv,

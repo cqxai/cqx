@@ -120,13 +120,29 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
     }
 
     fn emit_symbol(&mut self, name: &str, lang_kind: &str, span: Span) -> Id {
+        self.emit_symbol_with(name, lang_kind, span, None)
+    }
+
+    fn emit_symbol_with(
+        &mut self,
+        name: &str,
+        lang_kind: &str,
+        span: Span,
+        body: Option<&syn::Block>,
+    ) -> Id {
         let id = self.symbol_id(name);
         let start = span.start().line as u32;
         let end = span.end().line as u32;
-        let node = Node::new(id.clone(), NodeKind::Symbol)
+        let mut node = Node::new(id.clone(), NodeKind::Symbol)
             .attr("name", name)
             .attr("lang:kind", lang_kind)
             .attr("lines", end.saturating_sub(start) + 1);
+        if let Some(block) = body {
+            if let Some(hash) = body_fingerprint(block) {
+                node = node.attr("body", hash);
+            }
+        }
+        let node = node;
         let container = self.container();
         let ev = self.evidence(span);
         let _ = self.out.node(node);
@@ -339,6 +355,43 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
         }
     }
 
+    /// Records a lint being switched off. `scope` separates the two cases that
+    /// matter: an item-level allow is a local decision, a crate-wide one hides
+    /// every future occurrence including code nobody has written yet.
+    fn record_silencing(&mut self, owner: Id, attrs: &[syn::Attribute], scope: &'static str) {
+        for attr in attrs {
+            let kind = if attr.path().is_ident("allow") {
+                "allow"
+            } else if attr.path().is_ident("expect") {
+                "expect"
+            } else {
+                continue;
+            };
+            let mut lints: Vec<String> = Vec::new();
+            let _ = attr.parse_nested_meta(|meta| {
+                lints.push(
+                    meta.path
+                        .segments
+                        .iter()
+                        .map(|s| s.ident.to_string())
+                        .collect::<Vec<_>>()
+                        .join("::"),
+                );
+                Ok(())
+            });
+            let ev = self.evidence(attr.span());
+            for lint in lints {
+                let _ = self.out.edge(
+                    Edge::new(EdgeKind::Silences, owner.clone(), Id::capability("lint"))
+                        .attr("lint", lint)
+                        .attr("scope", scope)
+                        .attr("form", kind)
+                        .evidence(ev.clone()),
+                );
+            }
+        }
+    }
+
     fn is_test_context(&self) -> bool {
         self.test_role || self.cfg_test_depth > 0
     }
@@ -373,6 +426,25 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
             }
         }
     }
+}
+
+/// A fingerprint of a function body, for finding copies.
+///
+/// Exact token match rather than a structural one: two bodies with the same
+/// tokens were copied, whereas two bodies with the same *shape* are often just
+/// two functions doing similar work, which is not a defect. Short bodies are
+/// skipped because getters and one-line delegations collide constantly and mean
+/// nothing.
+fn body_fingerprint(block: &syn::Block) -> Option<String> {
+    use std::hash::{Hash, Hasher};
+    let text = block.to_token_stream().to_string();
+    let normalised: String = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if normalised.len() < 220 {
+        return None;
+    }
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    normalised.hash(&mut hasher);
+    Some(format!("{:x}", hasher.finish()))
 }
 
 /// Reads a `let` initialiser as a binding, when it is one syntax can follow.
@@ -463,8 +535,21 @@ fn callee_path(expr: &syn::Expr) -> Option<String> {
 }
 
 impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
+    fn visit_file(&mut self, node: &'ast syn::File) {
+        // `#![allow(..)]` at the top of a crate root or module file.
+        let file_id = self.file_id.clone();
+        self.record_silencing(file_id, &node.attrs, "crate");
+        syn::visit::visit_file(self, node);
+    }
+
     fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
-        let id = self.emit_symbol(&node.sig.ident.to_string(), "fn", node.span());
+        let id = self.emit_symbol_with(
+            &node.sig.ident.to_string(),
+            "fn",
+            node.span(),
+            Some(&node.block),
+        );
+        self.record_silencing(id.clone(), &node.attrs, "item");
         self.emit_signature(&id, &node.sig);
         if node.sig.unsafety.is_some() {
             let ev = self.evidence(node.sig.span());
@@ -482,7 +567,13 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
     }
 
     fn visit_impl_item_fn(&mut self, node: &'ast syn::ImplItemFn) {
-        let id = self.emit_symbol(&node.sig.ident.to_string(), "method", node.span());
+        let id = self.emit_symbol_with(
+            &node.sig.ident.to_string(),
+            "method",
+            node.span(),
+            Some(&node.block),
+        );
+        self.record_silencing(id.clone(), &node.attrs, "item");
         self.emit_signature(&id, &node.sig);
         if node.sig.unsafety.is_some() {
             let ev = self.evidence(node.sig.span());
