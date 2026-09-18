@@ -14,6 +14,36 @@ use std::cell::RefCell;
 
 use cqx_vfs::Vfs;
 
+// What the host gives us so the analysis can say how far along it is.
+//
+// A parse is a loop over a known number of files, and it is where the time
+// goes — seven of makepad's nine seconds, and two full minutes of its two.
+// Nothing inside a module can report that on its own: it holds the thread
+// until it returns, so there is no moment for anyone to ask it. Being handed a
+// function to call is the only way out, and it costs one call per file against
+// one parse per file.
+//
+// Every host must supply it. A module that is not given one is refused at
+// instantiation, which is better than one that quietly reports nothing.
+#[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "cqx")]
+extern "C" {
+    /// Called once per file, as it is parsed.
+    fn parsed_one();
+}
+
+/// The import is unsafe only because it crosses the boundary.
+#[cfg(target_arch = "wasm32")]
+fn tick() {
+    // SAFETY: the host supplies this at instantiation or the module does not
+    // load, so there is no path here without it.
+    unsafe { parsed_one() }
+}
+
+/// Built for anything else — a test run, a lint — there is no host to tell.
+#[cfg(not(target_arch = "wasm32"))]
+fn tick() {}
+
 thread_local! {
     /// The snapshot being assembled. A thread local rather than a `static mut`:
     /// wasm is single threaded, and shared mutable state is a finding this very
@@ -165,8 +195,17 @@ pub unsafe extern "C" fn cqx_dataset(
     let config_text = borrow(config, config_len);
     let result = SNAPSHOT.with(|s| -> Result<String, String> {
         let vfs = s.borrow();
+        // The same three phases the sharded path uses, so the one reader can
+        // say how far along it is too.
+        let metadata = cqx_rust::manifest::read(&vfs).map_err(|e| e.to_string())?;
+        let prepared = cqx_rust::extract::prepare_watched(&vfs, metadata, &tick)
+            .map_err(|e| e.to_string())?;
+        let mut facts_of = prepared.gathered();
+        facts_of.resolve();
         let mut facts = Vec::new();
-        cqx_rust::extract::run(&vfs, &mut facts).map_err(|e| e.to_string())?;
+        prepared
+            .emit(&vfs, &facts_of, &mut facts)
+            .map_err(|e| e.to_string())?;
         let stream = cqx_store::facts::Stream::from_ndjson(&String::from_utf8_lossy(&facts));
         let config = cqx_score::config::Config::from_text(if config_text.trim().is_empty() {
             None
@@ -252,7 +291,7 @@ pub unsafe extern "C" fn cqx_gather(metadata: *const u8, metadata_len: usize) ->
     let result = SNAPSHOT.with(|s| -> Result<String, String> {
         let metadata: serde_json::Value =
             serde_json::from_str(&text).map_err(|e| format!("metadata: {e}"))?;
-        let prepared = cqx_rust::extract::prepare_with(&s.borrow(), metadata)
+        let prepared = cqx_rust::extract::prepare_watched(&s.borrow(), metadata, &tick)
             .map_err(|e| e.to_string())?;
         let shared = prepared.gathered().shared();
         PREPARED.with(|p| *p.borrow_mut() = Some(prepared));

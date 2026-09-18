@@ -76,6 +76,15 @@ pub fn prepare(vfs: &Vfs) -> Result<Prepared, ExtractError> {
 /// So the manifests are read once, against everything, and every reader is
 /// given the answer. They are small; it is the sources that are not.
 pub fn prepare_with(vfs: &Vfs, metadata: Value) -> Result<Prepared, ExtractError> {
+    prepare_watched(vfs, metadata, &|| {})
+}
+
+/// The same, telling someone each time a file has been parsed.
+pub fn prepare_watched(
+    vfs: &Vfs,
+    metadata: Value,
+    parsed_one: &dyn Fn(),
+) -> Result<Prepared, ExtractError> {
     let packages = metadata["packages"].as_array().cloned().unwrap_or_default();
 
     let mut known: HashMap<String, Id> = HashMap::new();
@@ -107,8 +116,12 @@ pub fn prepare_with(vfs: &Vfs, metadata: Value) -> Result<Prepared, ExtractError
             .filter(|o| **o != pkg_dir && is_inside(o, &pkg_dir))
             .cloned()
             .collect();
-        let (parsed, failures) =
-            prepass::parse_package(vfs, &source_roots(pkg, &pkg_dir), &nested);
+        let (parsed, failures) = prepass::parse_package_watched(
+            vfs,
+            &source_roots(pkg, &pkg_dir),
+            &nested,
+            parsed_one,
+        );
         unparsed.extend(failures);
         per_package.push((Id::package(name), parsed));
     }
