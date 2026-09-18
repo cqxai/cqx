@@ -293,8 +293,8 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
         self.effect_via(kind, to, op, span, "literal");
     }
 
-    fn effect_via(&mut self, kind: EdgeKind, to: Id, op: &str, span: Span, via: &str) {
-        self.effect_provenance(kind, to, op, span, via, None, None);
+    fn effect_via(&mut self, kind: EdgeKind, to: Id, op: &str, span: Span, via: &'static str) {
+        self.effect_provenance(kind, to, op, span, Provenance::new(via));
     }
 
     /// Declares a capability node before an edge points at it. An edge whose
@@ -315,10 +315,13 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
         to: Id,
         op: &str,
         span: Span,
-        via: &str,
-        source_fn: Option<String>,
-        env_var: Option<String>,
+        from_where: Provenance,
     ) {
+        let Provenance {
+            via,
+            source_fn,
+            env_var,
+        } = from_where;
         self.declare_capability(&to);
         let from = self.container();
         let ev = self.evidence(span);
@@ -408,9 +411,9 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
 
     /// Turns a resolution outcome into the node id and the attributes that
     /// explain how it was reached.
-    fn spawn_target(&self, resolved: Resolved) -> (String, &'static str, Option<String>, Option<String>) {
+    fn spawn_target(&self, resolved: Resolved) -> (String, Provenance) {
         match resolved {
-            Resolved::Value(v, via) => (v, via, None, None),
+            Resolved::Value(v, via) => (v, Provenance::new(via)),
             Resolved::From(f) => {
                 // A target derived from the environment is the interesting
                 // case: it means the program launched is chosen at runtime by
@@ -422,13 +425,27 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
                     names.join(",")
                 });
                 match env {
-                    Some(vars) if !vars.is_empty() => {
-                        ("<dynamic>".to_string(), "env", Some(f), Some(vars))
-                    }
-                    _ => ("<dynamic>".to_string(), "fn", Some(f), None),
+                    Some(vars) if !vars.is_empty() => (
+                        "<dynamic>".to_string(),
+                        Provenance {
+                            via: "env",
+                            source_fn: Some(f),
+                            env_var: Some(vars),
+                        },
+                    ),
+                    _ => (
+                        "<dynamic>".to_string(),
+                        Provenance {
+                            via: "fn",
+                            source_fn: Some(f),
+                            env_var: None,
+                        },
+                    ),
                 }
             }
-            Resolved::Unresolved => ("<dynamic>".to_string(), "unresolved", None, None),
+            Resolved::Unresolved => {
+                ("<dynamic>".to_string(), Provenance::new("unresolved"))
+            }
         }
     }
 
@@ -568,6 +585,27 @@ fn binding_of(expr: &syn::Expr) -> Option<Binding> {
             _ => None,
         },
         _ => None,
+    }
+}
+
+/// Where a value came from, travelling together because they answer one
+/// question: not "what is the target" but "who decided it".
+#[derive(Default)]
+struct Provenance {
+    /// How the target was reached: a literal, a constant, a hop, or not at all.
+    via: &'static str,
+    /// The function the value came out of, when it came out of one.
+    source_fn: Option<String>,
+    /// The environment variables that function consults, when it consults any.
+    env_var: Option<String>,
+}
+
+impl Provenance {
+    fn new(via: &'static str) -> Provenance {
+        Provenance {
+            via,
+            ..Provenance::default()
+        }
     }
 }
 
@@ -873,20 +911,12 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
                     Some(arg) => self.resolve_string_arg(arg),
                     None => Resolved::Unresolved,
                 };
-                let (name, via, source_fn, env_var) = self.spawn_target(resolved);
+                let (name, from_where) = self.spawn_target(resolved);
                 let to = Id::process(&name);
                 let _ = self
                     .out
                     .node(Node::new(to.clone(), NodeKind::Process).attr("name", name.as_str()));
-                self.effect_provenance(
-                    EdgeKind::Spawns,
-                    to,
-                    &path,
-                    span,
-                    via,
-                    source_fn,
-                    env_var,
-                );
+                self.effect_provenance(EdgeKind::Spawns, to, &path, span, from_where);
             } else if path.ends_with("env::var")
                 || path.ends_with("env::var_os")
                 || path.ends_with("env::set_var")
@@ -896,12 +926,12 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
                     Some(arg) => self.resolve_string_arg(arg),
                     None => Resolved::Unresolved,
                 };
-                let (name, via, _, _) = self.spawn_target(resolved);
+                let (name, from_where) = self.spawn_target(resolved);
                 let to = Id::env_var(&name);
                 let _ = self
                     .out
                     .node(Node::new(to.clone(), NodeKind::EnvVar).attr("name", name.as_str()));
-                self.effect_via(EdgeKind::ReadsEnv, to, &path, span, via);
+                self.effect_provenance(EdgeKind::ReadsEnv, to, &path, span, from_where);
             } else if path.ends_with("process::exit") || path.ends_with("process::abort") {
                 self.effect(EdgeKind::EffectExec, Id::capability("exec"), &path, span);
             } else if path.contains("fs::") {

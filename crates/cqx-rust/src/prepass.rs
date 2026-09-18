@@ -263,7 +263,7 @@ pub fn parse_package(
         if !dir.is_dir() {
             continue;
         }
-        for entry in walkdir::WalkDir::new(&dir)
+        for entry in walkdir::WalkDir::new(dir)
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())
@@ -283,7 +283,7 @@ pub fn parse_package(
                 |source| syn::parse_file(&source).map_err(|e| e.to_string()),
             ) {
                 Ok(file) => parsed.push(ParsedFile {
-                    module_prefix: crate::extract::module_prefix(&dir, path),
+                    module_prefix: crate::extract::module_prefix(dir, path),
                     rel_path: rel,
                     parsed: file,
                     test_role: *is_test,
