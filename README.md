@@ -4,6 +4,8 @@
   <img src="screenshot.png" alt="CQX Screenshot" width="70%">
 </p>
 
+Live demo: https://explorer.deka.gg
+
 A queryable graph of a codebase: what it contains, what it touches, and what
 crosses its boundaries — and a **CodeQuality Score** derived from it.
 
