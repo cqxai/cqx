@@ -48,6 +48,11 @@ impl Id {
     pub fn external(name: &str) -> Id {
         Id(format!("ext:{name}"))
     }
+    /// A type as it was written. Declared types are what a signature actually
+    /// promises, and reading them needs no inference.
+    pub fn type_ref(text: &str) -> Id {
+        Id(format!("type:{text}"))
+    }
 }
 
 impl std::fmt::Display for Id {
@@ -69,6 +74,7 @@ pub enum NodeKind {
     EnvVar,
     Capability,
     External,
+    Type,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -79,6 +85,14 @@ pub enum EdgeKind {
     DependsOn,
     Imports,
     Calls,
+    // --- declared types: what a signature promises ---
+    /// A symbol declares this type (a struct, enum, trait or alias).
+    Defines,
+    /// A type has a field of another type; the field name is on the edge.
+    HasField,
+    /// A parameter of this symbol has this type; name and position on the edge.
+    Param,
+    Returns,
     // --- effect edges: few, dangerous, and the default view ---
     Spawns,
     ReadsEnv,
