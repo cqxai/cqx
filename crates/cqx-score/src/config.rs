@@ -42,6 +42,10 @@ pub struct Rule {
     /// agent — can decide whether to change it without reading this source.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub describes: String,
+    /// What to do about it. A finding without a remedy is a complaint, and a
+    /// reader who does not already know the fix cannot act on the number.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub remedy: String,
     /// The most this rule can ever deduct.
     pub weight: f64,
     /// At or below this value, the rule deducts nothing.
@@ -116,12 +120,19 @@ pub struct Config {
 /// per ten thousand lines of product code.
 pub fn defaults() -> BTreeMap<String, Rule> {
     let mut rules = BTreeMap::new();
-    let mut add = |id: &str, category: &str, weight: f64, free: f64, full: f64, describes: &str| {
+    let mut add = |id: &str,
+                   category: &str,
+                   weight: f64,
+                   free: f64,
+                   full: f64,
+                   describes: &str,
+                   remedy: &str| {
         rules.insert(
             id.to_string(),
             Rule {
                 category: category.to_string(),
                 describes: describes.to_string(),
+                remedy: remedy.to_string(),
                 weight,
                 free,
                 full,
@@ -131,18 +142,18 @@ pub fn defaults() -> BTreeMap<String, Rule> {
         );
     };
     // Quality — reinvention and silencing.
-    add("result-string-density", "quality", 30.0, 1.0, 20.0, "functions returning Result<_, String> instead of a real error type, per 10k lines");
-    add("broad-lint-silencing", "quality", 25.0, 0.3, 2.0, "crate-wide allow(clippy::all) or allow(warnings), per 10k lines");
-    add("duplicated-bodies", "quality", 10.0, 0.5, 3.0, "function bodies that are exact token copies of another, per 10k lines");
-    add("undocumented-suppressions", "quality", 10.0, 1.0, 6.0, "crate-level lint suppressions with no reason given, per 10k lines");
+    add("result-string-density", "quality", 30.0, 1.0, 20.0, "functions returning Result<_, String> instead of a real error type, per 10k lines", "Give the crate an error type and return that. A String error cannot be matched on, so every caller either re-parses the text or swallows it.");
+    add("broad-lint-silencing", "quality", 25.0, 0.3, 2.0, "crate-wide allow(clippy::all) or allow(warnings), per 10k lines", "Replace the blanket allow with the specific lints meant, or fix them. A crate-wide allow also silences everything written after it, including code nobody has typed yet.");
+    add("duplicated-bodies", "quality", 10.0, 0.5, 3.0, "function bodies that are exact token copies of another, per 10k lines", "Move the shared body somewhere both callers can reach. The copies are listed below; they were found by exact token match, so they were copied rather than merely similar.");
+    add("undocumented-suppressions", "quality", 10.0, 1.0, 6.0, "crate-level lint suppressions with no reason given, per 10k lines", "Add reason = \"...\" to each suppression. deno documents every one of its crate-level suppressions, which is why theirs read as decisions rather than residue.");
     // Containment — effects escaping the crate that should own them.
-    add("exit-in-library", "containment", 30.0, 1.0, 15.0, "process::exit called from a library crate, per 10k lines");
+    add("exit-in-library", "containment", 30.0, 1.0, 15.0, "process::exit called from a library crate, per 10k lines", "Return an error and let the binary decide the exit code. A library that exits takes that decision away from every caller, including a test harness.");
     // Legibility — what the tool, and the next author, can follow.
-    add("bare-string-params", "legibility", 20.0, 0.12, 0.35, "share of parameters declared as a bare string rather than a domain type");
-    add("unproven-spawn-targets", "legibility", 30.0, 0.2, 0.8, "share of spawn and env targets the extractor could not resolve");
+    add("bare-string-params", "legibility", 20.0, 0.12, 0.35, "share of parameters declared as a bare string rather than a domain type", "Introduce a newtype for the concept. Three interchangeable strings in one signature is an argument swap that still compiles and still runs.");
+    add("unproven-spawn-targets", "legibility", 30.0, 0.2, 0.8, "share of spawn and env targets the extractor could not resolve", "Where the target comes from a parameter, the caller is deciding it — hoisting the spawn there makes it knowable. Where it comes from the environment, that is the finding rather than a gap.");
     // Security — reach that an attacker could steer.
-    add("env-controlled-spawn", "security", 30.0, 0.0, 2.0, "spawn targets chosen by an environment variable, per 10k lines");
-    add("shell-invocation", "security", 20.0, 0.0, 1.0, "spawning a shell, which turns an argument into a command, per 10k lines");
+    add("env-controlled-spawn", "security", 30.0, 0.0, 2.0, "spawn targets chosen by an environment variable, per 10k lines", "Resolve the program from a known location, or validate it before spawning. As it stands, whoever sets the variable chooses what runs.");
+    add("shell-invocation", "security", 20.0, 0.0, 1.0, "spawning a shell, which turns an argument into a command, per 10k lines", "Pass the program and its arguments directly rather than through a shell. A shell turns an argument into a command.");
     // Modularity — house style, so the defaults are deliberately lenient.
     //
     // Across the five reference projects, files over 1000 lines run from 1.07
@@ -150,9 +161,9 @@ pub fn defaults() -> BTreeMap<String, Rule> {
     // set is the one with the most large files. A default that condemned that
     // would be wrong, so these begin to bite well above the field and the
     // threshold is a parameter for teams whose standard is stricter.
-    add("oversized-files", "modularity", 25.0, 3.5, 12.0, "files longer than max_lines, per 10k lines — a house standard, not a fact");
-    add("oversized-line-share", "modularity", 15.0, 0.70, 0.95, "share of all lines living in files longer than max_lines");
-    add("crate-type-scatter", "modularity", 10.0, 0.20, 1.50, "crates whose signatures are mostly built from three or more other crates' types");
+    add("oversized-files", "modularity", 25.0, 3.5, 12.0, "files longer than max_lines, per 10k lines — a house standard, not a fact", "Split the file, or raise the standard if this is simply how the project is written: cqx config set oversized-files.max_lines N. Measured across ripgrep, tokio and deno, file length tracks habit rather than quality.");
+    add("oversized-line-share", "modularity", 15.0, 0.70, 0.95, "share of all lines living in files longer than max_lines", "Same standard as oversized-files, measured by weight rather than count: it catches a codebase where most of the code lives in a handful of very large files.");
+    add("crate-type-scatter", "modularity", 10.0, 0.20, 1.50, "crates whose signatures are mostly built from three or more other crates' types", "A crate built mostly from other crates' types, pulled from several of them, usually wants splitting or absorbing. One strong pull is an adapter and perfectly fine.");
     rules.get_mut("oversized-files").unwrap().params.insert("max_lines".into(), 1000.0);
     rules
         .get_mut("oversized-line-share")
