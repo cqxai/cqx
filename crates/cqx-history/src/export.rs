@@ -128,12 +128,6 @@ fn run(context: &Context) -> Result<(), String> {
     )?;
     let branch = branch_name(&repo);
     let history_page = remote.as_deref().and_then(commits_url);
-    let meta = cqx_view::Meta {
-        repo: &name,
-        branch: &branch,
-        remote: remote.as_deref(),
-        commits_url: history_page.as_deref(),
-    };
 
     let scratch = out.join(".work");
     let mut commits: Vec<CommitScore> = Vec::new();
@@ -157,6 +151,11 @@ fn run(context: &Context) -> Result<(), String> {
             let _ = std::fs::remove_dir_all(&scratch);
             materialise(&repo, sha, &scratch)?;
             let snapshot = cqx_vfs::from_dir(&scratch).map_err(|e| format!("{sha}: {e}"))?;
+
+            // The clock starts with the source in hand, because that is where
+            // the browser starts too. What git and the disk cost is real, but
+            // it is not what this measures.
+            let started = std::time::Instant::now();
             let mut facts = Vec::new();
             cqx_rust::extract::run(&snapshot, &mut facts).map_err(|e| format!("{sha}: {e}"))?;
             let stream = cqx_store::facts::Stream::from_ndjson(&String::from_utf8_lossy(&facts));
@@ -166,7 +165,15 @@ fn run(context: &Context) -> Result<(), String> {
                 serde_json::from_value(report["scores"].clone()).unwrap_or_default();
             // The timeline lives in the index, not in here: a file that carries
             // its neighbours would be rewritten every time a commit lands.
+            let meta = cqx_view::Meta {
+                repo: &name,
+                branch: &branch,
+                remote: remote.as_deref(),
+                commits_url: history_page.as_deref(),
+                analysed_ms: Some(started.elapsed().as_millis() as u64),
+            };
             let dataset = cqx_view::dataset(&stream, report, serde_json::json!([]), &meta);
+
             std::fs::write(&path, dataset.to_string()).map_err(|e| format!("{e}"))?;
             (scores, metrics.lines, false)
         };
@@ -215,9 +222,9 @@ fn run(context: &Context) -> Result<(), String> {
 
     let index = serde_json::json!({
         "repo": name,
-        "branch": meta.branch,
-        "remote": meta.remote,
-        "commits_url": meta.commits_url,
+        "branch": branch,
+        "remote": remote,
+        "commits_url": history_page,
         "generated": git(&repo, &["show", "-s", "--format=%aI", "HEAD"])?.trim(),
         "config": cqx_score::config_json(&config),
         "commits": commits,
