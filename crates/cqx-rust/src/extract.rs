@@ -85,6 +85,21 @@ pub fn prepare_watched(
     metadata: Value,
     parsed_one: &dyn Fn(),
 ) -> Result<Prepared, ExtractError> {
+    prepare_reporting(vfs, metadata, &|_| {}, parsed_one)
+}
+
+/// The same, saying first how many files it is about to read.
+///
+/// A fraction needs a denominator that means something. A repository holds
+/// more `.rs` files than any crate claims — makepad has six thousand and
+/// fewer than three thousand belong to one — so counting what was fetched
+/// made a finished analysis look stalled at forty-five per cent.
+pub fn prepare_reporting(
+    vfs: &Vfs,
+    metadata: Value,
+    total: &dyn Fn(u32),
+    parsed_one: &dyn Fn(),
+) -> Result<Prepared, ExtractError> {
     let packages = metadata["packages"].as_array().cloned().unwrap_or_default();
 
     let mut known: HashMap<String, Id> = HashMap::new();
@@ -100,6 +115,22 @@ pub fn prepare_watched(
         .iter()
         .filter_map(|p| p["manifest_path"].as_str().map(parent_of))
         .collect();
+
+    // Counted before anything is read, which costs only path comparisons.
+    let mut expected = 0u32;
+    for pkg in &packages {
+        if pkg["name"].as_str().is_none() {
+            continue;
+        }
+        let pkg_dir = parent_of(pkg["manifest_path"].as_str().unwrap_or_default());
+        let nested: Vec<String> = pkg_dirs
+            .iter()
+            .filter(|o| **o != pkg_dir && is_inside(o, &pkg_dir))
+            .cloned()
+            .collect();
+        expected += prepass::files_of(vfs, &source_roots(pkg, &pkg_dir), &nested).len() as u32;
+    }
+    total(expected);
 
     let mut per_package: Vec<(Id, Vec<ParsedFile>)> = Vec::new();
     let mut unparsed: Vec<String> = Vec::new();
