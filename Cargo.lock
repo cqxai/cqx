@@ -72,6 +72,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "cqx"
+version = "0.1.0"
+dependencies = [
+ "cqx-rust",
+ "cqx-store",
+ "deka-cli-core",
+]
+
+[[package]]
+name = "cqx-rust"
+version = "0.1.0"
+dependencies = [
+ "cqx-schema",
+ "deka-cli-core",
+ "proc-macro2",
+ "quote",
+ "serde_json",
+ "syn 2.0.119",
+ "walkdir",
+]
+
+[[package]]
+name = "cqx-schema"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "cqx-store"
+version = "0.1.0"
+dependencies = [
+ "cqx-schema",
+ "deka-cli-core",
+ "serde_json",
+ "zega-core",
+ "zega-parser",
+]
+
+[[package]]
 name = "crc32fast"
 version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -108,47 +149,6 @@ dependencies = [
  "lock_api",
  "once_cell",
  "parking_lot_core",
-]
-
-[[package]]
-name = "dcx"
-version = "0.1.0"
-dependencies = [
- "dcx-rust",
- "dcx-store",
- "deka-cli-core",
-]
-
-[[package]]
-name = "dcx-rust"
-version = "0.1.0"
-dependencies = [
- "dcx-schema",
- "deka-cli-core",
- "proc-macro2",
- "quote",
- "serde_json",
- "syn 2.0.119",
- "walkdir",
-]
-
-[[package]]
-name = "dcx-schema"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "dcx-store"
-version = "0.1.0"
-dependencies = [
- "dcx-schema",
- "deka-cli-core",
- "serde_json",
- "zega-core",
- "zega-parser",
 ]
 
 [[package]]

@@ -1,9 +1,13 @@
-# dcx — deka code explorer
+# cqx — CodeQuality Explorer
 
 A queryable graph of a codebase: what it contains, what it touches, and what
-crosses its boundaries.
+crosses its boundaries — and a **CodeQuality Score** derived from it.
 
-`dcx` scans source, emits a language-agnostic stream of facts, loads them into a
+cqx is repository-agnostic. It was built while auditing a large Rust workspace
+and is calibrated against ripgrep, tokio and deno, but nothing in it is specific
+to any project.
+
+`cqx` scans source, emits a language-agnostic stream of facts, loads them into a
 graph database, and serves a web explorer over the result.
 
 It is two halves, and they are deliberately separable:
@@ -15,11 +19,27 @@ It is two halves, and they are deliberately separable:
 The index is useful with no UI at all. That is on purpose: the UI is how you
 explore a codebase, the index is how you defend one.
 
+## The CodeQuality Score
+
+Every category starts at **100** and is degraded only by a named rule with a
+published weight and a cap, so a score is a list of findings rather than a curve
+fitted to an imaginary average codebase. No reference population is needed, and
+every deduction opens to the file and line that caused it.
+
+The rules target the failure modes of code written fast by many hands — effects
+escaping their crate, lints switched off wholesale, the same concept spelled
+four ways, bodies copied rather than shared — not abstract elegance.
+
+Thresholds are anchored on real projects rather than intuition, which has already
+corrected two wrong assumptions: large files turn out to be normal in Rust
+(ripgrep keeps 81% of its lines in files over 500), and raw `unsafe` counts
+measure a project's domain rather than its discipline (tokio and deno carry an
+order of magnitude more than a CLI does).
+
 ## Status
 
-Early, and nothing here is stable yet. The Rust extractor lands first because it
-is what we need on our own toolchain; the schema is designed to be
-language-agnostic from the first commit so that other extractors slot in without
+Early, and nothing here is stable yet. The Rust extractor lands first; the schema
+is language-agnostic from the first commit so other extractors slot in without
 touching the core.
 
 ## The model
@@ -78,9 +98,9 @@ prove and says so; missing edge kinds degrade the view, they never corrupt it.
 Identifiers are path-addressed, never line-addressed:
 
 ```
-pkg:deka_hir
-file:crates/deka_hir/src/resolve.rs
-sym:deka_hir::resolve::resolve_import
+pkg:grep_searcher
+file:crates/searcher/src/sink.rs
+sym:grep_searcher::sink::matched
 ```
 
 Three properties follow, and none of them are available otherwise:
@@ -103,12 +123,12 @@ rather than snapshots.
 The core knows nothing about any language, and there are two ways in.
 
 **Bundled extractors are crates.** Each one owns a command and registers it with
-the CLI registry from `deka-cli-core`; the `dcx` binary is composition only, so a
+the CLI registry from `deka-cli-core`; the `cqx` binary is composition only, so a
 handler can exist nowhere but its owning crate (the rfd#61 pattern, which exists
 precisely because implementations kept leaking into the core crate).
 
 ```rust
-// crates/dcx-rust/src/lib.rs — the handler body lives with the language
+// crates/cqx-rust/src/lib.rs — the handler body lives with the language
 pub fn register(registry: &mut Registry) {
     registry.add_command(EXTRACT_COMMAND);
     registry.add_flag(FlagSpec { name: "--quiet", .. });
@@ -116,15 +136,15 @@ pub fn register(registry: &mut Registry) {
 ```
 
 ```rust
-// crates/dcx/src/main.rs — the binary's whole job
-RegistryBuilder::new().with(dcx_rust::register)
+// crates/cqx/src/main.rs — the binary's whole job
+RegistryBuilder::new().with(cqx_rust::register)
 ```
 
 **Out-of-tree extractors are programs.** Anything that writes the same facts to
 stdout participates without being in this repo:
 
 ```
-dcx-extract-<lang> <path>  >  facts.ndjson
+cqx-extract-<lang> <path>  >  facts.ndjson
 ```
 
 Either way the schema is identical. Language-specific vocabulary lives in a
@@ -134,7 +154,7 @@ Either way the schema is identical. Language-specific vocabulary lives in a
 
 - Inferring architecture from code. Declared intent is checked against observed
   facts; what the tool infers on its own, it does not enforce.
-- Being a linter. Existing tools are better at single-file rules. `dcx` is for
+- Being a linter. Existing tools are better at single-file rules. `cqx` is for
   relationships between things.
 - A pretty dependency hairball. If the default view needs a legend, it failed.
 
@@ -142,20 +162,21 @@ Either way the schema is identical. Language-specific vocabulary lives in a
 
 ```
 crates/
-  dcx/             the binary — registry + dispatch, no handler bodies
-  dcx-schema/      fact schema + stable ids (the contract everything else depends on)
-  dcx-rust/        Rust extractor: owns the `extract` command
+  cqx/             the binary — registry + dispatch, no handler bodies
+  cqx-schema/      fact schema + stable ids (the contract everything else depends on)
+  cqx-rust/        Rust extractor: owns the `extract` command
 samples/basic/     a workspace with deliberately planted facts
 ```
 
-Planned: `dcx-core` (load, query, diff), `dcx-serve` (the local server behind
-`deka explore`), and the web explorer.
+Planned: `cqx-serve` (a local server for the explorer) and the web explorer
+itself. `deka explore` in the deka toolchain is a downstream consumer of this
+tool, not a part of it.
 
 ## Try it
 
 ```
-cargo run -p dcx -- extract samples/basic
-cargo run -p dcx -- extract /path/to/a/workspace --out facts.ndjson
+cargo run -p cqx -- extract samples/basic
+cargo run -p cqx -- extract /path/to/a/workspace --out facts.ndjson
 ```
 
 `samples/basic` exists so output can be checked against a known answer instead of

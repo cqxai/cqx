@@ -16,7 +16,7 @@ use crate::facts::Stream;
 ///
 /// `Debug` lower-cased turns `DependsOn` into `dependson`, which silently made
 /// every multi-word edge kind unqueryable while single-word ones worked.
-fn edge_type(kind: dcx_schema::EdgeKind) -> String {
+fn edge_type(kind: cqx_schema::EdgeKind) -> String {
     serde_json::to_value(kind)
         .ok()
         .and_then(|v| v.as_str().map(str::to_string))
