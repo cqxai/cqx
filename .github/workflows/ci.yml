@@ -39,7 +39,7 @@ jobs:
       # cqx is meant to run in a browser, which means the analysis path must not
       # acquire a dependency that cannot go there. This job is what notices.
       - run: |
-          for crate in cqx-vfs cqx-schema cqx-rust cqx-score cqx-store; do
+          for crate in cqx-vfs cqx-schema cqx-rust cqx-score cqx-store cqx-view; do
             cargo build --locked --target wasm32-unknown-unknown -p "$crate"
           done
           cargo build --locked --release --target wasm32-unknown-unknown -p cqx-wasm

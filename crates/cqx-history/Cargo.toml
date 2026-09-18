@@ -12,6 +12,7 @@ cqx-schema = { workspace = true }
 cqx-vfs = { workspace = true }
 cqx-score = { path = "../cqx-score" }
 cqx-store = { path = "../cqx-store" }
+cqx-view = { path = "../cqx-view" }
 deka-cli-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -1,0 +1,15 @@
+[package]
+name = "cqx-view"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Turns a fact stream into the dataset an explorer renders."
+
+[dependencies]
+cqx-schema = { path = "../cqx-schema" }
+cqx-store = { path = "../cqx-store" }
+serde_json.workspace = true
+
+[dev-dependencies]
+cqx-rust = { path = "../cqx-rust" }
+cqx-vfs = { workspace = true }
