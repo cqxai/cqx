@@ -6,7 +6,7 @@
 //! unresolved names in real code are one alias, one constant or one hop away,
 //! not a question about the type system.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -77,28 +77,74 @@ fn propagate_env(
     calls: &mut HashMap<String, Vec<String>>,
     reads_env: &mut HashMap<String, Vec<String>>,
 ) {
+    let calls = &*calls;
+    // Who names whom, the other way round.
+    //
+    // A round only ever gives a caller what its callees already have, so the
+    // only names that can gain anything are the callers of something that
+    // reads the environment — a few hundred of them in makepad, against a
+    // hundred thousand functions. Walking every function eight times to find
+    // that out was eleven of the twenty-nine seconds the browser spent on it.
+    let mut callers_of: HashMap<&str, Vec<&str>> = HashMap::new();
+    for (caller, callees) in calls.iter() {
+        for callee in callees {
+            callers_of
+                .entry(callee.as_str())
+                .or_default()
+                .push(caller.as_str());
+        }
+    }
+
     for _ in 0..8 {
-        let mut changed = false;
-        let snapshot = reads_env.clone();
-        for (caller, callees) in calls.iter() {
+        let mut candidates: Vec<&str> = Vec::new();
+        let mut seen: HashSet<&str> = HashSet::new();
+        for name in reads_env.keys() {
+            for caller in callers_of.get(name.as_str()).into_iter().flatten() {
+                if seen.insert(caller) {
+                    candidates.push(caller);
+                }
+            }
+        }
+
+        // Everything gained lands at the end of the round, which is what the
+        // copy of the map was for: what a caller is measured against is the
+        // state the round began in. Holding the gains is the same rule without
+        // eight deep copies of every name and variable in the workspace.
+        let mut gains: Vec<(&str, Vec<String>)> = Vec::new();
+        for caller in candidates {
+            let Some(callees) = calls.get(caller) else {
+                continue;
+            };
+            let known = reads_env.get(caller);
             let mut gained: Vec<String> = Vec::new();
+            // In the order this caller names them, because that is the order
+            // the variables are reported in.
             for callee in callees {
-                if let Some(vars) = snapshot.get(callee) {
-                    for var in vars {
-                        let known = snapshot.get(caller).is_some_and(|v| v.contains(var));
-                        if !known && !gained.contains(var) {
-                            gained.push(var.clone());
-                        }
+                let Some(vars) = reads_env.get(callee) else {
+                    continue;
+                };
+                for var in vars {
+                    if known.is_some_and(|v| v.contains(var)) {
+                        continue;
+                    }
+                    if !gained.contains(var) {
+                        gained.push(var.clone());
                     }
                 }
             }
             if !gained.is_empty() {
-                changed = true;
-                reads_env.entry(caller.clone()).or_default().extend(gained);
+                gains.push((caller, gained));
             }
         }
-        if !changed {
+        if gains.is_empty() {
             break;
+        }
+        let owned: Vec<(String, Vec<String>)> = gains
+            .into_iter()
+            .map(|(caller, gained)| (caller.to_string(), gained))
+            .collect();
+        for (caller, gained) in owned {
+            reads_env.entry(caller).or_default().extend(gained);
         }
     }
 }
