@@ -1,0 +1,11 @@
+[package]
+name = "cqx-vfs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "An in-memory snapshot of the files being analysed."
+
+[dependencies]
+serde = { workspace = true }
+walkdir = { workspace = true }
