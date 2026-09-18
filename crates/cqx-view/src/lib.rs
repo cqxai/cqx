@@ -22,6 +22,16 @@ pub struct Meta<'a> {
     pub branch: &'a str,
     pub remote: Option<&'a str>,
     pub commits_url: Option<&'a str>,
+    /// How long this took, in milliseconds.
+    ///
+    /// Measured from source in memory to finished dataset: parsing, the fact
+    /// stream, the metrics, the score and this fold. Not the checkout, not the
+    /// upload — a browser has neither, and a number that means two different
+    /// things depending on where it was produced is not worth printing.
+    ///
+    /// The caller measures it. A wasm build has no clock, so there the page
+    /// times the call and fills this in.
+    pub analysed_ms: Option<u64>,
 }
 
 /// The six effects worth a badge. `silences` is deliberately not among them:
@@ -450,6 +460,10 @@ pub fn dataset(stream: &Stream, score: Value, history: Value, meta: &Meta<'_>) -
 
     json!({
         "repo": meta.repo,
+        "analysis": {
+            "ms": meta.analysed_ms,
+            "cqx": env!("CARGO_PKG_VERSION"),
+        },
         "branch": meta.branch,
         "remote": meta.remote,
         "commits_url": meta.commits_url,
