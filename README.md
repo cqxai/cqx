@@ -1,7 +1,7 @@
 # cqx — CodeQuality Explorer
 
 <p align="left">
-  <img src="image.png" alt="CQX Screenshot" width="70%">
+  <img src="screenshot.png" alt="CQX Screenshot" width="70%">
 </p>
 
 A queryable graph of a codebase: what it contains, what it touches, and what
