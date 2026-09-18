@@ -5,6 +5,8 @@ use std::collections::{HashMap, HashSet};
 use cqx_schema::{Edge, EdgeKind, NodeKind};
 use cqx_store::facts::Stream;
 
+use crate::config::Config;
+
 /// One rule's input: a value, and the findings that produced it.
 pub struct Measure {
     pub value: f64,
@@ -19,6 +21,13 @@ pub struct Finding {
 
 /// Closures cannot express the lifetime tie between an edge and a string
 /// borrowed out of it, so these stay plain functions.
+/// Types that say nothing about where logic belongs.
+const PRIMITIVES: &[&str] = &[
+    "String", "&str", "bool", "usize", "u8", "u32", "u64", "i32", "i64", "f64", "char", "()",
+    "Self", "&self", "&mut self", "PathBuf", "&Path", "Vec<String>", "serde_json::Value",
+    "&[u8]", "Vec<u8>", "&mut Self",
+];
+
 fn package_of(id: &str) -> Option<&str> {
     id.strip_prefix("sym:").and_then(|r| r.split("::").next())
 }
@@ -56,7 +65,8 @@ impl Metrics {
         self.values.get(id)
     }
 
-    pub fn compute(stream: &Stream, exclude: &[String]) -> Metrics {
+    pub fn compute(stream: &Stream, config: &Config) -> Metrics {
+        let exclude = &config.exclude;
         let excluded = |path: &str| exclude.iter().any(|p| path.starts_with(p.as_str()));
 
         // Test code is tagged rather than dropped, but it is not the product.
@@ -71,6 +81,7 @@ impl Metrics {
             .collect();
 
         let mut lines = 0u64;
+        let mut files: Vec<(String, u64)> = Vec::new();
         for node in &stream.nodes {
             if node.kind != NodeKind::File || test_files.contains(node.id.0.as_str()) {
                 continue;
@@ -79,8 +90,11 @@ impl Metrics {
             if excluded(path) {
                 continue;
             }
-            lines += node.attrs.get("lines").and_then(|v| v.as_u64()).unwrap_or(0);
+            let n = node.attrs.get("lines").and_then(|v| v.as_u64()).unwrap_or(0);
+            lines += n;
+            files.push((path.to_string(), n));
         }
+        files.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
         // A tiny codebase would otherwise divide its way to an infinite density.
         let scale = (lines as f64 / 10_000.0).max(0.05);
 
@@ -226,6 +240,67 @@ impl Metrics {
             .collect();
         density("duplicated-bodies", dup);
 
+        // A crate whose signatures are mostly built from other crates' types,
+        // pulled from three or more of them, is a junk drawer rather than a
+        // component. One strong pull is an adapter and perfectly fine, which is
+        // why the owner count matters as much as the share.
+        let mut type_owner: HashMap<&str, HashSet<&str>> = HashMap::new();
+        for edge in &stream.edges {
+            if edge.kind == EdgeKind::Defines {
+                if let Some(p) = package_of(&edge.from.0) {
+                    type_owner
+                        .entry(edge.to.0.trim_start_matches("type:"))
+                        .or_default()
+                        .insert(p);
+                }
+            }
+        }
+        let mut own: HashMap<&str, u32> = HashMap::new();
+        let mut foreign: HashMap<&str, u32> = HashMap::new();
+        let mut sources: HashMap<&str, HashSet<&str>> = HashMap::new();
+        for edge in &stream.edges {
+            if !matches!(edge.kind, EdgeKind::Param | EdgeKind::Returns) {
+                continue;
+            }
+            let Some(p) = package_of(&edge.from.0) else { continue };
+            let written = edge.to.0.trim_start_matches("type:");
+            if PRIMITIVES.contains(&written) {
+                continue;
+            }
+            let base = written
+                .trim_start_matches('&')
+                .split('<')
+                .next()
+                .unwrap_or(written)
+                .rsplit("::")
+                .next()
+                .unwrap_or(written);
+            let Some(owners) = type_owner.get(base) else { continue };
+            if owners.contains(p) {
+                *own.entry(p).or_default() += 1;
+            } else {
+                *foreign.entry(p).or_default() += 1;
+                if let Some(o) = owners.iter().next() {
+                    sources.entry(p).or_default().insert(o);
+                }
+            }
+        }
+        let mut scatter: Vec<Finding> = Vec::new();
+        for (pkg, f) in &foreign {
+            let total = own.get(pkg).copied().unwrap_or(0) + f;
+            let owners = sources.get(pkg).map(HashSet::len).unwrap_or(0);
+            if total >= 12 && (*f as f64 / total as f64) > 0.30 && owners >= 3 {
+                scatter.push(Finding {
+                    what: format!(
+                        "{:.0}% of its signature types belong to {owners} other crates",
+                        *f as f64 / total as f64 * 100.0
+                    ),
+                    file: pkg.to_string(),
+                    line: 0,
+                });
+            }
+        }
+
         // Ratios, which need no scale.
         let params: Vec<&Edge> = stream
             .edges
@@ -269,6 +344,53 @@ impl Metrics {
                     unproven.len() as f64 / targets.len() as f64
                 },
                 findings: unproven,
+            },
+        );
+
+        // --- modularity: a house standard, so the threshold is a parameter ---
+        let max_lines = config
+            .rules
+            .get("oversized-files")
+            .map(|r| r.param("max_lines", 1000.0))
+            .unwrap_or(1000.0) as u64;
+        let oversized: Vec<&(String, u64)> =
+            files.iter().filter(|(_, n)| *n > max_lines).collect();
+        values.insert(
+            "oversized-files".into(),
+            Measure {
+                value: oversized.len() as f64 / scale,
+                findings: oversized
+                    .iter()
+                    .map(|(path, n)| Finding {
+                        what: format!("{n} lines, over the {max_lines}-line standard"),
+                        file: path.clone(),
+                        line: 0,
+                    })
+                    .collect(),
+            },
+        );
+        let share_max = config
+            .rules
+            .get("oversized-line-share")
+            .map(|r| r.param("max_lines", 1000.0))
+            .unwrap_or(1000.0) as u64;
+        let in_big: u64 = files.iter().filter(|(_, n)| *n > share_max).map(|(_, n)| *n).sum();
+        values.insert(
+            "oversized-line-share".into(),
+            Measure {
+                value: if lines == 0 {
+                    0.0
+                } else {
+                    in_big as f64 / lines as f64
+                },
+                findings: Vec::new(),
+            },
+        );
+        values.insert(
+            "crate-type-scatter".into(),
+            Measure {
+                value: scatter.len() as f64 / scale,
+                findings: scatter,
             },
         );
 

@@ -38,6 +38,10 @@ impl std::fmt::Display for Origin {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Rule {
     pub category: String,
+    /// What the rule measures, in one line. Present so that a reader — human or
+    /// agent — can decide whether to change it without reading this source.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub describes: String,
     /// The most this rule can ever deduct.
     pub weight: f64,
     /// At or below this value, the rule deducts nothing.
@@ -46,6 +50,21 @@ pub struct Rule {
     pub full: f64,
     #[serde(default = "yes")]
     pub enabled: bool,
+    /// Knobs belonging to this rule alone — a line threshold, a ratio — as
+    /// distinct from weight and thresholds, which every rule has.
+    ///
+    /// These exist because some standards are a house style rather than a fact
+    /// about good code. File size is the clearest case: measured across ripgrep,
+    /// tokio, deno, deka and dsc, it tracks a project's habits and not its
+    /// quality, so cqx ships a lenient default and makes the knob obvious.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub params: BTreeMap<String, f64>,
+}
+
+impl Rule {
+    pub fn param(&self, name: &str, fallback: f64) -> f64 {
+        self.params.get(name).copied().unwrap_or(fallback)
+    }
 }
 
 fn yes() -> bool {
@@ -61,6 +80,8 @@ pub struct RulePatch {
     pub full: Option<f64>,
     pub enabled: Option<bool>,
     pub category: Option<String>,
+    #[serde(default)]
+    pub params: BTreeMap<String, f64>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -95,31 +116,49 @@ pub struct Config {
 /// per ten thousand lines of product code.
 pub fn defaults() -> BTreeMap<String, Rule> {
     let mut rules = BTreeMap::new();
-    let mut add = |id: &str, category: &str, weight: f64, free: f64, full: f64| {
+    let mut add = |id: &str, category: &str, weight: f64, free: f64, full: f64, describes: &str| {
         rules.insert(
             id.to_string(),
             Rule {
                 category: category.to_string(),
+                describes: describes.to_string(),
                 weight,
                 free,
                 full,
                 enabled: true,
+                params: BTreeMap::new(),
             },
         );
     };
     // Quality — reinvention and silencing.
-    add("result-string-density", "quality", 30.0, 1.0, 20.0);
-    add("broad-lint-silencing", "quality", 25.0, 0.3, 2.0);
-    add("duplicated-bodies", "quality", 10.0, 0.5, 3.0);
-    add("undocumented-suppressions", "quality", 10.0, 1.0, 6.0);
+    add("result-string-density", "quality", 30.0, 1.0, 20.0, "functions returning Result<_, String> instead of a real error type, per 10k lines");
+    add("broad-lint-silencing", "quality", 25.0, 0.3, 2.0, "crate-wide allow(clippy::all) or allow(warnings), per 10k lines");
+    add("duplicated-bodies", "quality", 10.0, 0.5, 3.0, "function bodies that are exact token copies of another, per 10k lines");
+    add("undocumented-suppressions", "quality", 10.0, 1.0, 6.0, "crate-level lint suppressions with no reason given, per 10k lines");
     // Containment — effects escaping the crate that should own them.
-    add("exit-in-library", "containment", 30.0, 1.0, 15.0);
+    add("exit-in-library", "containment", 30.0, 1.0, 15.0, "process::exit called from a library crate, per 10k lines");
     // Legibility — what the tool, and the next author, can follow.
-    add("bare-string-params", "legibility", 20.0, 0.12, 0.35);
-    add("unproven-spawn-targets", "legibility", 30.0, 0.2, 0.8);
+    add("bare-string-params", "legibility", 20.0, 0.12, 0.35, "share of parameters declared as a bare string rather than a domain type");
+    add("unproven-spawn-targets", "legibility", 30.0, 0.2, 0.8, "share of spawn and env targets the extractor could not resolve");
     // Security — reach that an attacker could steer.
-    add("env-controlled-spawn", "security", 30.0, 0.0, 2.0);
-    add("shell-invocation", "security", 20.0, 0.0, 1.0);
+    add("env-controlled-spawn", "security", 30.0, 0.0, 2.0, "spawn targets chosen by an environment variable, per 10k lines");
+    add("shell-invocation", "security", 20.0, 0.0, 1.0, "spawning a shell, which turns an argument into a command, per 10k lines");
+    // Modularity — house style, so the defaults are deliberately lenient.
+    //
+    // Across the five reference projects, files over 1000 lines run from 1.07
+    // per 10 kLOC (deka) to 3.04 (ripgrep) — the best-regarded codebase in the
+    // set is the one with the most large files. A default that condemned that
+    // would be wrong, so these begin to bite well above the field and the
+    // threshold is a parameter for teams whose standard is stricter.
+    add("oversized-files", "modularity", 25.0, 3.5, 12.0, "files longer than max_lines, per 10k lines — a house standard, not a fact");
+    add("oversized-line-share", "modularity", 15.0, 0.70, 0.95, "share of all lines living in files longer than max_lines");
+    add("crate-type-scatter", "modularity", 10.0, 0.20, 1.50, "crates whose signatures are mostly built from three or more other crates' types");
+    rules.get_mut("oversized-files").unwrap().params.insert("max_lines".into(), 1000.0);
+    rules
+        .get_mut("oversized-line-share")
+        .unwrap()
+        .params
+        .insert("max_lines".into(), 1000.0);
     rules
 }
 
@@ -188,6 +227,19 @@ impl Config {
                     touched = true;
                 }
             }
+            // CQX_RULE_OVERSIZED_FILES_PARAM_MAX_LINES=800
+            let names: Vec<String> = rule.params.keys().cloned().collect();
+            for name in names {
+                let pk = name.to_uppercase().replace('-', "_");
+                if let Some(raw) = std::env::var_os(format!("CQX_RULE_{key}_PARAM_{pk}")) {
+                    let v: f64 = raw
+                        .to_string_lossy()
+                        .parse()
+                        .map_err(|_| format!("CQX_RULE_{key}_PARAM_{pk} is not a number"))?;
+                    rule.params.insert(name, v);
+                    touched = true;
+                }
+            }
             if let Some(raw) = std::env::var_os(format!("CQX_RULE_{key}_ENABLED")) {
                 rule.enabled = matches!(
                     raw.to_string_lossy().to_ascii_lowercase().as_str(),
@@ -237,6 +289,9 @@ fn apply(rule: &mut Rule, patch: &RulePatch) {
     }
     if let Some(v) = &patch.category {
         rule.category = v.clone();
+    }
+    for (name, value) in &patch.params {
+        rule.params.insert(name.clone(), *value);
     }
 }
 

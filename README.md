@@ -227,3 +227,23 @@ previous commit.
 A commit's score can never change, so each one is written once and reread
 thereafter: twelve commits of a 75k-line workspace take 15 seconds cold and half
 a second warm.
+
+## Recalibrating
+
+Nothing here is a fact about good code; some of it is a house standard. File
+length is the clearest case — measured across ripgrep, tokio, deno, deka and dsc,
+it tracks a project's habits rather than its quality, and the best-regarded
+codebase in that set has the *most* large files. So cqx ships a lenient default
+and makes the knob obvious.
+
+```
+cqx config show                                  # or --json, for a reader that is not a person
+cqx config set oversized-files.max_lines 2500
+cqx config set oversized-line-share.enabled false
+```
+
+`config set` rewrites one field and leaves the rest of the file alone, checks the
+rule and field exist, and names the accepted fields when one does not. The
+effective configuration travels with every result — `score --json` and
+`history.json` both carry it — so anything rendering those shows the standards
+they were scored against rather than cqx's defaults.
