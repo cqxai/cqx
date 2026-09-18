@@ -1,6 +1,8 @@
 //! Scans a cargo workspace and emits facts.
 
 use std::collections::HashMap;
+
+use serde_json::Value;
 use std::io::Write;
 
 use cqx_schema::{Edge, EdgeKind, Evidence, Fact, Id, Node, NodeKind, Writer};
@@ -39,16 +41,43 @@ impl From<std::io::Error> for ExtractError {
     }
 }
 
-pub fn run(vfs: &Vfs, out: impl Write) -> Result<Stats, ExtractError> {
-    let metadata = manifest::read(vfs).map_err(ExtractError::Metadata)?;
-    let mut w = Writer::new(out);
-    w.fact(&Fact::header("rust", &vfs.label))?;
+/// A workspace parsed but not yet described.
+///
+/// The trees are the expensive part — both to produce and to hold — so they are
+/// produced once and kept. Splitting the work means splitting these: a reader
+/// given part of a snapshot parses its part, says what it found, and is told
+/// what everything else found before it writes anything down.
+pub struct Prepared {
+    metadata: Value,
+    /// Package name as it appears in `use` -> its node id, so an import of a
+    /// sibling crate resolves to that package rather than to an external.
+    known: HashMap<String, Id>,
+    per_package: Vec<(Id, Vec<ParsedFile>)>,
+    unparsed: Vec<String>,
+}
 
+/// Reads the manifests and parses every file the snapshot holds.
+pub fn prepare(vfs: &Vfs) -> Result<Prepared, ExtractError> {
+    let metadata = manifest::read(vfs).map_err(ExtractError::Metadata)?;
+    prepare_with(vfs, metadata)
+}
+
+/// The same, told in advance what the workspace contains.
+///
+/// Reading a workspace in pieces requires this. A manifest does not list every
+/// target it has — cargo finds `src/bin/*.rs` and `tests/*.rs` by looking — so
+/// a reader holding some of the sources discovers fewer targets than a reader
+/// holding all of them, and a file discovered under a different target is given
+/// a different module path. Splitting deka four ways produced
+/// `permissions::bridge_diff::main` where reading it whole produced
+/// `permissions::bin::bridge_diff::main`: the same function, two names, and a
+/// graph that depends on how the work was divided.
+///
+/// So the manifests are read once, against everything, and every reader is
+/// given the answer. They are small; it is the sources that are not.
+pub fn prepare_with(vfs: &Vfs, metadata: Value) -> Result<Prepared, ExtractError> {
     let packages = metadata["packages"].as_array().cloned().unwrap_or_default();
 
-    // Package name (underscored, as it appears in `use`) -> node id, so an
-    // import of a sibling crate resolves to that package rather than to an
-    // external.
     let mut known: HashMap<String, Id> = HashMap::new();
     for pkg in &packages {
         if let Some(name) = pkg["name"].as_str() {
@@ -56,24 +85,15 @@ pub fn run(vfs: &Vfs, out: impl Write) -> Result<Stats, ExtractError> {
         }
     }
 
-    let mut stats = Stats {
-        packages: 0,
-        files: 0,
-        nodes: 0,
-        edges: 0,
-        unparsed: Vec::new(),
-    };
-
-    // Parse the whole workspace before visiting any of it: a value's
-    // provenance routinely crosses a crate boundary.
     // Paths are relative to the snapshot throughout: there is no filesystem to
     // be absolute against.
     let pkg_dirs: Vec<String> = packages
         .iter()
         .filter_map(|p| p["manifest_path"].as_str().map(parent_of))
         .collect();
-    let mut per_package: Vec<(Id, Vec<ParsedFile>)> = Vec::new();
 
+    let mut per_package: Vec<(Id, Vec<ParsedFile>)> = Vec::new();
+    let mut unparsed: Vec<String> = Vec::new();
     for pkg in &packages {
         let Some(name) = pkg["name"].as_str() else {
             continue;
@@ -89,60 +109,111 @@ pub fn run(vfs: &Vfs, out: impl Write) -> Result<Stats, ExtractError> {
             .collect();
         let (parsed, failures) =
             prepass::parse_package(vfs, &source_roots(pkg, &pkg_dir), &nested);
-        stats.unparsed.extend(failures);
+        unparsed.extend(failures);
         per_package.push((Id::package(name), parsed));
     }
-    let all_files: Vec<&ParsedFile> = per_package.iter().flat_map(|(_, f)| f.iter()).collect();
-    let facts = PackageFacts::collect(&all_files);
-    drop(all_files);
 
-    for pkg in &packages {
-        let Some(name) = pkg["name"].as_str() else {
-            continue;
-        };
-        let manifest_path = pkg["manifest_path"].as_str().unwrap_or_default().to_string();
-        let pkg_dir = parent_of(&manifest_path);
-        let pkg_id = Id::package(name);
-        stats.packages += 1;
+    Ok(Prepared {
+        metadata,
+        known,
+        per_package,
+        unparsed,
+    })
+}
 
-        w.node(
-            Node::new(pkg_id.clone(), NodeKind::Package)
-                .attr("name", name)
-                .attr("version", pkg["version"].as_str().unwrap_or("")),
-        )?;
-
-        // Binary targets are the roots of the whole graph: reachability is
-        // measured from them, which is how real dead code gets found.
-        for target in pkg["targets"].as_array().into_iter().flatten() {
-            let kinds = target["kind"].as_array().cloned().unwrap_or_default();
-            let is_bin = kinds.iter().any(|k| k.as_str() == Some("bin"));
-            if !is_bin {
-                continue;
-            }
-            let bin_name = target["name"].as_str().unwrap_or(name);
-            let bin_id = Id(format!("bin:{bin_name}"));
-            w.node(Node::new(bin_id.clone(), NodeKind::Binary).attr("name", bin_name))?;
-            w.edge(Edge::new(EdgeKind::Contains, pkg_id.clone(), bin_id))?;
-        }
-
-        emit_dependencies(&mut w, &pkg_id, pkg, &manifest_path, vfs, &known)?;
-
-        let dir_id = Id::directory(&pkg_dir);
-        w.node(Node::new(dir_id.clone(), NodeKind::Directory).attr("path", pkg_dir.as_str()))?;
-        w.edge(Edge::new(EdgeKind::Contains, pkg_id.clone(), dir_id))?;
-
-        let Some((_, parsed)) = per_package.iter().find(|(id, _)| *id == pkg_id) else {
-            continue;
-        };
-        for file in parsed {
-            visit_file(&mut w, file, vfs, &pkg_id, &known, &facts);
-            stats.files += 1;
-        }
+impl Prepared {
+    /// What these files say, before anything is followed across the workspace.
+    ///
+    /// Read in the order the files were parsed, so two of these merged in that
+    /// same order hold what one pass over all of them would.
+    pub fn gathered(&self) -> PackageFacts {
+        let all: Vec<&ParsedFile> = self.per_package.iter().flat_map(|(_, f)| f.iter()).collect();
+        PackageFacts::gather(&all)
     }
 
-    stats.nodes = w.nodes;
-    stats.edges = w.edges;
-    Ok(stats)
+    /// Writes out everything these trees contain.
+    ///
+    /// `facts` is what the whole workspace said, not only this part of it: a
+    /// value's provenance routinely crosses a crate boundary, so a reader
+    /// holding one slice still resolves against all of them.
+    pub fn emit<W: Write>(
+        &self,
+        vfs: &Vfs,
+        facts: &PackageFacts,
+        out: W,
+    ) -> Result<Stats, ExtractError> {
+        let mut w = Writer::new(out);
+        w.fact(&Fact::header("rust", &vfs.label))?;
+
+        let mut stats = Stats {
+            packages: 0,
+            files: 0,
+            nodes: 0,
+            edges: 0,
+            unparsed: self.unparsed.clone(),
+        };
+
+        let packages = self.metadata["packages"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+
+        for pkg in &packages {
+            let Some(name) = pkg["name"].as_str() else {
+                continue;
+            };
+            let manifest_path = pkg["manifest_path"].as_str().unwrap_or_default().to_string();
+            let pkg_dir = parent_of(&manifest_path);
+            let pkg_id = Id::package(name);
+            stats.packages += 1;
+
+            w.node(
+                Node::new(pkg_id.clone(), NodeKind::Package)
+                    .attr("name", name)
+                    .attr("version", pkg["version"].as_str().unwrap_or("")),
+            )?;
+
+            // Binary targets are the roots of the whole graph: reachability is
+            // measured from them, which is how real dead code gets found.
+            for target in pkg["targets"].as_array().into_iter().flatten() {
+                let kinds = target["kind"].as_array().cloned().unwrap_or_default();
+                let is_bin = kinds.iter().any(|k| k.as_str() == Some("bin"));
+                if !is_bin {
+                    continue;
+                }
+                let bin_name = target["name"].as_str().unwrap_or(name);
+                let bin_id = Id(format!("bin:{bin_name}"));
+                w.node(Node::new(bin_id.clone(), NodeKind::Binary).attr("name", bin_name))?;
+                w.edge(Edge::new(EdgeKind::Contains, pkg_id.clone(), bin_id))?;
+            }
+
+            emit_dependencies(&mut w, &pkg_id, pkg, &manifest_path, vfs, &self.known)?;
+
+            let dir_id = Id::directory(&pkg_dir);
+            w.node(Node::new(dir_id.clone(), NodeKind::Directory).attr("path", pkg_dir.as_str()))?;
+            w.edge(Edge::new(EdgeKind::Contains, pkg_id.clone(), dir_id))?;
+
+            let Some((_, parsed)) = self.per_package.iter().find(|(id, _)| *id == pkg_id) else {
+                continue;
+            };
+            for file in parsed {
+                visit_file(&mut w, file, vfs, &pkg_id, &self.known, facts);
+                stats.files += 1;
+            }
+        }
+
+        stats.nodes = w.nodes;
+        stats.edges = w.edges;
+        Ok(stats)
+    }
+}
+
+/// Reads a whole snapshot, in one pass, by itself.
+pub fn run(vfs: &Vfs, out: impl Write) -> Result<Stats, ExtractError> {
+    let prepared = prepare(vfs)?;
+    let mut facts = prepared.gathered();
+    facts.resolve();
+    prepared.emit(vfs, &facts, out)
 }
 
 fn visit_file<W: Write>(

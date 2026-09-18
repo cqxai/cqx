@@ -266,8 +266,27 @@ pub struct Writer<W: std::io::Write> {
     /// nothing new — and a duplicated containment edge multiplies every path
     /// through it when the stream is walked as a graph.
     seen_structural: std::collections::HashSet<(EdgeKind, Id, Id)>,
+    /// An edge that carries evidence can still be asserted twice. Evidence is a
+    /// line range, not a column, so two calls on one line produce the same fact
+    /// — `fs::metadata(src)` and `fs::metadata(dest)` in one `match` is the
+    /// case that found this. Said twice, it is still one thing known.
+    ///
+    /// Held as hashes rather than as the facts themselves: a large repository
+    /// has hundreds of thousands of edges, and keeping each one's text to
+    /// compare against would cost more than the stream it is writing.
+    seen_witnessed: std::collections::HashSet<u64>,
     pub nodes: usize,
     pub edges: usize,
+}
+
+/// A fixed-key hash, so two runs over one snapshot agree. The standard
+/// hasher a `HashSet` reaches for is seeded per process, which would make what
+/// is written depend on when it was written.
+fn digest(text: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    text.hash(&mut hasher);
+    hasher.finish()
 }
 
 impl<W: std::io::Write> Writer<W> {
@@ -276,6 +295,7 @@ impl<W: std::io::Write> Writer<W> {
             out,
             seen_nodes: std::collections::HashSet::new(),
             seen_structural: std::collections::HashSet::new(),
+            seen_witnessed: std::collections::HashSet::new(),
             nodes: 0,
             edges: 0,
         }
@@ -295,14 +315,24 @@ impl<W: std::io::Write> Writer<W> {
     }
 
     pub fn edge(&mut self, edge: Edge) -> std::io::Result<()> {
-        if edge.ev.is_empty()
-            && !self
+        if edge.ev.is_empty() {
+            if !self
                 .seen_structural
                 .insert((edge.kind, edge.from.clone(), edge.to.clone()))
-        {
+            {
+                return Ok(());
+            }
+            self.edges += 1;
+            return self.fact(&Fact::Edge(edge));
+        }
+        // Written once to be compared, then written out, rather than rendered
+        // twice.
+        let line = serde_json::to_string(&Fact::Edge(edge))?;
+        if !self.seen_witnessed.insert(digest(&line)) {
             return Ok(());
         }
         self.edges += 1;
-        self.fact(&Fact::Edge(edge))
+        self.out.write_all(line.as_bytes())?;
+        self.out.write_all(b"\n")
     }
 }
