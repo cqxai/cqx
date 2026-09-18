@@ -1,5 +1,9 @@
 # cqx — CodeQuality Explorer
 
+<p align="left">
+  <img src="image.png" alt="CQX Screenshot" width="70%">
+</p>
+
 A queryable graph of a codebase: what it contains, what it touches, and what
 crosses its boundaries — and a **CodeQuality Score** derived from it.
 
@@ -14,7 +18,7 @@ It is two halves, and they are deliberately separable:
 
 1. **The index** — scan → facts → queryable graph. Runs in CI, answers questions
    in milliseconds, and can fail a build when a new boundary gets crossed.
-2. **The explorer** — a web view over that same graph. 2D first; 3D later.
+2. **The explorer** — a web view over that same graph.
 
 The index is useful with no UI at all. That is on purpose: the UI is how you
 explore a codebase, the index is how you defend one.
@@ -35,12 +39,6 @@ corrected two wrong assumptions: large files turn out to be normal in Rust
 (ripgrep keeps 81% of its lines in files over 500), and raw `unsafe` counts
 measure a project's domain rather than its discipline (tokio and deno carry an
 order of magnitude more than a CLI does).
-
-## Status
-
-Early, and nothing here is stable yet. The Rust extractor lands first; the schema
-is language-agnostic from the first commit so other extractors slot in without
-touching the core.
 
 ## The model
 
