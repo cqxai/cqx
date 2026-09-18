@@ -144,3 +144,49 @@ pub unsafe extern "C" fn cqx_score(config: *const u8, config_len: usize) -> *mut
         Err(e) => serde_json::json!({ "error": e }).to_string(),
     })
 }
+
+/// Builds the full dataset for the snapshot: the score, and the facts folded
+/// into the shape an explorer renders.
+///
+/// The same function the exporter calls, so a commit analysed here and a commit
+/// analysed in CI cannot disagree.
+///
+/// # Safety
+/// Both pointers must reference that many bytes of valid UTF-8. `repo` names
+/// the repository — `<org>/<repo>` — and `config` is a cqx.json, or empty.
+#[no_mangle]
+pub unsafe extern "C" fn cqx_dataset(
+    repo: *const u8,
+    repo_len: usize,
+    config: *const u8,
+    config_len: usize,
+) -> *mut u8 {
+    let repo = borrow(repo, repo_len);
+    let config_text = borrow(config, config_len);
+    let result = SNAPSHOT.with(|s| -> Result<String, String> {
+        let vfs = s.borrow();
+        let mut facts = Vec::new();
+        cqx_rust::extract::run(&vfs, &mut facts).map_err(|e| e.to_string())?;
+        let stream = cqx_store::facts::Stream::from_ndjson(&String::from_utf8_lossy(&facts));
+        let config = cqx_score::config::Config::from_text(if config_text.trim().is_empty() {
+            None
+        } else {
+            Some(config_text.as_str())
+        })?;
+        let metrics = cqx_score::metrics::Metrics::compute(&stream, &config);
+        let report = cqx_score::report_json(&config, &metrics);
+        // A browser has one commit in hand and no git: the timeline it shows
+        // comes from the index it already fetched, not from in here.
+        let meta = cqx_view::Meta {
+            repo: repo.as_str(),
+            branch: "",
+            remote: None,
+            commits_url: None,
+        };
+        Ok(cqx_view::dataset(&stream, report, serde_json::json!([]), &meta).to_string())
+    });
+    respond(match result {
+        Ok(json) => json,
+        Err(e) => serde_json::json!({ "error": e }).to_string(),
+    })
+}
