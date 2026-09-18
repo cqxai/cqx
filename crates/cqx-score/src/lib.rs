@@ -362,8 +362,8 @@ fn explain(config: &Config) {
         None => println!("configuration: built-in defaults (no cqx.json found)"),
     }
     println!(
-        "\n{:<26}{:<13}{:>8}{:>8}{:>8}   {}",
-        "rule", "category", "weight", "free", "full", "from"
+        "\n{:<26}{:<13}{:>8}{:>8}{:>8}   from",
+        "rule", "category", "weight", "free", "full"
     );
     for (id, rule) in &config.rules {
         let origin = config.origins.get(id).copied().unwrap_or(Origin::Default);

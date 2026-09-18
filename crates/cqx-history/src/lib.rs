@@ -64,9 +64,11 @@ pub struct History {
     /// The origin remote as a browsable https URL, if there is one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub remote: Option<String>,
-    /// Where a reader can see the full history. Only set for hosts whose path
-    /// layout is known — guessing one produces a link that 404s, which is worse
-    /// than no link.
+    /// Where a reader can see the full history. Points at the repository's own
+    /// history page rather than a specific branch: a branch URL goes stale the
+    /// moment the branch is deleted, and the branch itself is recorded above for
+    /// anyone who needs it. Only set for hosts whose path layout is known —
+    /// guessing one produces a link that 404s, which is worse than no link.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub commits_url: Option<String>,
     pub generated: String,
@@ -81,6 +83,7 @@ pub struct History {
     pub commits: Vec<CommitScore>,
 }
 
+/// Detached head has no branch name; say so rather than inventing one.
 fn branch_name(repo: &Path) -> String {
     git(repo, &["rev-parse", "--abbrev-ref", "HEAD"])
         .map(|s| s.trim().to_string())
@@ -109,15 +112,12 @@ fn remote_url(repo: &Path) -> Option<String> {
     Some(normalised)
 }
 
-/// The path to a branch's history, for hosts whose layout is known.
-fn commits_url(remote: &str, branch: &str) -> Option<String> {
-    if branch == "detached" || branch == "unknown" {
-        return None;
-    }
+/// The path to a repository's history, for hosts whose layout is known.
+fn commits_url(remote: &str) -> Option<String> {
     if remote.contains("github.com") {
-        Some(format!("{remote}/commits/{branch}"))
+        Some(format!("{remote}/commits/"))
     } else if remote.contains("gitlab.com") {
-        Some(format!("{remote}/-/commits/{branch}"))
+        Some(format!("{remote}/-/commits/"))
     } else {
         None
     }
@@ -316,11 +316,8 @@ fn run(context: &Context) -> Result<(), String> {
         repo: repo.display().to_string(),
         // Detached head has no branch name; say so rather than inventing one.
         remote: remote_url(&repo),
-        commits_url: remote_url(&repo).and_then(|u| commits_url(&u, &branch_name(&repo))),
-        branch: git(&repo, &["rev-parse", "--abbrev-ref", "HEAD"])
-            .map(|s| s.trim().to_string())
-            .map(|b| if b == "HEAD" { "detached".to_string() } else { b })
-            .unwrap_or_else(|_| "unknown".to_string()),
+        commits_url: remote_url(&repo).and_then(|u| commits_url(&u)),
+        branch: branch_name(&repo),
         generated: git(&repo, &["show", "-s", "--format=%aI", "HEAD"])?
             .trim()
             .to_string(),
