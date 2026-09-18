@@ -102,10 +102,12 @@ name = "cqx-rust"
 version = "0.1.4"
 dependencies = [
  "cqx-schema",
+ "cqx-store",
  "cqx-vfs",
  "deka-cli-core",
  "proc-macro2",
  "quote",
+ "serde",
  "serde_json",
  "syn 2.0.119",
  "toml",

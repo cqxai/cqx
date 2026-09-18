@@ -6,7 +6,7 @@
 
 pub mod extract;
 pub mod manifest;
-mod prepass;
+pub mod prepass;
 mod visit;
 
 use std::path::PathBuf;
