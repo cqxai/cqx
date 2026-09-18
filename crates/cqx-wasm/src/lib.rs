@@ -350,6 +350,33 @@ pub unsafe extern "C" fn cqx_emit(shared: *const u8, shared_len: usize) -> *mut 
     })
 }
 
+/// Attaches the source line to every finding whose file this reader holds.
+///
+/// The sharded path has nowhere else to do this. One reader holds a slice of
+/// the sources and the coordinator holds none of them, so the report goes
+/// round the readers in turn and each fills in the findings it can answer for.
+/// It is the same function the exporter and the single reader call, so a
+/// finding shows the same line however the work was divided.
+///
+/// # Safety
+/// `report` must point to `report_len` bytes of valid UTF-8: a score report,
+/// or one already passed through another reader.
+#[no_mangle]
+pub unsafe extern "C" fn cqx_quote(report: *const u8, report_len: usize) -> *mut u8 {
+    let text = borrow(report, report_len);
+    let result = SNAPSHOT.with(|s| -> Result<String, String> {
+        let mut report: serde_json::Value =
+            serde_json::from_str(&text).map_err(|e| format!("report: {e}"))?;
+        let vfs = s.borrow();
+        cqx_view::quote(&mut report, &|path| vfs.read(path).map(str::to_string));
+        Ok(report.to_string())
+    });
+    respond(match result {
+        Ok(json) => json,
+        Err(e) => serde_json::json!({ "error": e }).to_string(),
+    })
+}
+
 /// Starts a fresh union.
 #[no_mangle]
 pub extern "C" fn cqx_merge_reset() {
