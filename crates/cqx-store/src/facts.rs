@@ -15,15 +15,21 @@ pub struct Stream {
 
 impl Stream {
     pub fn load(path: &Path) -> std::io::Result<Stream> {
-        use std::io::BufRead;
-        let file = std::fs::File::open(path)?;
+        Ok(Stream::from_ndjson(&std::fs::read_to_string(path)?))
+    }
+
+    /// Parses a fact stream from text.
+    ///
+    /// The only form that exists in a browser, where there is no path to read
+    /// from — and the form `load` is written in terms of, so there is one
+    /// parser rather than two.
+    pub fn from_ndjson(text: &str) -> Stream {
         let mut stream = Stream::default();
-        for line in std::io::BufReader::new(file).lines() {
-            let line = line?;
+        for line in text.lines() {
             if line.trim().is_empty() {
                 continue;
             }
-            match serde_json::from_str::<Fact>(&line) {
+            match serde_json::from_str::<Fact>(line) {
                 Ok(Fact::Header { schema, root, .. }) => {
                     stream.schema = schema;
                     stream.root = root;
@@ -35,7 +41,7 @@ impl Stream {
                 Err(_) => continue,
             }
         }
-        Ok(stream)
+        stream
     }
 
     pub fn report(&self) {
