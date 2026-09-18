@@ -12,4 +12,5 @@ deka-cli-core = { workspace = true }
 serde_json = { workspace = true }
 syn = { workspace = true }
 proc-macro2 = { workspace = true }
+quote = { workspace = true }
 walkdir = { workspace = true }

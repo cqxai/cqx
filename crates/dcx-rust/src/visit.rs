@@ -9,6 +9,7 @@ use std::collections::HashMap;
 
 use dcx_schema::{Edge, EdgeKind, Evidence, Id, Node, NodeKind, Writer};
 use proc_macro2::Span;
+use quote::ToTokens;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 
@@ -127,6 +128,74 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
     /// Test code is tagged rather than dropped: a spawn in a test is a real
     /// fact about the repository, it is just not a fact about the product, and
     /// a query that cannot tell them apart reports numbers nobody can act on.
+    /// Declares a referenced type and returns its id.
+    fn type_node(&mut self, ty: &syn::Type) -> Id {
+        let text = type_text(ty);
+        let id = Id::type_ref(&text);
+        let _ = self
+            .out
+            .node(Node::new(id.clone(), NodeKind::Type).attr("text", text.as_str()));
+        id
+    }
+
+    /// Records a function's declared parameters and return type.
+    ///
+    /// A signature is a promise the compiler already checked, so reading it
+    /// needs no inference — which is why `fn f(a: &str, b: &str)` can be called
+    /// out as a swap hazard without knowing anything about `a` or `b`.
+    fn emit_signature(&mut self, symbol: &Id, sig: &syn::Signature) {
+        for (position, input) in sig.inputs.iter().enumerate() {
+            let syn::FnArg::Typed(typed) = input else {
+                continue; // `self` carries no declared type of interest
+            };
+            let name = match &*typed.pat {
+                syn::Pat::Ident(ident) => ident.ident.to_string(),
+                _ => "_".to_string(),
+            };
+            let ty = self.type_node(&typed.ty);
+            let ev = self.evidence(typed.span());
+            let _ = self.out.edge(
+                Edge::new(EdgeKind::Param, symbol.clone(), ty)
+                    .attr("name", name)
+                    .attr("position", position as u64)
+                    .evidence(ev),
+            );
+        }
+        if let syn::ReturnType::Type(_, ty) = &sig.output {
+            let id = self.type_node(ty);
+            let ev = self.evidence(ty.span());
+            let _ = self
+                .out
+                .edge(Edge::new(EdgeKind::Returns, symbol.clone(), id).evidence(ev));
+        }
+    }
+
+    /// Records a type's declared fields, so two types can be compared by shape
+    /// and one concept's many spellings can be counted.
+    fn emit_fields(&mut self, symbol: &Id, name: &str, fields: &syn::Fields) {
+        let owner = Id::type_ref(name);
+        let _ = self
+            .out
+            .node(Node::new(owner.clone(), NodeKind::Type).attr("text", name));
+        let _ = self
+            .out
+            .edge(Edge::new(EdgeKind::Defines, symbol.clone(), owner.clone()));
+        for (position, field) in fields.iter().enumerate() {
+            let field_name = field
+                .ident
+                .as_ref()
+                .map(|i| i.to_string())
+                .unwrap_or_else(|| position.to_string());
+            let ty = self.type_node(&field.ty);
+            let ev = self.evidence(field.span());
+            let _ = self.out.edge(
+                Edge::new(EdgeKind::HasField, owner.clone(), ty)
+                    .attr("name", field_name)
+                    .evidence(ev),
+            );
+        }
+    }
+
     fn effect(&mut self, kind: EdgeKind, to: Id, op: &str, span: Span) {
         let from = self.container();
         let ev = self.evidence(span);
@@ -173,6 +242,30 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
     }
 }
 
+/// Renders a declared type as normalised source text, so that two spellings of
+/// the same type compare equal.
+fn type_text(ty: &syn::Type) -> String {
+    let raw = ty.to_token_stream().to_string();
+    let mut out = String::with_capacity(raw.len());
+    let mut prev = ' ';
+    for ch in raw.chars() {
+        if ch == ' ' {
+            prev = ch;
+            continue;
+        }
+        // keep a space only where removing it would join two identifiers
+        if prev == ' ' && !out.is_empty() {
+            let last = out.chars().last().unwrap_or(' ');
+            if (last.is_alphanumeric() || last == '_') && (ch.is_alphanumeric() || ch == '_') {
+                out.push(' ');
+            }
+        }
+        out.push(ch);
+        prev = ch;
+    }
+    out
+}
+
 /// Renders an expression's callee as a dotted path, e.g. `std::process::exit`.
 /// Returns `None` for calls we cannot name syntactically (closures, fields).
 fn callee_path(expr: &syn::Expr) -> Option<String> {
@@ -204,6 +297,7 @@ fn first_string_arg(args: &syn::punctuated::Punctuated<syn::Expr, syn::Token![,]
 impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
     fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
         let id = self.emit_symbol(&node.sig.ident.to_string(), "fn", node.span());
+        self.emit_signature(&id, &node.sig);
         if node.sig.unsafety.is_some() {
             let ev = self.evidence(node.sig.span());
             let _ = self.out.edge(
@@ -219,6 +313,7 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
 
     fn visit_impl_item_fn(&mut self, node: &'ast syn::ImplItemFn) {
         let id = self.emit_symbol(&node.sig.ident.to_string(), "method", node.span());
+        self.emit_signature(&id, &node.sig);
         if node.sig.unsafety.is_some() {
             let ev = self.evidence(node.sig.span());
             let _ = self.out.edge(
@@ -233,12 +328,25 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
     }
 
     fn visit_item_struct(&mut self, node: &'ast syn::ItemStruct) {
-        self.emit_symbol(&node.ident.to_string(), "struct", node.span());
+        let id = self.emit_symbol(&node.ident.to_string(), "struct", node.span());
+        let name = node.ident.to_string();
+        self.emit_fields(&id, &name, &node.fields);
         syn::visit::visit_item_struct(self, node);
     }
 
     fn visit_item_enum(&mut self, node: &'ast syn::ItemEnum) {
-        self.emit_symbol(&node.ident.to_string(), "enum", node.span());
+        let id = self.emit_symbol(&node.ident.to_string(), "enum", node.span());
+        let name = node.ident.to_string();
+        let owner = Id::type_ref(&name);
+        let _ = self
+            .out
+            .node(Node::new(owner.clone(), NodeKind::Type).attr("text", name.as_str()));
+        let _ = self
+            .out
+            .edge(Edge::new(EdgeKind::Defines, id.clone(), owner));
+        for variant in &node.variants {
+            self.emit_fields(&id, &format!("{name}::{}", variant.ident), &variant.fields);
+        }
         syn::visit::visit_item_enum(self, node);
     }
 
