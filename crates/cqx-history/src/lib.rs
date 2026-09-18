@@ -57,6 +57,10 @@ pub struct CommitScore {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct History {
     pub repo: String,
+    /// The branch that was walked. Recorded rather than assumed: a reader that
+    /// prints "commits to main" is wrong on every repository using master, and
+    /// on every one scored from a feature branch.
+    pub branch: String,
     pub generated: String,
     /// The configuration every commit here was scored with, so a reader shows
     /// the project's own standards rather than cqx's defaults — and can say
@@ -260,6 +264,11 @@ fn run(context: &Context) -> Result<(), String> {
     let history = History {
         config: cqx_score::config_json(&config),
         repo: repo.display().to_string(),
+        // Detached head has no branch name; say so rather than inventing one.
+        branch: git(&repo, &["rev-parse", "--abbrev-ref", "HEAD"])
+            .map(|s| s.trim().to_string())
+            .map(|b| if b == "HEAD" { "detached".to_string() } else { b })
+            .unwrap_or_else(|_| "unknown".to_string()),
         generated: git(&repo, &["show", "-s", "--format=%aI", "HEAD"])?
             .trim()
             .to_string(),
