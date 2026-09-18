@@ -68,6 +68,14 @@ pub fn run(root: &Path, out: impl Write) -> Result<Stats, ExtractError> {
 
     // Parse the whole workspace before visiting any of it: a value's
     // provenance routinely crosses a crate boundary.
+    let pkg_dirs: Vec<PathBuf> = packages
+        .iter()
+        .filter_map(|p| {
+            Path::new(p["manifest_path"].as_str()?)
+                .parent()
+                .map(Path::to_path_buf)
+        })
+        .collect();
     let mut per_package: Vec<(Id, Vec<ParsedFile>)> = Vec::new();
 
     for pkg in &packages {
@@ -78,7 +86,20 @@ pub fn run(root: &Path, out: impl Write) -> Result<Stats, ExtractError> {
         let Some(pkg_dir) = manifest.parent() else {
             continue;
         };
-        let (parsed, failures) = prepass::parse_package(pkg_dir, &root);
+        // A package owns its directory minus any package nested inside it:
+        // deno has eleven such pairs, and dropping the parent outright lost 442
+        // files while keeping it stole them from their real owner.
+        let nested: Vec<PathBuf> = pkg_dirs
+            .iter()
+            .filter(|o| o.as_path() != pkg_dir && o.starts_with(pkg_dir))
+            .cloned()
+            .collect();
+        let (parsed, failures) = prepass::parse_package(
+            pkg_dir,
+            &root,
+            &source_roots(pkg, pkg_dir),
+            &nested,
+        );
         stats.unparsed.extend(failures);
         per_package.push((Id::package(name), parsed));
     }
@@ -184,6 +205,44 @@ fn visit_file<W: Write>(
         facts,
     );
     syn::visit::Visit::visit_file(&mut visitor, &file.parsed);
+}
+
+/// The directories a package's sources actually live in, taken from its
+/// declared targets. Falls back to `src/` only when a manifest declares nothing.
+fn source_roots(pkg: &serde_json::Value, pkg_dir: &Path) -> Vec<(PathBuf, bool)> {
+    let mut roots: Vec<(PathBuf, bool)> = Vec::new();
+    for target in pkg["targets"].as_array().into_iter().flatten() {
+        let Some(src) = target["src_path"].as_str() else {
+            continue;
+        };
+        let Some(dir) = Path::new(src).parent() else {
+            continue;
+        };
+        let kinds = target["kind"].as_array().cloned().unwrap_or_default();
+        // A build script commonly sits at the repository root, which would make
+        // the whole repository this package's source root and parse every other
+        // crate a second time under the wrong name.
+        if kinds.iter().any(|k| k.as_str() == Some("custom-build")) {
+            continue;
+        }
+        let is_test = kinds
+            .iter()
+            .any(|k| matches!(k.as_str(), Some("test") | Some("bench") | Some("example")));
+        let entry = (dir.to_path_buf(), is_test);
+        if !roots.iter().any(|(d, _)| d == &entry.0) {
+            roots.push(entry);
+        }
+    }
+    for extra in ["tests", "benches"] {
+        let dir = pkg_dir.join(extra);
+        if dir.is_dir() && !roots.iter().any(|(d, _)| d == &dir) {
+            roots.push((dir, true));
+        }
+    }
+    if roots.is_empty() {
+        roots.push((pkg_dir.join("src"), false));
+    }
+    roots
 }
 
 /// `src/foo/bar.rs` -> `foo::bar`; `src/lib.rs`, `src/main.rs` and

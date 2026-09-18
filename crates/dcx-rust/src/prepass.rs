@@ -7,7 +7,7 @@
 //! not a question about the type system.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use syn::visit::Visit;
 
@@ -245,11 +245,21 @@ pub struct ParsedFile {
 
 /// Parses every `.rs` file under a package's source roots once, so both passes
 /// read the same trees instead of parsing twice.
-pub fn parse_package(pkg_dir: &Path, root: &Path) -> (Vec<ParsedFile>, Vec<String>) {
+///
+/// `roots` comes from the manifest's own targets rather than an assumed `src/`.
+/// Not every workspace uses that layout — deno declares `ext/fs/lib.rs` — and
+/// assuming it silently reported 81 packages holding 93 files.
+pub fn parse_package(
+    pkg_dir: &Path,
+    root: &Path,
+    roots: &[(PathBuf, bool)],
+    nested: &[PathBuf],
+) -> (Vec<ParsedFile>, Vec<String>) {
     let mut parsed = Vec::new();
     let mut failures = Vec::new();
-    for src_root in ["src", "tests", "benches"] {
-        let dir = pkg_dir.join(src_root);
+    let mut seen: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
+    let _ = pkg_dir;
+    for (dir, is_test) in roots {
         if !dir.is_dir() {
             continue;
         }
@@ -262,6 +272,12 @@ pub fn parse_package(pkg_dir: &Path, root: &Path) -> (Vec<ParsedFile>, Vec<Strin
             if path.extension().and_then(|e| e.to_str()) != Some("rs") {
                 continue;
             }
+            if nested.iter().any(|n| path.starts_with(n)) {
+                continue; // belongs to a package nested inside this one
+            }
+            if !seen.insert(path.to_path_buf()) {
+                continue; // two roots can overlap; a file belongs to one package once
+            }
             let rel = crate::extract::rel(root, path);
             match std::fs::read_to_string(path).map_err(|e| e.to_string()).and_then(
                 |source| syn::parse_file(&source).map_err(|e| e.to_string()),
@@ -270,7 +286,7 @@ pub fn parse_package(pkg_dir: &Path, root: &Path) -> (Vec<ParsedFile>, Vec<Strin
                     module_prefix: crate::extract::module_prefix(&dir, path),
                     rel_path: rel,
                     parsed: file,
-                    test_role: src_root != "src",
+                    test_role: *is_test,
                 }),
                 Err(e) => failures.push(format!("{rel}: {e}")),
             }
