@@ -1,0 +1,54 @@
+name: release
+
+# Tagging cuts a release and attaches the artefacts other things build against.
+# cqx-web fetches the wasm module by pinned version rather than carrying a
+# binary in git, so updating it is a one-line, reviewable diff.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (must already exist)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  artefacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+
+      # The analysis, for a browser or any other wasm host.
+      - name: Build cqx_wasm.wasm
+        run: cargo build --locked --release --target wasm32-unknown-unknown -p cqx-wasm
+
+      # And the command line tool, for CI and for a terminal.
+      - name: Build cqx
+        run: cargo build --locked --release -p cqx
+
+      - name: Collect
+        run: |
+          mkdir -p artefacts
+          cp target/wasm32-unknown-unknown/release/cqx_wasm.wasm artefacts/ 2>/dev/null \
+            || cp .target/wasm32-unknown-unknown/release/cqx_wasm.wasm artefacts/
+          cp target/release/cqx artefacts/cqx-linux-x86_64 2>/dev/null \
+            || cp .target/release/cqx artefacts/cqx-linux-x86_64
+          cd artefacts && sha256sum * > SHA256SUMS && cat SHA256SUMS
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 \
+            || gh release create "$TAG" --title "$TAG" --generate-notes
+          gh release upload "$TAG" artefacts/* --clobber
