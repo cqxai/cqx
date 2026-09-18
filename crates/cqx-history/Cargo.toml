@@ -9,6 +9,7 @@ description = "Scores a repository commit by commit."
 [dependencies]
 cqx-rust = { path = "../cqx-rust" }
 cqx-schema = { workspace = true }
+cqx-vfs = { workspace = true }
 cqx-score = { path = "../cqx-score" }
 cqx-store = { path = "../cqx-store" }
 deka-cli-core = { workspace = true }

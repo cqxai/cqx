@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/cqx", "crates/cqx-rust", "crates/cqx-schema", "crates/cqx-history", "crates/cqx-score", "crates/cqx-store"]
+members = ["crates/cqx", "crates/cqx-rust", "crates/cqx-schema", "crates/cqx-history", "crates/cqx-score", "crates/cqx-store", "crates/cqx-vfs"]
 exclude = ["fixtures"]
 
 [workspace.package]
@@ -11,6 +11,8 @@ repository = "https://github.com/samifouad/cqx"
 
 [workspace.dependencies]
 cqx-schema = { path = "crates/cqx-schema" }
+cqx-vfs = { path = "crates/cqx-vfs" }
+toml = "0.8"
 deka-cli-core = { version = "0.5", default-features = false, features = ["registry"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

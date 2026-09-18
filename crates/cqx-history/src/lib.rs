@@ -253,7 +253,9 @@ fn run(context: &Context) -> Result<(), String> {
             materialise(&repo, sha, &scratch)?;
             let facts_path = out_dir.join(format!("{}.ndjson", &sha[..12]));
             let file = std::fs::File::create(&facts_path).map_err(|e| format!("{e}"))?;
-            let stats = cqx_rust::extract::run(&scratch, std::io::BufWriter::new(file))
+            let snapshot = cqx_vfs::from_dir(&scratch)
+                .map_err(|e| format!("{sha}: {e}"))?;
+            let stats = cqx_rust::extract::run(&snapshot, std::io::BufWriter::new(file))
                 .map_err(|e| format!("{sha}: {e}"))?;
             let _ = stats;
             let stream = cqx_store::facts::Stream::load(&facts_path)
