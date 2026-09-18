@@ -119,3 +119,37 @@ pub fn find(id: &str) -> Result<Widget, String> { let _ = id; Err(String::new())
     assert_eq!(widget["pkg"], "widget");
     assert_eq!(widget["fields"][0][0], "id");
 }
+
+#[test]
+fn a_workspace_below_the_root_is_still_found() {
+    // vercel-labs/agent-browser: a repository most of the way Rust, whose Rust
+    // lives in cli/ beside a web application. Refusing to look below the root
+    // reported it as having none.
+    let data = analyse(&[
+        ("package.json", "{}"),
+        ("cli/Cargo.toml", MANIFEST),
+        ("cli/src/lib.rs", "pub fn nothing() {}\n"),
+    ]);
+    assert_eq!(data["packages"][0]["name"], "widget");
+    // Repo-relative, not rebased: a finding has to point at a path someone can
+    // open in the repository it came from.
+    assert_eq!(data["files"][0]["path"], "cli/src/lib.rs");
+}
+
+#[test]
+fn the_shallowest_manifest_wins_and_a_workspace_beats_a_package() {
+    let workspace = r#"
+[workspace]
+members = ["inner"]
+"#;
+    let data = analyse(&[
+        ("tools/one/Cargo.toml", MANIFEST),
+        ("tools/one/src/lib.rs", "pub fn a() {}\n"),
+        ("rust/Cargo.toml", workspace),
+        ("rust/inner/Cargo.toml", MANIFEST),
+        ("rust/inner/src/lib.rs", "pub fn b() {}\n"),
+    ]);
+    // rust/ is shallower than tools/one, and names a member besides.
+    assert_eq!(data["files"][0]["path"], "rust/inner/src/lib.rs");
+    assert_eq!(data["files"].as_array().expect("files").len(), 1);
+}

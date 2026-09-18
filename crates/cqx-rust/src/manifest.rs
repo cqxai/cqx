@@ -14,13 +14,53 @@ use std::collections::BTreeMap;
 use cqx_vfs::Vfs;
 use serde_json::{json, Value};
 
+/// Where the workspace begins.
+///
+/// Usually the root of the snapshot. A repository that keeps its Rust in a
+/// subdirectory — a command-line tool beside a web application, one crate in a
+/// monorepo — keeps it somewhere else, and refusing to look is how a repository
+/// that is most of the way Rust reports nothing at all.
+///
+/// The shallowest manifest wins, and a workspace root beats a bare package at
+/// the same depth: a workspace names its members, so starting there reaches
+/// more than starting inside one of them. Ties break on the name, so two runs
+/// over one snapshot cannot disagree.
+///
+/// This will sometimes pick wrongly. A repository with two unrelated Rust
+/// projects side by side gets one of them, and a report on half a repository is
+/// still worth more than a message saying there is no Rust in it.
+fn workspace_root(vfs: &Vfs) -> Option<String> {
+    if vfs.contains("Cargo.toml") {
+        return Some(String::new());
+    }
+    let mut best: Option<(usize, bool, String)> = None;
+    for path in vfs.paths() {
+        let Some(dir) = path.strip_suffix("/Cargo.toml") else {
+            continue;
+        };
+        let declares_workspace = vfs
+            .read(path)
+            .and_then(|text| toml::from_str::<toml::Value>(text).ok())
+            .is_some_and(|manifest| manifest.get("workspace").is_some());
+        // Ordered so that `min` prefers shallow, then a workspace, then a name.
+        let candidate = (dir.matches('/').count(), !declares_workspace, dir.to_string());
+        if best.as_ref().is_none_or(|held| candidate < *held) {
+            best = Some(candidate);
+        }
+    }
+    best.map(|(_, _, dir)| dir)
+}
+
 /// The workspace as the extractor expects to receive it.
 pub fn read(vfs: &Vfs) -> Result<Value, String> {
+    let base = workspace_root(vfs)
+        .ok_or_else(|| "no Cargo.toml anywhere in the snapshot".to_string())?;
+    let root_path = join(&base, "Cargo.toml");
     let root_manifest = vfs
-        .read("Cargo.toml")
-        .ok_or_else(|| "no Cargo.toml at the root of the snapshot".to_string())?;
+        .read(&root_path)
+        .ok_or_else(|| format!("{root_path}: vanished between finding it and reading it"))?;
     let root: toml::Value =
-        toml::from_str(root_manifest).map_err(|e| format!("Cargo.toml: {e}"))?;
+        toml::from_str(root_manifest).map_err(|e| format!("{root_path}: {e}"))?;
 
     let inherited = root
         .get("workspace")
@@ -30,7 +70,7 @@ pub fn read(vfs: &Vfs) -> Result<Value, String> {
     let mut member_dirs: Vec<String> = Vec::new();
     // A manifest with a [package] of its own is a member, workspace root or not.
     if root.get("package").is_some() {
-        member_dirs.push(String::new());
+        member_dirs.push(base.clone());
     }
     if let Some(workspace) = root.get("workspace") {
         let patterns = workspace
@@ -51,8 +91,9 @@ pub fn read(vfs: &Vfs) -> Result<Value, String> {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
+        let excluded: Vec<String> = excluded.iter().map(|e| join(&base, e)).collect();
         for pattern in patterns {
-            for dir in expand(vfs, &pattern) {
+            for dir in expand(vfs, &join(&base, pattern)) {
                 if excluded.iter().any(|e| dir == *e || dir.starts_with(&format!("{e}/"))) {
                     continue;
                 }
@@ -69,7 +110,7 @@ pub fn read(vfs: &Vfs) -> Result<Value, String> {
                 let Some(rel) = spec.get("path").and_then(|v| v.as_str()) else {
                     continue;
                 };
-                let target = resolve("", rel);
+                let target = resolve(&base, rel);
                 if vfs.contains(&join(&target, "Cargo.toml")) && !member_dirs.contains(&target) {
                     member_dirs.push(target);
                 }
