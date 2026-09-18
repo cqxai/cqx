@@ -7,9 +7,9 @@ repository.workspace = true
 description = "Loads a cqx fact stream into a queryable graph."
 
 [features]
-# cqx is public and zega is not, so the graph backend is opt-in and built from a
-# sibling checkout. Without it cqx still loads and counts facts; it just cannot
-# answer a traversal.
+# The graph backend is opt-in because it is a heavy dependency, not because it is
+# unavailable: without it cqx still loads and counts facts, it just cannot answer
+# a traversal.
 default = []
 zega = ["dep:zega-core", "dep:zega-parser"]
 
@@ -17,5 +17,5 @@ zega = ["dep:zega-core", "dep:zega-parser"]
 cqx-schema = { workspace = true }
 deka-cli-core = { workspace = true }
 serde_json = { workspace = true }
-zega-core = { path = "../../../zega/zega-core", optional = true }
-zega-parser = { path = "../../../zega/zega-parser", optional = true }
+zega-core = { git = "https://github.com/samifouad/zega", optional = true }
+zega-parser = { git = "https://github.com/samifouad/zega", optional = true }
