@@ -1,0 +1,14 @@
+[package]
+name = "cqx-score"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The CodeQuality Score: rules, configuration and scoring."
+
+[dependencies]
+cqx-schema = { workspace = true }
+cqx-store = { path = "../cqx-store" }
+deka-cli-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

@@ -11,6 +11,7 @@ fn build_registry() -> Registry {
     RegistryBuilder::new()
         .with(cqx_rust::register)
         .with(cqx_store::register)
+        .with(cqx_score::register)
         .flags([
             FlagSpec {
                 name: "--help",
@@ -57,7 +58,7 @@ fn main() {
         std::process::exit(2);
     }
 
-    std::process::exit(cqx_rust::exit_code());
+    std::process::exit(cqx_rust::exit_code().max(cqx_score::exit_code()));
 }
 
 fn usage(registry: &Registry) {
