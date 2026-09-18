@@ -247,3 +247,22 @@ rule and field exist, and names the accepted fields when one does not. The
 effective configuration travels with every result — `score --json` and
 `history.json` both carry it — so anything rendering those shows the standards
 they were scored against rather than cqx's defaults.
+
+## Conformance
+
+cqx reads a workspace by parsing manifests rather than by running
+`cargo metadata`, so cargo is the oracle: whatever it reports about packages,
+versions and target roots is what the parser has to reproduce.
+
+`reference-repos.toml` pins ripgrep, tokio and deno by commit, and CI fetches
+them to check the parser against all three. They are here because our own
+repositories were not enough — three cargo rules were found only when an
+external project disagreed:
+
+- a build script at a repository root would otherwise claim the whole repository
+- declared `[[example]]` targets do not replace discovery, they add to it
+- a path in `[workspace.dependencies]` makes a member even when nothing draws on it
+
+Locally the test skips when the checkouts are absent. Setting
+`CQX_REFERENCE_DIR` asserts they are present, so a failed fetch fails the job
+rather than quietly checking nothing.

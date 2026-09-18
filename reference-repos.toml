@@ -1,0 +1,28 @@
+# Repositories cqx is checked against, pinned by commit.
+#
+# Pinned rather than tracking a branch on purpose: a conformance test against a
+# moving upstream fails for reasons that have nothing to do with the change
+# under test. Updating a pin is a visible diff, and a deliberate act.
+#
+# These are here because our own repositories were not enough. Two cargo rules
+# were found only when tokio and deno disagreed with the parser: declared
+# [[example]] targets override discovery, and a path in [workspace.dependencies]
+# makes a workspace member even when nothing draws on it.
+
+[[repo]]
+name = "ripgrep"
+url = "https://github.com/BurntSushi/ripgrep"
+rev = "3fce3b5bb0236da2df6d99672afb8a719642eca7"
+note = "small, conventional layout, a build script at the repository root"
+
+[[repo]]
+name = "tokio"
+url = "https://github.com/tokio-rs/tokio"
+rev = "cf782c5b917b7ea21b6f97f07104ebf16d35f5f8"
+note = "declares [[example]] and [[bench]] targets pointing at its package root"
+
+[[repo]]
+name = "deno"
+url = "https://github.com/denoland/deno"
+rev = "abd22074e47c6a5cd14e9e4e84743f084aa5a575"
+note = "81 members, nested packages, and members declared only by a workspace path"
