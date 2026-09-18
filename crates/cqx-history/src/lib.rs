@@ -58,6 +58,14 @@ pub struct CommitScore {
 pub struct History {
     pub repo: String,
     pub generated: String,
+    /// The configuration every commit here was scored with, so a reader shows
+    /// the project's own standards rather than cqx's defaults — and can say
+    /// which knobs were turned.
+    ///
+    /// One configuration across the whole walk on purpose: scoring each commit
+    /// against the config as of that commit would make the line jump when
+    /// somebody edits a threshold, which is the opposite of a trend.
+    pub config: serde_json::Value,
     pub commits: Vec<CommitScore>,
 }
 
@@ -196,7 +204,7 @@ fn run(context: &Context) -> Result<(), String> {
             let _ = stats;
             let stream = cqx_store::facts::Stream::load(&facts_path)
                 .map_err(|e| format!("{}: {e}", facts_path.display()))?;
-            let metrics = cqx_score::metrics::Metrics::compute(&stream, &config.exclude);
+            let metrics = cqx_score::metrics::Metrics::compute(&stream, &config);
             let (scores, _) = cqx_score::score(&config, &metrics);
             if !keep {
                 let _ = std::fs::remove_file(&facts_path);
@@ -250,6 +258,7 @@ fn run(context: &Context) -> Result<(), String> {
     let _ = std::fs::remove_dir_all(&scratch);
 
     let history = History {
+        config: cqx_score::config_json(&config),
         repo: repo.display().to_string(),
         generated: git(&repo, &["show", "-s", "--format=%aI", "HEAD"])?
             .trim()
