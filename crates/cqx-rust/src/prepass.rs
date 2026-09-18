@@ -47,6 +47,16 @@ pub struct Shared {
     /// that it is showing some of them rather than all of them.
     #[serde(default)]
     pub truncated: BTreeSet<String>,
+    /// Every function name this workspace declares.
+    ///
+    /// What makes a call worth writing down. A call to `to_string` reaches the
+    /// standard library, which this extractor does not read and has nothing to
+    /// say about; a call to `enforce_read` may reach a function three crates
+    /// away, and following that is the whole point of recording calls at all.
+    /// Recording both put three hundred megabytes of `clone` and `push` into
+    /// makepad's fact stream to carry the few thousand edges anyone queries.
+    #[serde(default)]
+    pub defined: BTreeSet<String>,
 }
 
 impl Shared {
@@ -76,6 +86,7 @@ impl Shared {
             }
         }
         self.truncated.extend(other.truncated);
+        self.defined.extend(other.defined);
     }
 
     /// Walks `calls` to a fixpoint so a function that calls a function that
@@ -206,6 +217,8 @@ pub struct PackageFacts {
     pub reads_env: HashMap<String, Vec<String>>,
     /// Those whose list stopped at [`MOST_VARS`]. See it for why there is one.
     pub truncated: BTreeSet<String>,
+    /// Every function name this workspace declares. See [`Shared::defined`].
+    pub defined: BTreeSet<String>,
 }
 
 impl PackageFacts {
@@ -231,6 +244,7 @@ impl PackageFacts {
         for ParsedFile { rel_path, parsed, .. } in files.iter().copied() {
             let mut file_aliases = HashMap::new();
             let mut collector = Collector {
+                defined: &mut facts.defined,
                 aliases: &mut file_aliases,
                 constants: &mut facts.constants,
                 literal_fns: &mut facts.literal_fns,
@@ -252,6 +266,7 @@ impl PackageFacts {
             calls: self.calls.clone(),
             reads_env: self.reads_env.clone(),
             truncated: self.truncated.clone(),
+            defined: self.defined.clone(),
         }
     }
 
@@ -267,6 +282,7 @@ impl PackageFacts {
             calls: self.calls,
             reads_env: self.reads_env,
             truncated: self.truncated,
+            defined: self.defined,
         }
     }
 
@@ -278,6 +294,7 @@ impl PackageFacts {
         self.calls = shared.calls;
         self.reads_env = shared.reads_env;
         self.truncated = shared.truncated;
+        self.defined = shared.defined;
     }
 
     /// Follows what was gathered to its conclusion.
@@ -295,6 +312,7 @@ impl PackageFacts {
 }
 
 struct Collector<'a> {
+    defined: &'a mut BTreeSet<String>,
     aliases: &'a mut HashMap<String, String>,
     constants: &'a mut HashMap<String, String>,
     literal_fns: &'a mut HashMap<String, String>,
@@ -364,6 +382,7 @@ fn string_literal(expr: &syn::Expr) -> Option<String> {
 
 impl<'a> Collector<'a> {
     fn enter_fn(&mut self, name: String, block: &syn::Block) {
+        self.defined.insert(name.clone());
         if let Some(value) = sole_string_literal(block) {
             self.literal_fns.insert(name.clone(), value);
         }

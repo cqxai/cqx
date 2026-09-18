@@ -345,6 +345,106 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
         let _ = self.out.edge(edge);
     }
 
+    /// Who calls what, by name.
+    ///
+    /// The name and not the definition: resolving a call to the function it
+    /// reaches needs a compiler, and this extractor has `syn`. What it can say
+    /// is that this function calls something called `enforce_read`, which is
+    /// enough for the question a policy actually asks — does every operation
+    /// on this boundary reach a check. A workspace with two `enforce_read`s
+    /// conflates them, so the edge is recorded as inferred and carries the
+    /// path as written for anyone who needs to tell them apart.
+    ///
+    /// Method calls are recorded too, with no receiver type to go on. That
+    /// costs precision and buys the majority of calls in idiomatic Rust:
+    /// `self.enforce_read(path)` was previously invisible.
+    fn calls(&mut self, name: &str, path: &str, _span: Span, form: &'static str) {
+        // Only a name this workspace declares somewhere. A call into the
+        // standard library reaches code this extractor never reads, so the
+        // edge would lead nowhere — and `clone`, `push` and `to_string` are
+        // more than half of every call written.
+        if name.is_empty() || !self.facts.defined.contains(name) {
+            return;
+        }
+        let to = Id::external(name);
+        let _ = self
+            .out
+            .node(Node::new(to.clone(), NodeKind::External).attr("name", name));
+        let from = self.container();
+        // No evidence, deliberately. A call edge answers "does this function
+        // reach something named X", and the finding that follows points at the
+        // function, not at the call. Carrying a file, a line and a column for
+        // every call site instead of one edge per pair is what made makepad's
+        // facts three hundred megabytes; the Writer folds the repeats away on
+        // its own once there is nothing to tell them apart.
+        let mut edge = Edge::new(EdgeKind::Calls, from, to)
+            .attr("form", form)
+            .inferred("name");
+        if path != name {
+            edge = edge.attr("path", path);
+        }
+        if self.is_test_context() {
+            edge = edge.attr("role", "test");
+        }
+        let _ = self.out.edge(edge);
+    }
+
+    /// What a macro was handed.
+    ///
+    /// `syn` parses a macro invocation into an opaque token stream and the
+    /// default walk stops there, so everything inside one is invisible — deka
+    /// writes 7,536 macro invocations, sixteen of which call `env::var`,
+    /// `process::exit` or `Command::new` in their arguments. None of those
+    /// effects were recorded.
+    ///
+    /// The arguments are re-parsed as expressions and walked like any others.
+    /// A macro whose body is not a list of expressions — `matches!(x, Some(_))`,
+    /// a `quote!` block — simply fails to parse and is left alone, which is
+    /// the right outcome: this reads what was written, and still expands
+    /// nothing.
+    fn walk_macro(&mut self, mac: &syn::Macro) {
+        let name = mac
+            .path
+            .segments
+            .last()
+            .map(|s| s.ident.to_string())
+            .unwrap_or_default();
+        // Generated code is not this function's behaviour, and a token stream
+        // meant for a parser is not a list of expressions.
+        if matches!(name.as_str(), "quote" | "quote_spanned" | "matches" | "cfg_if" | "include_str" | "include_bytes") {
+            return;
+        }
+        type Args = syn::punctuated::Punctuated<syn::Expr, syn::Token![,]>;
+        let Ok(args) = mac.parse_body_with(Args::parse_terminated) else {
+            return;
+        };
+        // A structured format assembled by interpolation. The values decide
+        // the structure, which is the injection family in one line.
+        if matches!(name.as_str(), "format" | "write" | "writeln" | "print" | "println" | "eprint" | "eprintln") {
+            if let Some(syn::Expr::Lit(lit)) = args.first() {
+                if let syn::Lit::Str(text) = &lit.lit {
+                    let body = text.value();
+                    if args.len() > 1 && looks_structured(&body) {
+                        let to = Id::capability("json");
+                        self.declare_capability(&to);
+                        let from = self.container();
+                        let ev = self.evidence(mac.span());
+                        let mut edge = Edge::new(EdgeKind::Interpolates, from, to)
+                            .attr("via", name.as_str())
+                            .evidence(ev);
+                        if self.is_test_context() {
+                            edge = edge.attr("role", "test");
+                        }
+                        let _ = self.out.edge(edge);
+                    }
+                }
+            }
+        }
+        for arg in &args {
+            syn::visit::visit_expr(self, arg);
+        }
+    }
+
     /// Rewrites a callee path through this file's aliases, so `Proc::new`
     /// reads as `std::process::Command::new` when `Proc` was renamed.
     fn canonical_path(&self, path: &str) -> String {
@@ -546,6 +646,45 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
                 }
             }
         }
+    }
+}
+
+/// The bare name of whatever this expression calls, when it calls something.
+fn called_name(expr: &syn::Expr) -> Option<String> {
+    match expr {
+        syn::Expr::Call(call) => {
+            let path = callee_path(&call.func)?;
+            Some(path.rsplit("::").next().unwrap_or(&path).to_string())
+        }
+        syn::Expr::MethodCall(call) => Some(call.method.to_string()),
+        // `let _ = check(..)?;` and `let _ = &check(..);` still called it.
+        syn::Expr::Try(t) => called_name(&t.expr),
+        syn::Expr::Reference(r) => called_name(&r.expr),
+        syn::Expr::Await(a) => called_name(&a.base),
+        _ => None,
+    }
+}
+
+/// A format string that is building JSON rather than a message.
+fn looks_structured(text: &str) -> bool {
+    // Braces are how a format string names its holes, so a doubled brace is
+    // the only way one can contain a literal `{` — which is what building an
+    // object by hand looks like.
+    (text.contains("{{") && text.contains("}}"))
+        || text.contains("\":")
+        || text.contains("\"{}\"")
+}
+
+/// An arm body that does nothing at all: `{}`, `()`, or `{ () }`.
+fn does_nothing(expr: &syn::Expr) -> bool {
+    match expr {
+        syn::Expr::Tuple(t) => t.elems.is_empty(),
+        syn::Expr::Block(b) => {
+            b.block.stmts.is_empty()
+                || (b.block.stmts.len() == 1
+                    && matches!(&b.block.stmts[0], syn::Stmt::Expr(e, None) if does_nothing(e)))
+        }
+        _ => false,
     }
 }
 
@@ -840,6 +979,27 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
     }
 
     fn visit_local(&mut self, node: &'ast syn::Local) {
+        // `let _ = check(..)` — called, and its answer thrown away. Only the
+        // wildcard: `let _x = ..` keeps the value and may well be used later,
+        // and a bare `check(..);` statement cannot be told from a function
+        // that returns nothing without knowing its type.
+        if matches!(node.pat, syn::Pat::Wild(_)) {
+            if let Some(init) = &node.init {
+                if let Some(name) = called_name(&init.expr) {
+                    let to = Id::external(&name);
+                    let _ = self
+                        .out
+                        .node(Node::new(to.clone(), NodeKind::External).attr("name", name.as_str()));
+                    let from = self.container();
+                    let ev = self.evidence(node.span());
+                    let mut edge = Edge::new(EdgeKind::Discards, from, to).evidence(ev);
+                    if self.is_test_context() {
+                        edge = edge.attr("role", "test");
+                    }
+                    let _ = self.out.edge(edge);
+                }
+            }
+        }
         if let syn::Pat::Ident(ident) = &node.pat {
             if let Some(init) = &node.init {
                 let name = ident.ident.to_string();
@@ -896,6 +1056,36 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
         syn::visit::visit_item_use(self, node);
     }
 
+    fn visit_expr_macro(&mut self, node: &'ast syn::ExprMacro) {
+        self.walk_macro(&node.mac);
+        syn::visit::visit_expr_macro(self, node);
+    }
+
+    fn visit_stmt_macro(&mut self, node: &'ast syn::StmtMacro) {
+        self.walk_macro(&node.mac);
+        syn::visit::visit_stmt_macro(self, node);
+    }
+
+    fn visit_expr_match(&mut self, node: &'ast syn::ExprMatch) {
+        // A dispatch and its fallback. Whether an empty fallback is a hole
+        // depends on what the other arms do, which is a question for a rule;
+        // what the extractor can say is that the fallback is there and empty.
+        if let Some(arm) = node.arms.iter().find(|a| matches!(a.pat, syn::Pat::Wild(_))) {
+            let from = self.container();
+            let ev = self.evidence(node.span());
+            let mut edge = Edge::new(EdgeKind::DefaultArm, from, Id::capability("dispatch"))
+                .attr("arms", node.arms.len() as u64)
+                .attr("empty", does_nothing(&arm.body))
+                .evidence(ev);
+            if self.is_test_context() {
+                edge = edge.attr("role", "test");
+            }
+            self.declare_capability(&Id::capability("dispatch"));
+            let _ = self.out.edge(edge);
+        }
+        syn::visit::visit_expr_match(self, node);
+    }
+
     fn visit_expr_unsafe(&mut self, node: &'ast syn::ExprUnsafe) {
         self.declare_capability(&Id::capability("unsafe"));
         let from = self.container();
@@ -912,6 +1102,8 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
         if let Some(raw) = callee_path(&node.func) {
             let path = self.canonical_path(&raw);
             let span = node.span();
+            let bare = path.rsplit("::").next().unwrap_or(&path).to_string();
+            self.calls(&bare, &path, span, "path");
             // A process boundary. At the binary zoom level these are most of
             // the edges that exist, and every one of them matters.
             if path.ends_with("Command::new") {
@@ -955,6 +1147,34 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
         // Receivers are chased by the default walk; only the method name is
         // new information here.
         let name = node.method.to_string();
+        self.calls(&name, &name, node.span(), "method");
+        // What was asked of the subprocess, not only which one. A shell is
+        // not dangerous; a shell handed a string nobody checked is, and the
+        // two are indistinguishable without this.
+        //
+        // Attributed to the enclosing function rather than to a particular
+        // `Command`: following a builder through a local binding needs
+        // dataflow, and the question a rule asks — does this function spawn a
+        // shell and pass it something unresolved — is answered without it.
+        if matches!(name.as_str(), "arg" | "args") {
+            for arg in &node.args {
+                let (value, from_where) = self.spawn_target(self.resolve_string_arg(arg));
+                let to = Id::capability("exec");
+                self.declare_capability(&to);
+                let from = self.container();
+                let ev = self.evidence(node.span());
+                let mut edge = Edge::new(EdgeKind::SpawnArg, from, to)
+                    .attr("via", from_where.via)
+                    .evidence(ev);
+                if from_where.via == "literal" {
+                    edge = edge.attr("value", value.as_str());
+                }
+                if self.is_test_context() {
+                    edge = edge.attr("role", "test");
+                }
+                let _ = self.out.edge(edge);
+            }
+        }
         if matches!(name.as_str(), "spawn" | "output" | "status") {
             if let syn::Expr::Call(inner) = &*node.receiver {
                 if callee_path(&inner.func)

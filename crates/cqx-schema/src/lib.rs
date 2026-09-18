@@ -102,6 +102,27 @@ pub enum EdgeKind {
     /// A lint was switched off. Crate-wide is the strong form: it hides every
     /// future occurrence, including ones nobody has written yet.
     Silences,
+    /// A `Result` thrown away by binding it to `_`.
+    ///
+    /// The shape of a check that is called and then ignored — `let _ =
+    /// enforce_read(path)` reads as enforcement and performs none.
+    Discards,
+    /// A `match` with a catch-all arm, and whether that arm does nothing.
+    ///
+    /// A dispatch whose arms perform checks and whose fallback is empty fails
+    /// open: every action nobody thought of is permitted.
+    DefaultArm,
+    /// A structured format built by interpolating into a string.
+    ///
+    /// JSON assembled with `format!` is the same mistake as SQL assembled with
+    /// `+`: the values decide the structure. Serialising cannot be escaped
+    /// wrongly because it is never escaped at all.
+    Interpolates,
+    /// An argument handed to a subprocess.
+    ///
+    /// The program alone does not say what was asked of it. A shell is not
+    /// dangerous; a shell passed a string nobody checked is.
+    SpawnArg,
     // --- effect edges: few, dangerous, and the default view ---
     Spawns,
     ReadsEnv,
