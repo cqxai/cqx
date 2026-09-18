@@ -347,6 +347,21 @@ pub fn parse_package(
     roots: &[(String, bool)],
     nested: &[String],
 ) -> (Vec<ParsedFile>, Vec<String>) {
+    parse_package_watched(vfs, roots, nested, &|| {})
+}
+
+/// The same, telling someone each time a file is done.
+///
+/// Parsing is where the time goes — seven of makepad's nine seconds — and it
+/// is the one part that can say how far along it is, because it is a loop over
+/// a known number of files. Everything after it is a single pass over what was
+/// parsed.
+pub fn parse_package_watched(
+    vfs: &Vfs,
+    roots: &[(String, bool)],
+    nested: &[String],
+    done: &dyn Fn(),
+) -> (Vec<ParsedFile>, Vec<String>) {
     let mut parsed = Vec::new();
     let mut failures = Vec::new();
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -364,6 +379,7 @@ pub fn parse_package(
             let Some(source) = vfs.read(path) else {
                 continue;
             };
+            done();
             match syn::parse_file(source) {
                 Ok(file) => parsed.push(ParsedFile {
                     module_prefix: crate::extract::module_prefix(dir, path),
