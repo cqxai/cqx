@@ -3,12 +3,12 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use dcx_schema::Fact;
+use cqx_schema::Fact;
 
 #[derive(Default)]
 pub struct Stream {
-    pub nodes: Vec<dcx_schema::Node>,
-    pub edges: Vec<dcx_schema::Edge>,
+    pub nodes: Vec<cqx_schema::Node>,
+    pub edges: Vec<cqx_schema::Edge>,
     pub schema: String,
     pub root: String,
 }

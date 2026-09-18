@@ -1,5 +1,5 @@
 [package]
-name = "dcx"
+name = "cqx"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -7,14 +7,14 @@ repository.workspace = true
 description = "deka code explorer."
 
 [[bin]]
-name = "dcx"
+name = "cqx"
 path = "src/main.rs"
 
 [features]
 default = []
-zega = ["dcx-store/zega"]
+zega = ["cqx-store/zega"]
 
 [dependencies]
 deka-cli-core = { workspace = true }
-dcx-rust = { path = "../dcx-rust" }
-dcx-store = { path = "../dcx-store" }
+cqx-rust = { path = "../cqx-rust" }
+cqx-store = { path = "../cqx-store" }

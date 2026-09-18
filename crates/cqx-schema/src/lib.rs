@@ -1,4 +1,4 @@
-//! The dcx fact schema.
+//! The cqx fact schema.
 //!
 //! An extractor emits a stream of [`Fact`]s as newline-delimited JSON. Nothing
 //! in this crate knows about any particular language: language-specific
