@@ -9,6 +9,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use deka_cli_core::{CommandSpec, Context, FlagSpec, ParamSpec, Registry};
+
+pub mod export;
 use serde::{Deserialize, Serialize};
 
 pub const HISTORY_COMMAND: CommandSpec = CommandSpec {
@@ -23,6 +25,7 @@ pub const HISTORY_COMMAND: CommandSpec = CommandSpec {
 
 pub fn register(registry: &mut Registry) {
     registry.add_command(HISTORY_COMMAND);
+    export::register(registry);
     registry.add_param(ParamSpec {
         name: "--commits",
         description: "how many commits back to score (default 20)",
@@ -84,7 +87,7 @@ pub struct History {
 }
 
 /// Detached head has no branch name; say so rather than inventing one.
-fn branch_name(repo: &Path) -> String {
+pub(crate) fn branch_name(repo: &Path) -> String {
     git(repo, &["rev-parse", "--abbrev-ref", "HEAD"])
         .map(|s| s.trim().to_string())
         .map(|b| if b == "HEAD" { "detached".to_string() } else { b })
@@ -95,7 +98,7 @@ fn branch_name(repo: &Path) -> String {
 ///
 /// `git@github.com:owner/repo.git`, `ssh://git@github.com/owner/repo.git` and
 /// the https form all name the same page.
-fn remote_url(repo: &Path) -> Option<String> {
+pub(crate) fn remote_url(repo: &Path) -> Option<String> {
     let raw = git(repo, &["remote", "get-url", "origin"]).ok()?;
     let raw = raw.trim().trim_end_matches('/');
     let raw = raw.strip_suffix(".git").unwrap_or(raw);
@@ -113,7 +116,7 @@ fn remote_url(repo: &Path) -> Option<String> {
 }
 
 /// The path to a repository's history, for hosts whose layout is known.
-fn commits_url(remote: &str) -> Option<String> {
+pub(crate) fn commits_url(remote: &str) -> Option<String> {
     if remote.contains("github.com") {
         Some(format!("{remote}/commits/"))
     } else if remote.contains("gitlab.com") {
@@ -123,7 +126,7 @@ fn commits_url(remote: &str) -> Option<String> {
     }
 }
 
-fn git(repo: &Path, args: &[&str]) -> Result<String, String> {
+pub(crate) fn git(repo: &Path, args: &[&str]) -> Result<String, String> {
     let out = Command::new("git")
         .args(args)
         .current_dir(repo)
@@ -143,7 +146,7 @@ fn git(repo: &Path, args: &[&str]) -> Result<String, String> {
 ///
 /// `git archive` rather than a checkout: the working tree is never touched, so
 /// this is safe to run against a repository somebody is using.
-fn materialise(repo: &Path, sha: &str, into: &Path) -> Result<(), String> {
+pub(crate) fn materialise(repo: &Path, sha: &str, into: &Path) -> Result<(), String> {
     std::fs::create_dir_all(into).map_err(|e| format!("{}: {e}", into.display()))?;
     let archive = Command::new("git")
         .args(["archive", "--format=tar", sha])
@@ -173,7 +176,7 @@ fn cmd_history(context: &Context) {
 static FAILED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub fn exit_code() -> i32 {
-    i32::from(FAILED.load(std::sync::atomic::Ordering::Relaxed))
+    i32::from(FAILED.load(std::sync::atomic::Ordering::Relaxed)) | export::exit_code()
 }
 
 fn run(context: &Context) -> Result<(), String> {

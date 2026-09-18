@@ -91,6 +91,7 @@ dependencies = [
  "cqx-score",
  "cqx-store",
  "cqx-vfs",
+ "cqx-view",
  "deka-cli-core",
  "serde",
  "serde_json",
@@ -150,6 +151,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cqx-view"
+version = "0.1.0"
+dependencies = [
+ "cqx-rust",
+ "cqx-schema",
+ "cqx-store",
+ "cqx-vfs",
+ "serde_json",
+]
+
+[[package]]
 name = "cqx-wasm"
 version = "0.1.0"
 dependencies = [
@@ -157,6 +169,7 @@ dependencies = [
  "cqx-score",
  "cqx-store",
  "cqx-vfs",
+ "cqx-view",
  "serde_json",
 ]
 
