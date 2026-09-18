@@ -150,9 +150,23 @@ pub struct Evidence {
     pub file: String,
     /// Inclusive `[start, end]`, 1-indexed.
     pub line: [u32; 2],
+    /// Inclusive `[start, end]`, 0-indexed, as the parser counts them.
+    ///
+    /// A line says which statement; a column says which part of it. Without
+    /// one a reader is told that something on line 28 ends the process and
+    /// left to find the call themselves — which is the difference between an
+    /// index and a diagnostic.
+    ///
+    /// Defaulted so a stream written before this parses as one without it.
+    #[serde(default, skip_serializing_if = "is_unknown")]
+    pub col: [u32; 2],
     pub extractor: String,
     #[serde(default, skip_serializing_if = "is_static")]
     pub source: Source,
+}
+
+fn is_unknown(c: &[u32; 2]) -> bool {
+    c == &[0, 0]
 }
 
 fn is_static(s: &Source) -> bool {
@@ -164,6 +178,18 @@ impl Evidence {
         Evidence {
             file: file.to_string(),
             line: [start, end],
+            col: [0, 0],
+            extractor: "rust".to_string(),
+            source: Source::Static,
+        }
+    }
+
+    /// The same, knowing which part of the line.
+    pub fn spanning(file: &str, line: [u32; 2], col: [u32; 2]) -> Evidence {
+        Evidence {
+            file: file.to_string(),
+            line,
+            col,
             extractor: "rust".to_string(),
             source: Source::Static,
         }
