@@ -149,12 +149,16 @@ fn run(context: &Context) -> Result<(), String> {
             (scores, lines, true)
         } else {
             let _ = std::fs::remove_dir_all(&scratch);
+
+            // Getting the source in hand. A browser spends this on the network;
+            // here it goes on unpacking a commit and reading it off a disk.
+            // Different work, same question — and a report that leaves it out
+            // of one side reads as though that side were free.
+            let reading = std::time::Instant::now();
             materialise(&repo, sha, &scratch)?;
             let snapshot = cqx_vfs::from_dir(&scratch).map_err(|e| format!("{sha}: {e}"))?;
+            let fetched_ms = reading.elapsed().as_millis() as u64;
 
-            // The clock starts with the source in hand, because that is where
-            // the browser starts too. What git and the disk cost is real, but
-            // it is not what this measures.
             let started = std::time::Instant::now();
             let mut facts = Vec::new();
             cqx_rust::extract::run(&snapshot, &mut facts).map_err(|e| format!("{sha}: {e}"))?;
@@ -171,6 +175,7 @@ fn run(context: &Context) -> Result<(), String> {
                 remote: remote.as_deref(),
                 commits_url: history_page.as_deref(),
                 analysed_ms: Some(started.elapsed().as_millis() as u64),
+                fetched_ms: Some(fetched_ms),
             };
             let dataset = cqx_view::dataset(&stream, report, serde_json::json!([]), &meta);
 
