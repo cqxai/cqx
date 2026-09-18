@@ -44,6 +44,25 @@ impl Stream {
         stream
     }
 
+    /// Drops what more than one reader said.
+    ///
+    /// Readers given different parts of a workspace all describe the packages,
+    /// the binaries and the dependencies, because each of them read every
+    /// manifest. The same node arriving twice says nothing new, and a
+    /// containment edge arriving twice multiplies every path through it — one
+    /// query returned 7,999 rows where 212 was right, and that was this.
+    ///
+    /// Edges are compared whole, evidence included, so two facts are dropped
+    /// only when they are the same fact. Two readers cannot produce the same
+    /// evidence for different things: no file is given to more than one.
+    pub fn dedupe(&mut self) {
+        let mut nodes = std::collections::HashSet::new();
+        self.nodes.retain(|n| nodes.insert(n.id.clone()));
+        let mut edges = std::collections::HashSet::new();
+        self.edges
+            .retain(|e| edges.insert(serde_json::to_string(e).unwrap_or_default()));
+    }
+
     pub fn report(&self) {
         let mut node_kinds: BTreeMap<String, usize> = BTreeMap::new();
         for node in &self.nodes {
