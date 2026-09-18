@@ -238,6 +238,18 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
         self.effect_provenance(kind, to, op, span, via, None, None);
     }
 
+    /// Declares a capability node before an edge points at it. An edge whose
+    /// endpoint has no node is dropped silently by anything that loads the
+    /// stream, so the extractor never emits one.
+    fn declare_capability(&mut self, id: &Id) {
+        if let Some(name) = id.0.strip_prefix("cap:") {
+            let name = name.to_string();
+            let _ = self
+                .out
+                .node(Node::new(id.clone(), NodeKind::Capability).attr("name", name));
+        }
+    }
+
     fn effect_provenance(
         &mut self,
         kind: EdgeKind,
@@ -248,6 +260,7 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
         source_fn: Option<String>,
         env_var: Option<String>,
     ) {
+        self.declare_capability(&to);
         let from = self.container();
         let ev = self.evidence(span);
         let mut edge = Edge::new(kind, from, to).attr("op", op).evidence(ev);
@@ -392,6 +405,7 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
                 Ok(())
             });
             let ev = self.evidence(attr.span());
+            self.declare_capability(&Id::capability("lint"));
             for lint in lints {
                 // How broadly the lint is drawn matters far more than how many
                 // there are: naming one lint is a decision, switching off
@@ -575,6 +589,7 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
         self.record_silencing(id.clone(), &node.attrs, "item");
         self.emit_signature(&id, &node.sig);
         if node.sig.unsafety.is_some() {
+            self.declare_capability(&Id::capability("unsafe"));
             let ev = self.evidence(node.sig.span());
             let _ = self.out.edge(
                 Edge::new(EdgeKind::UnsafeAt, id.clone(), Id::capability("unsafe"))
@@ -599,6 +614,7 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
         self.record_silencing(id.clone(), &node.attrs, "item");
         self.emit_signature(&id, &node.sig);
         if node.sig.unsafety.is_some() {
+            self.declare_capability(&Id::capability("unsafe"));
             let ev = self.evidence(node.sig.span());
             let _ = self.out.edge(
                 Edge::new(EdgeKind::UnsafeAt, id.clone(), Id::capability("unsafe"))
@@ -657,6 +673,7 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
         // `static mut` is shared mutable state with no synchronisation: an
         // effect, not a definition detail.
         if matches!(node.mutability, syn::StaticMutability::Mut(_)) {
+            self.declare_capability(&Id::capability("unsafe"));
             let ev = self.evidence(node.span());
             let _ = self.out.edge(
                 Edge::new(EdgeKind::UnsafeAt, id, Id::capability("unsafe"))
@@ -690,6 +707,7 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
         };
         let id = self.emit_symbol(&name, "impl", node.span());
         if node.unsafety.is_some() {
+            self.declare_capability(&Id::capability("unsafe"));
             let ev = self.evidence(node.span());
             let _ = self.out.edge(
                 Edge::new(EdgeKind::UnsafeAt, id.clone(), Id::capability("unsafe"))
@@ -762,6 +780,7 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
     }
 
     fn visit_expr_unsafe(&mut self, node: &'ast syn::ExprUnsafe) {
+        self.declare_capability(&Id::capability("unsafe"));
         let from = self.container();
         let ev = self.evidence(node.span());
         let _ = self.out.edge(
