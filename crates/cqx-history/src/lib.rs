@@ -61,6 +61,14 @@ pub struct History {
     /// prints "commits to main" is wrong on every repository using master, and
     /// on every one scored from a feature branch.
     pub branch: String,
+    /// The origin remote as a browsable https URL, if there is one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub remote: Option<String>,
+    /// Where a reader can see the full history. Only set for hosts whose path
+    /// layout is known — guessing one produces a link that 404s, which is worse
+    /// than no link.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commits_url: Option<String>,
     pub generated: String,
     /// The configuration every commit here was scored with, so a reader shows
     /// the project's own standards rather than cqx's defaults — and can say
@@ -71,6 +79,48 @@ pub struct History {
     /// somebody edits a threshold, which is the opposite of a trend.
     pub config: serde_json::Value,
     pub commits: Vec<CommitScore>,
+}
+
+fn branch_name(repo: &Path) -> String {
+    git(repo, &["rev-parse", "--abbrev-ref", "HEAD"])
+        .map(|s| s.trim().to_string())
+        .map(|b| if b == "HEAD" { "detached".to_string() } else { b })
+        .unwrap_or_else(|_| "unknown".to_string())
+}
+
+/// Normalises whatever form origin is configured in into a browsable URL.
+///
+/// `git@github.com:owner/repo.git`, `ssh://git@github.com/owner/repo.git` and
+/// the https form all name the same page.
+fn remote_url(repo: &Path) -> Option<String> {
+    let raw = git(repo, &["remote", "get-url", "origin"]).ok()?;
+    let raw = raw.trim().trim_end_matches('/');
+    let raw = raw.strip_suffix(".git").unwrap_or(raw);
+    let normalised = if let Some(rest) = raw.strip_prefix("git@") {
+        let (host, path) = rest.split_once(':')?;
+        format!("https://{host}/{path}")
+    } else if let Some(rest) = raw.strip_prefix("ssh://git@") {
+        format!("https://{rest}")
+    } else if raw.starts_with("http://") || raw.starts_with("https://") {
+        raw.to_string()
+    } else {
+        return None;
+    };
+    Some(normalised)
+}
+
+/// The path to a branch's history, for hosts whose layout is known.
+fn commits_url(remote: &str, branch: &str) -> Option<String> {
+    if branch == "detached" || branch == "unknown" {
+        return None;
+    }
+    if remote.contains("github.com") {
+        Some(format!("{remote}/commits/{branch}"))
+    } else if remote.contains("gitlab.com") {
+        Some(format!("{remote}/-/commits/{branch}"))
+    } else {
+        None
+    }
 }
 
 fn git(repo: &Path, args: &[&str]) -> Result<String, String> {
@@ -265,6 +315,8 @@ fn run(context: &Context) -> Result<(), String> {
         config: cqx_score::config_json(&config),
         repo: repo.display().to_string(),
         // Detached head has no branch name; say so rather than inventing one.
+        remote: remote_url(&repo),
+        commits_url: remote_url(&repo).and_then(|u| commits_url(&u, &branch_name(&repo))),
         branch: git(&repo, &["rev-parse", "--abbrev-ref", "HEAD"])
             .map(|s| s.trim().to_string())
             .map(|b| if b == "HEAD" { "detached".to_string() } else { b })
