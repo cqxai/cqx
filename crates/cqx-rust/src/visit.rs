@@ -163,13 +163,72 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
     /// fact about the repository, it is just not a fact about the product, and
     /// a query that cannot tell them apart reports numbers nobody can act on.
     /// Declares a referenced type and returns its id.
+    ///
+    /// The node carries the type exactly as written, so a signature can be
+    /// rendered back verbatim, plus the outermost name on its own — `Result`
+    /// out of `Result<Output, Diag>` — because attribution works on names, not
+    /// on spellings.
     fn type_node(&mut self, ty: &syn::Type) -> Id {
         let text = type_text(ty);
         let id = Id::type_ref(&text);
-        let _ = self
-            .out
-            .node(Node::new(id.clone(), NodeKind::Type).attr("text", text.as_str()));
+        let mut node = Node::new(id.clone(), NodeKind::Type).attr("text", text.as_str());
+        if let Some(base) = base_name(ty) {
+            node = node.attr("base", base);
+        }
+        let fresh = self.out.node(node).is_ok();
+        let _ = fresh;
+        self.emit_type_args(&id, ty);
         id
+    }
+
+    /// Records each generic argument as a type in its own right.
+    fn emit_type_args(&mut self, owner: &Id, ty: &syn::Type) {
+        match ty {
+            syn::Type::Reference(r) => self.emit_type_args(owner, &r.elem),
+            syn::Type::Paren(p) => self.emit_type_args(owner, &p.elem),
+            syn::Type::Slice(s) => {
+                let child = self.type_node(&s.elem);
+                self.type_arg_edge(owner, child, 0);
+            }
+            syn::Type::Array(a) => {
+                let child = self.type_node(&a.elem);
+                self.type_arg_edge(owner, child, 0);
+            }
+            syn::Type::Tuple(t) => {
+                for (position, elem) in t.elems.iter().enumerate() {
+                    let child = self.type_node(elem);
+                    self.type_arg_edge(owner, child, position);
+                }
+            }
+            syn::Type::Path(p) => {
+                let Some(segment) = p.path.segments.last() else {
+                    return;
+                };
+                let syn::PathArguments::AngleBracketed(args) = &segment.arguments else {
+                    return;
+                };
+                let mut position = 0;
+                for arg in &args.args {
+                    // Lifetimes and const generics say nothing about ownership.
+                    if let syn::GenericArgument::Type(inner) = arg {
+                        let child = self.type_node(inner);
+                        self.type_arg_edge(owner, child, position);
+                        position += 1;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn type_arg_edge(&mut self, owner: &Id, child: Id, position: usize) {
+        if owner == &child {
+            return; // a type is not its own argument
+        }
+        let _ = self.out.edge(
+            Edge::new(EdgeKind::TypeArg, owner.clone(), child)
+                .attr("position", position as u64),
+        );
     }
 
     /// Records a function's declared parameters and return type.
@@ -529,6 +588,18 @@ enum Resolved {
     /// informative than the value would be.
     From(String),
     Unresolved,
+}
+
+/// The outermost type name, with generics and references stripped:
+/// `&ast::Expr<'a>` is an `Expr`. Attribution matches on this, because a crate
+/// defines `Expr`, not `&ast::Expr<'a>`.
+fn base_name(ty: &syn::Type) -> Option<String> {
+    match ty {
+        syn::Type::Reference(r) => base_name(&r.elem),
+        syn::Type::Paren(p) => base_name(&p.elem),
+        syn::Type::Path(p) => p.path.segments.last().map(|s| s.ident.to_string()),
+        _ => None,
+    }
 }
 
 /// Renders a declared type as normalised source text, so that two spellings of

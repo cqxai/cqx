@@ -93,6 +93,12 @@ pub enum EdgeKind {
     /// A parameter of this symbol has this type; name and position on the edge.
     Param,
     Returns,
+    /// A type's generic argument: `Result<Output, Diag>` holds two.
+    ///
+    /// The whole written type stays one node so a signature renders verbatim;
+    /// these edges let each component be attributed to the crate that defines
+    /// it, which is what makes a signature readable at a glance.
+    TypeArg,
     /// A lint was switched off. Crate-wide is the strong form: it hides every
     /// future occurrence, including ones nobody has written yet.
     Silences,
