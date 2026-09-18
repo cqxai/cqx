@@ -174,16 +174,72 @@ pub fn defaults() -> BTreeMap<String, Rule> {
 }
 
 impl Config {
+    /// Builds a configuration from text, or from the defaults when there is
+    /// none. No filesystem: this is the form a browser can use, and the form
+    /// `resolve` finishes with once it has found a file.
+    pub fn from_text(text: Option<&str>) -> Result<Config, String> {
+        let mut config = Config {
+            rules: defaults(),
+            origins: defaults().keys().map(|k| (k.clone(), Origin::Default)).collect(),
+            min_score: None,
+            exclude: Vec::new(),
+            loaded_from: None,
+        };
+        if let Some(text) = text {
+            let file: ConfigFile = serde_json::from_str(text).map_err(|e| e.to_string())?;
+            config.apply_file(&file, "configuration")?;
+        }
+        config.apply_env()?;
+        config.validate()?;
+        Ok(config)
+    }
+
+    fn apply_file(&mut self, file: &ConfigFile, source: &str) -> Result<(), String> {
+        if file.version > 1 {
+            return Err(format!(
+                "{source}: config version {} is newer than this build understands (1)",
+                file.version
+            ));
+        }
+        for (id, patch) in &file.rules {
+            let Some(rule) = self.rules.get_mut(id) else {
+                return Err(format!(
+                    "{source}: no rule named '{id}'. Run `cqx score --explain` for the list."
+                ));
+            };
+            apply(rule, patch);
+            self.origins.insert(id.clone(), Origin::File);
+        }
+        self.min_score = file.min_score;
+        self.exclude.clone_from(&file.exclude);
+        Ok(())
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        for (id, rule) in &self.rules {
+            if rule.full <= rule.free {
+                return Err(format!(
+                    "rule '{id}': full ({}) must be greater than free ({})",
+                    rule.full, rule.free
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// Applies the layers in order and records where each rule ended up coming
-    /// from.
+    /// from: defaults, then a file, then the environment.
     pub fn resolve(explicit: Option<&Path>, root: &Path) -> Result<Config, String> {
-        let mut rules = defaults();
-        let mut origins: BTreeMap<String, Origin> = rules
-            .keys()
-            .map(|id| (id.clone(), Origin::Default))
-            .collect();
-        let mut min_score = None;
-        let mut exclude = Vec::new();
+        let mut config = Config {
+            rules: defaults(),
+            origins: defaults()
+                .keys()
+                .map(|id| (id.clone(), Origin::Default))
+                .collect(),
+            min_score: None,
+            exclude: Vec::new(),
+            loaded_from: None,
+        };
 
         let path = match explicit {
             Some(p) => Some(p.to_path_buf()),
@@ -191,37 +247,26 @@ impl Config {
                 .map(PathBuf::from)
                 .or_else(|| discover(root)),
         };
-
-        let mut loaded_from = None;
         if let Some(path) = path {
             let text = std::fs::read_to_string(&path)
                 .map_err(|e| format!("{}: {e}", path.display()))?;
             let file: ConfigFile = serde_json::from_str(&text)
                 .map_err(|e| format!("{}: {e}", path.display()))?;
-            if file.version > 1 {
-                return Err(format!(
-                    "{}: config version {} is newer than this build understands (1)",
-                    path.display(),
-                    file.version
-                ));
-            }
-            for (id, patch) in &file.rules {
-                let Some(rule) = rules.get_mut(id) else {
-                    return Err(format!(
-                        "{}: no rule named '{id}'. Run `cqx score --explain` for the list.",
-                        path.display()
-                    ));
-                };
-                apply(rule, patch);
-                origins.insert(id.clone(), Origin::File);
-            }
-            min_score = file.min_score;
-            exclude = file.exclude;
-            loaded_from = Some(path);
+            config.apply_file(&file, &path.display().to_string())?;
+            config.loaded_from = Some(path);
         }
 
-        // Environment last, because CI sets it per run.
-        for (id, rule) in rules.iter_mut() {
+        config.apply_env()?;
+        config.validate()?;
+        Ok(config)
+    }
+
+    /// Environment last, because CI sets it per run.
+    ///
+    /// In a browser there is no environment, so every lookup misses and this is
+    /// a no-op — which is the correct behaviour rather than a special case.
+    fn apply_env(&mut self) -> Result<(), String> {
+        for (id, rule) in self.rules.iter_mut() {
             let key = id.to_uppercase().replace('-', "_");
             let mut touched = false;
             for (suffix, field) in [("WEIGHT", 0), ("FREE", 1), ("FULL", 2)] {
@@ -259,29 +304,13 @@ impl Config {
                 touched = true;
             }
             if touched {
-                origins.insert(id.clone(), Origin::Env);
+                self.origins.insert(id.clone(), Origin::Env);
             }
         }
         if let Some(raw) = std::env::var_os("CQX_MIN_SCORE") {
-            min_score = raw.to_string_lossy().parse().ok();
+            self.min_score = raw.to_string_lossy().parse().ok();
         }
-
-        for (id, rule) in &rules {
-            if rule.full <= rule.free {
-                return Err(format!(
-                    "rule '{id}': full ({}) must be greater than free ({})",
-                    rule.full, rule.free
-                ));
-            }
-        }
-
-        Ok(Config {
-            rules,
-            origins,
-            min_score,
-            exclude,
-            loaded_from,
-        })
+        Ok(())
     }
 }
 

@@ -442,12 +442,22 @@ fn print_report(
     }
 }
 
-fn print_json(
+/// The whole result as data: scores, every rule with its deduction and
+/// findings, and the configuration it was all measured against.
+///
+/// Separate from printing it, because a browser wants the value and a terminal
+/// wants the text, and neither should have to go through the other.
+pub fn report_json(config: &Config, m: &Metrics) -> serde_json::Value {
+    let (scores, deductions) = score(config, m);
+    build_report(config, &scores, &deductions, m)
+}
+
+fn build_report(
     config: &Config,
     scores: &BTreeMap<String, u32>,
     deductions: &[Deduction],
     m: &Metrics,
-) {
+) -> serde_json::Value {
     let rules: Vec<serde_json::Value> = deductions
         .iter()
         .map(|d| {
@@ -482,11 +492,23 @@ fn print_json(
         .collect();
     // The configuration travels with the result: a consumer that renders this
     // should show the standards it was actually scored against.
-    let out = serde_json::json!({
+    serde_json::json!({
         "lines": m.lines,
         "scores": scores,
         "rules": rules,
         "config": config_json(config),
-    });
-    println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+    })
+}
+
+fn print_json(
+    config: &Config,
+    scores: &BTreeMap<String, u32>,
+    deductions: &[Deduction],
+    m: &Metrics,
+) {
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&build_report(config, scores, deductions, m))
+            .unwrap_or_default()
+    );
 }
