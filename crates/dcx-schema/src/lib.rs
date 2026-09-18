@@ -115,6 +115,25 @@ pub enum Source {
     Runtime,
 }
 
+/// How sure an extractor is of an edge.
+///
+/// `Proven` means the edge is visible in the source as written. `Inferred`
+/// means it took a step the extractor cannot fully guarantee — following an
+/// alias, a constant, or a function that returns a literal. Reporting the
+/// difference is the point: a graph that is right by luck is worse than one
+/// that says where it guessed.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Confidence {
+    #[default]
+    Proven,
+    Inferred,
+}
+
+fn is_proven(c: &Confidence) -> bool {
+    matches!(c, Confidence::Proven)
+}
+
 /// Where a fact can be seen in the source. An edge without evidence does not
 /// exist — that rule is what separates a map from a diagram.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -171,6 +190,8 @@ pub struct Edge {
     pub to: Id,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ev: Vec<Evidence>,
+    #[serde(default, skip_serializing_if = "is_proven")]
+    pub confidence: Confidence,
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub attrs: Map<String, Value>,
 }
@@ -182,8 +203,17 @@ impl Edge {
             from,
             to,
             ev: Vec::new(),
+            confidence: Confidence::Proven,
             attrs: Map::new(),
         }
+    }
+
+    /// Marks the edge as reached by a step the extractor cannot guarantee,
+    /// recording how it got there.
+    pub fn inferred(mut self, via: &str) -> Edge {
+        self.confidence = Confidence::Inferred;
+        self.attrs.insert("via".to_string(), via.into());
+        self
     }
     pub fn evidence(mut self, ev: Evidence) -> Edge {
         self.ev.push(ev);
