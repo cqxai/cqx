@@ -183,8 +183,10 @@ pub unsafe extern "C" fn cqx_dataset(
             remote: None,
             commits_url: None,
             // No clock here. The page times this call and fills it in, which
-            // measures the same span the exporter does.
+            // measures the same span the exporter does — and times its own
+            // reading of the source, which is the other half.
             analysed_ms: None,
+            fetched_ms: None,
         };
         Ok(cqx_view::dataset(&stream, report, serde_json::json!([]), &meta).to_string())
     });
