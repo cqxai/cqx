@@ -162,7 +162,8 @@ fn field(package: &toml::Value, key: &str, inherited: Option<&toml::Value>) -> O
 fn targets(vfs: &Vfs, dir: &str, manifest: &toml::Value, package: &str) -> Value {
     let mut out: Vec<Value> = Vec::new();
     let mut add = |name: &str, kind: &str, path: String| {
-        if vfs.contains(&path) {
+        // The same file declared and then discovered is still one target.
+        if vfs.contains(&path) && !out.iter().any(|t| t["src_path"] == json!(path)) {
             out.push(json!({ "name": name, "kind": [kind], "src_path": path }));
         }
     };
@@ -180,53 +181,48 @@ fn targets(vfs: &Vfs, dir: &str, manifest: &toml::Value, package: &str) -> Value
         None => add(package, "lib", join(dir, "src/lib.rs")),
     }
 
-    let declared_bins = manifest.get("bin").and_then(|v| v.as_array());
-    match declared_bins {
-        Some(bins) => {
-            for bin in bins {
-                let name = bin.get("name").and_then(|v| v.as_str()).unwrap_or(package);
-                let path = bin
-                    .get("path")
-                    .and_then(|v| v.as_str())
-                    .map(|p| join(dir, p))
-                    .unwrap_or_else(|| join(dir, format!("src/bin/{name}.rs")));
-                add(name, "bin", path);
-            }
-        }
-        None => {
-            add(package, "bin", join(dir, "src/main.rs"));
-            for path in auto(vfs, &join(dir, "src/bin")) {
-                let name = stem(&path);
-                add(&name, "bin", path);
-            }
+    // Declaring a target does not switch discovery off — cargo reports both.
+    // tokio's tests-integration lists four [[test]] entries in a directory of
+    // five files, and cargo finds all five. Only an explicit `autotests = false`
+    // and its siblings suppress the rest.
+    for bin in manifest.get("bin").and_then(|v| v.as_array()).into_iter().flatten() {
+        let name = bin.get("name").and_then(|v| v.as_str()).unwrap_or(package);
+        let path = bin
+            .get("path")
+            .and_then(|v| v.as_str())
+            .map(|p| join(dir, p))
+            .unwrap_or_else(|| join(dir, format!("src/bin/{name}.rs")));
+        add(name, "bin", path);
+    }
+    if auto_enabled(manifest, "autobins") {
+        add(package, "bin", join(dir, "src/main.rs"));
+        for path in auto(vfs, &join(dir, "src/bin")) {
+            let name = stem(&path);
+            add(&name, "bin", path);
         }
     }
 
     // Declared targets win over discovered ones: tokio's examples crate lists
     // twenty [[example]] entries pointing at files in its own root, which no
     // amount of convention would find.
-    for (folder, kind, table) in [
-        ("tests", "test", "test"),
-        ("benches", "bench", "bench"),
-        ("examples", "example", "example"),
+    for (folder, kind, table, flag) in [
+        ("tests", "test", "test", "autotests"),
+        ("benches", "bench", "bench", "autobenches"),
+        ("examples", "example", "example", "autoexamples"),
     ] {
-        match manifest.get(table).and_then(|v| v.as_array()) {
-            Some(declared) => {
-                for entry in declared {
-                    let name = entry.get("name").and_then(|v| v.as_str()).unwrap_or(package);
-                    let path = entry
-                        .get("path")
-                        .and_then(|v| v.as_str())
-                        .map(|p| join(dir, p))
-                        .unwrap_or_else(|| join(dir, format!("{folder}/{name}.rs")));
-                    add(name, kind, path);
-                }
-            }
-            None => {
-                for path in auto(vfs, &join(dir, folder)) {
-                    let name = stem(&path);
-                    add(&name, kind, path);
-                }
+        for entry in manifest.get(table).and_then(|v| v.as_array()).into_iter().flatten() {
+            let name = entry.get("name").and_then(|v| v.as_str()).unwrap_or(package);
+            let path = entry
+                .get("path")
+                .and_then(|v| v.as_str())
+                .map(|p| join(dir, p))
+                .unwrap_or_else(|| join(dir, format!("{folder}/{name}.rs")));
+            add(name, kind, path);
+        }
+        if auto_enabled(manifest, flag) {
+            for path in auto(vfs, &join(dir, folder)) {
+                let name = stem(&path);
+                add(&name, kind, path);
             }
         }
     }
@@ -240,6 +236,15 @@ fn targets(vfs: &Vfs, dir: &str, manifest: &toml::Value, package: &str) -> Value
     add("build-script-build", "custom-build", build);
 
     json!(out)
+}
+
+/// `autotests = false` and friends turn discovery off for one target kind.
+fn auto_enabled(manifest: &toml::Value, flag: &str) -> bool {
+    manifest
+        .get("package")
+        .and_then(|p| p.get(flag))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true)
 }
 
 /// Files cargo would pick up automatically: `foo.rs`, or `foo/main.rs`.

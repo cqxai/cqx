@@ -1,0 +1,95 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: build · clippy · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked --workspace --all-targets
+      # Clippy is clean, so it is enforced rather than tracked. A tool that
+      # reports lint suppression has no business carrying warnings of its own.
+      - run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - run: cargo test --locked --workspace
+      # The query backend is optional and pulls a git dependency, so it is built
+      # separately rather than hidden inside the default path.
+      - run: cargo build --locked -p cqx --features zega
+
+  wasm:
+    name: analysis compiles for wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      # cqx is meant to run in a browser, which means the analysis path must not
+      # acquire a dependency that cannot go there. This job is what notices.
+      - run: |
+          for crate in cqx-vfs cqx-schema cqx-rust cqx-score; do
+            cargo build --locked --target wasm32-unknown-unknown -p "$crate"
+          done
+
+  conformance:
+    name: manifest parser agrees with cargo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # Keyed on the pinned revisions, so updating a pin fetches afresh and
+      # leaving them alone costs nothing.
+      - name: Cache reference checkouts
+        uses: actions/cache@v4
+        with:
+          path: .reference
+          key: reference-${{ hashFiles('reference-repos.toml') }}
+
+      - name: Fetch pinned reference repositories
+        run: |
+          python3 - <<'PY'
+          import re, subprocess, pathlib, sys
+          text = pathlib.Path("reference-repos.toml").read_text()
+          repos = re.findall(
+              r'name\s*=\s*"([^"]+)"\s*\nurl\s*=\s*"([^"]+)"\s*\nrev\s*=\s*"([^"]+)"', text)
+          if not repos:
+              sys.exit("no repositories parsed from reference-repos.toml")
+          for name, url, rev in repos:
+              d = pathlib.Path(".reference") / name
+              if (d / "Cargo.toml").is_file():
+                  print(f"{name}: cached")
+                  continue
+              d.mkdir(parents=True, exist_ok=True)
+              # One commit, no blobs until asked: deno is otherwise 170MB.
+              for cmd in (["git", "init", "-q", "."],
+                          ["git", "remote", "add", "origin", url],
+                          ["git", "fetch", "-q", "--depth", "1",
+                           "--filter=blob:none", "origin", rev],
+                          ["git", "checkout", "-q", "FETCH_HEAD"]):
+                  subprocess.run(cmd, cwd=d, check=True)
+              print(f"{name}: fetched {rev[:12]}")
+          PY
+
+      # Cargo is the oracle here, not the implementation: the test compares what
+      # cqx parses out of the manifests against what cargo reports.
+      #
+      # Setting CQX_REFERENCE_DIR asserts the checkouts are present, so a failed
+      # fetch fails the job instead of quietly checking nothing.
+      - name: Compare against cargo metadata
+        env:
+          CQX_REFERENCE_DIR: ${{ github.workspace }}/.reference
+        run: cargo test --locked -p cqx-rust --test conformance -- --nocapture
