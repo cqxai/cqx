@@ -67,29 +67,38 @@ impl Shared {
     /// different crates — and following it through part of a workspace would
     /// find fewer of them.
     pub fn resolve(&mut self) {
-        for _ in 0..8 {
-            let mut changed = false;
-            let snapshot = self.reads_env.clone();
-            for (caller, callees) in &self.calls {
-                let mut gained: Vec<String> = Vec::new();
-                for callee in callees {
-                    if let Some(vars) = snapshot.get(callee) {
-                        for var in vars {
-                            let known = snapshot.get(caller).is_some_and(|v| v.contains(var));
-                            if !known && !gained.contains(var) {
-                                gained.push(var.clone());
-                            }
+        propagate_env(&mut self.calls, &mut self.reads_env);
+    }
+}
+
+/// One walk to a fixpoint, over whichever maps are handed to it, so the two
+/// forms of the same facts do not carry two copies of it.
+fn propagate_env(
+    calls: &mut HashMap<String, Vec<String>>,
+    reads_env: &mut HashMap<String, Vec<String>>,
+) {
+    for _ in 0..8 {
+        let mut changed = false;
+        let snapshot = reads_env.clone();
+        for (caller, callees) in calls.iter() {
+            let mut gained: Vec<String> = Vec::new();
+            for callee in callees {
+                if let Some(vars) = snapshot.get(callee) {
+                    for var in vars {
+                        let known = snapshot.get(caller).is_some_and(|v| v.contains(var));
+                        if !known && !gained.contains(var) {
+                            gained.push(var.clone());
                         }
                     }
                 }
-                if !gained.is_empty() {
-                    changed = true;
-                    self.reads_env.entry(caller.clone()).or_default().extend(gained);
-                }
             }
-            if !changed {
-                break;
+            if !gained.is_empty() {
+                changed = true;
+                reads_env.entry(caller.clone()).or_default().extend(gained);
             }
+        }
+        if !changed {
+            break;
         }
     }
 }
@@ -166,6 +175,20 @@ impl PackageFacts {
         }
     }
 
+    /// The same, for a caller with no further use for the facts.
+    ///
+    /// Copying four maps of a large workspace is not free: makepad's cost the
+    /// module the last of the four gigabytes wasm32 can address, and it failed
+    /// where it had previously finished. Moving them costs nothing.
+    pub fn into_shared(self) -> Shared {
+        Shared {
+            constants: self.constants,
+            literal_fns: self.literal_fns,
+            calls: self.calls,
+            reads_env: self.reads_env,
+        }
+    }
+
     /// Takes on what every reader found, keeping its own aliases — those are
     /// file-scoped and were never anyone else's to know.
     pub fn adopt(&mut self, shared: Shared) {
@@ -176,10 +199,12 @@ impl PackageFacts {
     }
 
     /// Follows what was gathered to its conclusion.
+    ///
+    /// In place. Going out through a copy and back doubled the four maps at
+    /// the moment the trees were also held, which on a large workspace is the
+    /// difference between finishing and running out of address space.
     pub fn resolve(&mut self) {
-        let mut shared = self.shared();
-        shared.resolve();
-        self.adopt(shared);
+        propagate_env(&mut self.calls, &mut self.reads_env);
     }
 
     pub fn aliases_for(&self, rel_path: &str) -> HashMap<String, String> {
@@ -364,18 +389,10 @@ pub fn parse_package_watched(
 ) -> (Vec<ParsedFile>, Vec<String>) {
     let mut parsed = Vec::new();
     let mut failures = Vec::new();
-    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-    for (dir, is_test) in roots {
-        for path in vfs.under(dir) {
-            if !path.ends_with(".rs") {
-                continue;
-            }
-            if nested.iter().any(|n| crate::extract::is_inside(path, n)) {
-                continue; // belongs to a package nested inside this one
-            }
-            if !seen.insert(path.to_string()) {
-                continue; // two roots can overlap; a file belongs to one package once
-            }
+    for (dir, is_test, path) in files_of(vfs, roots, nested) {
+        {
+            let path = path.as_str();
+            let (dir, is_test) = (&dir, &is_test);
             let Some(source) = vfs.read(path) else {
                 continue;
             };
@@ -392,4 +409,35 @@ pub fn parse_package_watched(
         }
     }
     (parsed, failures)
+}
+
+/// Which files a package owns, before any of them is read.
+///
+/// Separate from the parsing so the number can be known in advance. A reader
+/// waiting two minutes wants a fraction, and a fraction needs a denominator
+/// that means something: makepad holds six thousand `.rs` files and fewer than
+/// three thousand of them belong to a crate. Counting the rest made a finished
+/// analysis look stalled at forty-five per cent.
+pub fn files_of(
+    vfs: &Vfs,
+    roots: &[(String, bool)],
+    nested: &[String],
+) -> Vec<(String, bool, String)> {
+    let mut found = Vec::new();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for (dir, is_test) in roots {
+        for path in vfs.under(dir) {
+            if !path.ends_with(".rs") {
+                continue;
+            }
+            if nested.iter().any(|n| crate::extract::is_inside(path, n)) {
+                continue; // belongs to a package nested inside this one
+            }
+            if !seen.insert(path.to_string()) {
+                continue; // two roots can overlap; a file belongs to one package once
+            }
+            found.push((dir.clone(), *is_test, path.to_string()));
+        }
+    }
+    found
 }

@@ -28,11 +28,13 @@ use cqx_vfs::Vfs;
 #[cfg(target_arch = "wasm32")]
 #[link(wasm_import_module = "cqx")]
 extern "C" {
+    /// Called once, with the number of files about to be read.
+    fn parsing_total(files: u32);
     /// Called once per file, as it is parsed.
     fn parsed_one();
 }
 
-/// The import is unsafe only because it crosses the boundary.
+/// The imports are unsafe only because they cross the boundary.
 #[cfg(target_arch = "wasm32")]
 fn tick() {
     // SAFETY: the host supplies this at instantiation or the module does not
@@ -40,9 +42,18 @@ fn tick() {
     unsafe { parsed_one() }
 }
 
+#[cfg(target_arch = "wasm32")]
+fn expect(files: u32) {
+    // SAFETY: as above.
+    unsafe { parsing_total(files) }
+}
+
 /// Built for anything else — a test run, a lint — there is no host to tell.
 #[cfg(not(target_arch = "wasm32"))]
 fn tick() {}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn expect(_files: u32) {}
 
 thread_local! {
     /// The snapshot being assembled. A thread local rather than a `static mut`:
@@ -198,7 +209,7 @@ pub unsafe extern "C" fn cqx_dataset(
         // The same three phases the sharded path uses, so the one reader can
         // say how far along it is too.
         let metadata = cqx_rust::manifest::read(&vfs).map_err(|e| e.to_string())?;
-        let prepared = cqx_rust::extract::prepare_watched(&vfs, metadata, &tick)
+        let prepared = cqx_rust::extract::prepare_reporting(&vfs, metadata, &expect, &tick)
             .map_err(|e| e.to_string())?;
         let mut facts_of = prepared.gathered();
         facts_of.resolve();
@@ -294,9 +305,11 @@ pub unsafe extern "C" fn cqx_gather(metadata: *const u8, metadata_len: usize) ->
     let result = SNAPSHOT.with(|s| -> Result<String, String> {
         let metadata: serde_json::Value =
             serde_json::from_str(&text).map_err(|e| format!("metadata: {e}"))?;
-        let prepared = cqx_rust::extract::prepare_watched(&s.borrow(), metadata, &tick)
+        let prepared = cqx_rust::extract::prepare_reporting(&s.borrow(), metadata, &expect, &tick)
             .map_err(|e| e.to_string())?;
-        let shared = prepared.gathered().shared();
+        // Moved, not copied: the facts are of no further use here, and a copy
+        // of a large workspace's four maps is what exhausted the address space.
+        let shared = prepared.gathered().into_shared();
         PREPARED.with(|p| *p.borrow_mut() = Some(prepared));
         serde_json::to_string(&shared).map_err(|e| e.to_string())
     });
