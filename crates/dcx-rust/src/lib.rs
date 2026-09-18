@@ -5,6 +5,7 @@
 //! because that is the only place a handler can exist.
 
 pub mod extract;
+mod prepass;
 mod visit;
 
 use std::path::PathBuf;
