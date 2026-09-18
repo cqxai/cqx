@@ -286,7 +286,7 @@ fn emit_dependencies<W: Write>(
             .get(&dep_name.replace('-', "_"))
             .cloned()
             .unwrap_or_else(|| Id::external(dep_name));
-        if matches!(target.0.strip_prefix("ext:"), Some(_)) {
+        if target.0.starts_with("ext:") {
             w.node(Node::new(target.clone(), NodeKind::External).attr("name", dep_name))?;
         }
         let line = manifest_line(&manifest_text, dep_name).unwrap_or(1);
