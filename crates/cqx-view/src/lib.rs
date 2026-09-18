@@ -104,10 +104,23 @@ pub fn dataset(stream: &Stream, score: Value, history: Value, meta: &Meta<'_>) -
         .map(|n| (n.id.0.as_str(), n))
         .collect();
 
+    // A node is normally contained by one thing. A name declared in two places
+    // is contained by both, and taking whichever edge happened to arrive last
+    // makes the answer depend on the order the facts were written — which is
+    // the order the files were read, and, once the reading is divided between
+    // several readers, on how it was divided. The first by name is as arbitrary
+    // and never changes.
     let mut parent: HashMap<&str, &str> = HashMap::new();
     for edge in &stream.edges {
         if edge.kind == EdgeKind::Contains {
-            parent.insert(&edge.to.0, &edge.from.0);
+            parent
+                .entry(&edge.to.0)
+                .and_modify(|at| {
+                    if edge.from.0.as_str() < *at {
+                        *at = &edge.from.0;
+                    }
+                })
+                .or_insert(&edge.from.0);
         }
     }
 
@@ -252,29 +265,40 @@ pub fn dataset(stream: &Stream, score: Value, history: Value, meta: &Meta<'_>) -
     // A type node is the type as written. What a reader wants underneath a
     // signature is which crate each name came from, which is answerable only
     // for names this scan saw declared.
-    let mut defined_by: BTreeMap<&str, &str> = BTreeMap::new(); // type id → symbol id
+    // Every declaration, not the last one seen. A type id is a name, and a
+    // workspace may well declare the same name twice — ripgrep declares `Begin`
+    // in its printer and again in its tests. Keeping only one of them both hid
+    // the ambiguity, so `Error` was reported as belonging to whichever crate
+    // wrote the last edge, and made the answer depend on the order the files
+    // were read in.
+    let mut defined_by: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
     for edge in &stream.edges {
         if edge.kind == EdgeKind::Defines {
-            defined_by.insert(&edge.to.0, &edge.from.0);
+            defined_by
+                .entry(&edge.to.0)
+                .or_default()
+                .insert(&edge.from.0);
         }
     }
     let mut owner_of_base: HashMap<&str, Option<&str>> = HashMap::new();
-    for (ty, sym) in &defined_by {
+    for (ty, syms) in &defined_by {
         let Some(base) = node
             .get(*ty)
             .and_then(|n| attr(n, "base").or_else(|| attr(n, "text")))
         else {
             continue;
         };
-        let owner = climb(sym, &parent, "pkg:").and_then(package_name);
-        match owner_of_base.get(base) {
-            None => {
-                owner_of_base.insert(base, owner);
+        for sym in syms {
+            let owner = climb(sym, &parent, "pkg:").and_then(package_name);
+            match owner_of_base.get(base) {
+                None => {
+                    owner_of_base.insert(base, owner);
+                }
+                Some(existing) if *existing != owner => {
+                    owner_of_base.insert(base, Some(AMBIGUOUS));
+                }
+                Some(_) => {}
             }
-            Some(existing) if *existing != owner => {
-                owner_of_base.insert(base, Some(AMBIGUOUS));
-            }
-            Some(_) => {}
         }
     }
 
@@ -365,9 +389,22 @@ pub fn dataset(stream: &Stream, score: Value, history: Value, meta: &Meta<'_>) -
 
     let types: Vec<Value> = defined_by
         .iter()
-        .filter_map(|(ty, sym)| {
-            let declaration = node.get(*sym)?;
+        .filter_map(|(ty, syms)| {
+            // One row per name, so one of the declarations has to speak for it.
+            // The first by name, rather than the last to be read.
+            let sym = *syms.iter().next()?;
+            let declaration = node.get(sym)?;
             let pkg = climb(sym, &parent, "pkg:").and_then(package_name);
+            let mut fields = fields_of.get(*ty).cloned().unwrap_or_default();
+            if syms.len() > 1 {
+                // Two declarations of a name contribute their fields to the one
+                // row, in whatever order they were written. Settled, so the row
+                // says the same thing however the reading was divided. A single
+                // declaration keeps the order it was written in, which is the
+                // order it is declared in.
+                fields.sort();
+                fields.dedup();
+            }
             json!({
                 "id": ty,
                 "name": base_of(ty, &node),
@@ -375,7 +412,7 @@ pub fn dataset(stream: &Stream, score: Value, history: Value, meta: &Meta<'_>) -
                 "pkg": pkg,
                 "file": climb(sym, &parent, "file:").and_then(file_path),
                 "lines": lines_of(declaration),
-                "fields": fields_of.get(*ty).cloned().unwrap_or_default(),
+                "fields": fields,
                 "uses": used.get(*ty).copied().unwrap_or(0),
             })
             .into()
