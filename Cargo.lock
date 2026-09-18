@@ -76,6 +76,7 @@ name = "cqx"
 version = "0.1.0"
 dependencies = [
  "cqx-rust",
+ "cqx-score",
  "cqx-store",
  "deka-cli-core",
 ]
@@ -97,6 +98,17 @@ dependencies = [
 name = "cqx-schema"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "cqx-score"
+version = "0.1.0"
+dependencies = [
+ "cqx-schema",
+ "cqx-store",
+ "deka-cli-core",
  "serde",
  "serde_json",
 ]
