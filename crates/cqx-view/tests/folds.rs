@@ -26,6 +26,7 @@ fn analyse(files: &[(&str, &str)]) -> Value {
             remote: None,
             commits_url: None,
             analysed_ms: None,
+            fetched_ms: None,
         },
     )
 }

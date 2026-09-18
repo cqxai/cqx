@@ -32,6 +32,13 @@ pub struct Meta<'a> {
     /// The caller measures it. A wasm build has no clock, so there the page
     /// times the call and fills this in.
     pub analysed_ms: Option<u64>,
+    /// How long it took to get the source in hand, in milliseconds.
+    ///
+    /// Not the same work in both places — a checkout unpacks a commit and
+    /// reads it off a local disk, a browser pulls every file across the
+    /// internet — but it is the same question, and leaving it out of one of
+    /// them makes that one look faster than it was.
+    pub fetched_ms: Option<u64>,
 }
 
 /// The six effects worth a badge. `silences` is deliberately not among them:
@@ -462,6 +469,7 @@ pub fn dataset(stream: &Stream, score: Value, history: Value, meta: &Meta<'_>) -
         "repo": meta.repo,
         "analysis": {
             "ms": meta.analysed_ms,
+            "fetch": meta.fetched_ms,
             "cqx": env!("CARGO_PKG_VERSION"),
         },
         "branch": meta.branch,
