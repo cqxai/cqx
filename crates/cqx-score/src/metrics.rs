@@ -17,6 +17,17 @@ pub struct Finding {
     pub what: String,
     pub file: String,
     pub line: u32,
+    /// Which part of the line, `[start, end)`, as the parser counts columns.
+    ///
+    /// `[0, 0]` where there is no such part: a file that is too long, a crate
+    /// drawing on too many others. Those are true of the whole thing, and
+    /// inventing a column to satisfy a format would point at code that is not
+    /// the problem.
+    pub col: [u32; 2],
+    /// The line itself, so a reader is shown the code rather than told to go
+    /// and find it. Filled in after scoring, by whoever still holds the
+    /// source — the scorer sees a graph, not a repository.
+    pub text: String,
 }
 
 /// Closures cannot express the lifetime tie between an edge and a string
@@ -41,15 +52,29 @@ fn attr<'a>(e: &'a Edge, k: &str) -> &'a str {
 }
 
 fn finding(what: impl Into<String>, edge: &Edge) -> Finding {
-    let (file, line) = edge
+    let (file, line, col) = edge
         .ev
         .first()
-        .map(|e| (e.file.clone(), e.line[0]))
+        .map(|e| (e.file.clone(), e.line[0], e.col))
         .unwrap_or_default();
     Finding {
         what: what.into(),
         file,
         line,
+        col,
+        text: String::new(),
+    }
+}
+
+/// A finding about a whole file or crate, which has no part of a line to point
+/// at.
+pub fn about(what: impl Into<String>, file: impl Into<String>, line: u32) -> Finding {
+    Finding {
+        what: what.into(),
+        file: file.into(),
+        line,
+        col: [0, 0],
+        text: String::new(),
     }
 }
 
@@ -231,10 +256,12 @@ impl Metrics {
             .values()
             .filter(|v| v.len() > 1)
             .flat_map(|v| {
-                v.iter().skip(1).map(|id| Finding {
-                    what: format!("copy of {}", v[0].trim_start_matches("sym:")),
-                    file: id.trim_start_matches("sym:").to_string(),
-                    line: 0,
+                v.iter().skip(1).map(|id| {
+                    about(
+                        format!("copy of {}", v[0].trim_start_matches("sym:")),
+                        id.trim_start_matches("sym:"),
+                        0,
+                    )
                 })
             })
             .collect();
@@ -299,14 +326,14 @@ impl Metrics {
             let total = own.get(*pkg).copied().unwrap_or(0) + f;
             let owners = sources.get(*pkg).map(HashSet::len).unwrap_or(0);
             if total >= 12 && (*f as f64 / total as f64) > 0.30 && owners >= 3 {
-                scatter.push(Finding {
-                    what: format!(
+                scatter.push(about(
+                    format!(
                         "{:.0}% of its signature types belong to {owners} other crates",
                         *f as f64 / total as f64 * 100.0
                     ),
-                    file: pkg.to_string(),
-                    line: 0,
-                });
+                    pkg.to_string(),
+                    0,
+                ));
             }
         }
 
@@ -370,10 +397,12 @@ impl Metrics {
                 value: oversized.len() as f64 / scale,
                 findings: oversized
                     .iter()
-                    .map(|(path, n)| Finding {
-                        what: format!("{n} lines, over the {max_lines}-line standard"),
-                        file: path.clone(),
-                        line: 0,
+                    .map(|(path, n)| {
+                        about(
+                            format!("{n} lines, over the {max_lines}-line standard"),
+                            path.clone(),
+                            0,
+                        )
                     })
                     .collect(),
             },

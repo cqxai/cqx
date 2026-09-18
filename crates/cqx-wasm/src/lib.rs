@@ -213,7 +213,10 @@ pub unsafe extern "C" fn cqx_dataset(
             Some(config_text.as_str())
         })?;
         let metrics = cqx_score::metrics::Metrics::compute(&stream, &config);
-        let report = cqx_score::report_json(&config, &metrics);
+        let mut report = cqx_score::report_json(&config, &metrics);
+        // The snapshot is still here, so each finding can carry the line it
+        // points at rather than only its number.
+        cqx_view::quote(&mut report, &|path| vfs.read(path).map(str::to_string));
         // A browser has one commit in hand and no git: the timeline it shows
         // comes from the index it already fetched, not from in here.
         let meta = cqx_view::Meta {

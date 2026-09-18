@@ -164,7 +164,10 @@ fn run(context: &Context) -> Result<(), String> {
             cqx_rust::extract::run(&snapshot, &mut facts).map_err(|e| format!("{sha}: {e}"))?;
             let stream = cqx_store::facts::Stream::from_ndjson(&String::from_utf8_lossy(&facts));
             let metrics = cqx_score::metrics::Metrics::compute(&stream, &config);
-            let report = cqx_score::report_json(&config, &metrics);
+            let mut report = cqx_score::report_json(&config, &metrics);
+            // The checkout is still on disk, so each finding carries the line
+            // it points at.
+            cqx_view::quote(&mut report, &|path| snapshot.read(path).map(str::to_string));
             let scores: BTreeMap<String, u32> =
                 serde_json::from_value(report["scores"].clone()).unwrap_or_default();
             // The timeline lives in the index, not in here: a file that carries

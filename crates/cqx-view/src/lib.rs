@@ -492,3 +492,45 @@ pub fn dataset(stream: &Stream, score: Value, history: Value, meta: &Meta<'_>) -
         },
     })
 }
+
+/// Puts the line of code beside each finding that points at one.
+///
+/// The scorer works from a graph and has no repository to read, so this runs
+/// where the source still is: the exporter holds a checkout, a browser holds
+/// what it fetched. Without it a reader is told that something on line 28 ends
+/// the process and left to go and find it, which is the difference between an
+/// index and a diagnostic.
+///
+/// Only the one line, trimmed of trailing space. A finding about a whole file
+/// has no line to show and is left alone.
+pub fn quote(report: &mut Value, source: &dyn Fn(&str) -> Option<String>) {
+    let Some(rules) = report.get_mut("rules").and_then(Value::as_array_mut) else {
+        return;
+    };
+    // One file is usually asked for several times over — deka has 134 findings
+    // across far fewer files — so it is read once.
+    let mut read: BTreeMap<String, Option<Vec<String>>> = BTreeMap::new();
+    for rule in rules {
+        let Some(findings) = rule.get_mut("findings").and_then(Value::as_array_mut) else {
+            continue;
+        };
+        for finding in findings {
+            let (Some(path), Some(line)) = (
+                finding.get("file").and_then(Value::as_str).map(str::to_string),
+                finding.get("line").and_then(Value::as_u64),
+            ) else {
+                continue;
+            };
+            if line == 0 {
+                continue; // about the file, not a place in it
+            }
+            let lines = read
+                .entry(path.clone())
+                .or_insert_with(|| source(&path).map(|t| t.lines().map(str::to_string).collect()));
+            let Some(lines) = lines else { continue };
+            if let Some(text) = lines.get(line as usize - 1) {
+                finding["text"] = Value::String(text.trim_end().to_string());
+            }
+        }
+    }
+}

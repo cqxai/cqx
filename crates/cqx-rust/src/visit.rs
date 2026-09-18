@@ -75,10 +75,11 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
     }
 
     fn evidence(&self, span: Span) -> Evidence {
-        Evidence::at(
+        let (start, end) = (span.start(), span.end());
+        Evidence::spanning(
             &self.rel_path,
-            span.start().line as u32,
-            span.end().line as u32,
+            [start.line as u32, end.line as u32],
+            [start.column as u32, end.column as u32],
         )
     }
 
