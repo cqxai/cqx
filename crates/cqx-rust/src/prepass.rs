@@ -6,7 +6,7 @@
 //! unresolved names in real code are one alias, one constant or one hop away,
 //! not a question about the type system.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -23,12 +23,30 @@ use syn::visit::Visit;
 /// That distinction is most of the cost: makepad has six thousand files, and
 /// sending every file's aliases to every reader would be a large multiple of
 /// what actually needs sharing.
+/// How many environment variables are worth naming against one function.
+///
+/// The question a score asks of this map is whether a function is environment
+/// derived at all, and a truncated set answers it exactly as a whole one does.
+/// The names are only ever rendered into a finding, and a finding that names
+/// two hundred variables has told a reader nothing — while the closure that
+/// produced them is the largest thing cqx ever holds: makepad's ran to four
+/// and a half million pairs and ninety-five megabytes, against three hundred
+/// and ninety variables that actually exist in the workspace.
+///
+/// A function that reads this many directly keeps every one of them. The bound
+/// only refuses what propagation would pile on top.
+const MOST_VARS: usize = 8;
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Shared {
     pub constants: HashMap<String, String>,
     pub literal_fns: HashMap<String, String>,
     pub calls: HashMap<String, Vec<String>>,
     pub reads_env: HashMap<String, Vec<String>>,
+    /// The functions whose list stopped at [`MOST_VARS`], so a finding can say
+    /// that it is showing some of them rather than all of them.
+    #[serde(default)]
+    pub truncated: BTreeSet<String>,
 }
 
 impl Shared {
@@ -57,6 +75,7 @@ impl Shared {
                 }
             }
         }
+        self.truncated.extend(other.truncated);
     }
 
     /// Walks `calls` to a fixpoint so a function that calls a function that
@@ -67,7 +86,7 @@ impl Shared {
     /// different crates — and following it through part of a workspace would
     /// find fewer of them.
     pub fn resolve(&mut self) {
-        propagate_env(&mut self.calls, &mut self.reads_env);
+        propagate_env(&mut self.calls, &mut self.reads_env, &mut self.truncated);
     }
 }
 
@@ -76,6 +95,7 @@ impl Shared {
 fn propagate_env(
     calls: &mut HashMap<String, Vec<String>>,
     reads_env: &mut HashMap<String, Vec<String>>,
+    truncated: &mut BTreeSet<String>,
 ) {
     let calls = &*calls;
     // Who names whom, the other way round.
@@ -144,7 +164,18 @@ fn propagate_env(
             .map(|(caller, gained)| (caller.to_string(), gained))
             .collect();
         for (caller, gained) in owned {
-            reads_env.entry(caller).or_default().extend(gained);
+            let held = reads_env.entry(caller.clone()).or_default();
+            for var in gained {
+                // Past the bound the answer is already "yes, and from more of
+                // them than anyone wants listed". Refusing the rest is what
+                // keeps the closure from squaring: the same functions come out
+                // marked, carrying fewer names each.
+                if held.len() >= MOST_VARS {
+                    truncated.insert(caller);
+                    break;
+                }
+                held.push(var);
+            }
         }
     }
 }
@@ -173,6 +204,8 @@ pub struct PackageFacts {
     /// propagated through `calls`. This is what turns "unresolved" into
     /// "environment-controlled", which is the more useful answer.
     pub reads_env: HashMap<String, Vec<String>>,
+    /// Those whose list stopped at [`MOST_VARS`]. See it for why there is one.
+    pub truncated: BTreeSet<String>,
 }
 
 impl PackageFacts {
@@ -218,6 +251,7 @@ impl PackageFacts {
             literal_fns: self.literal_fns.clone(),
             calls: self.calls.clone(),
             reads_env: self.reads_env.clone(),
+            truncated: self.truncated.clone(),
         }
     }
 
@@ -232,6 +266,7 @@ impl PackageFacts {
             literal_fns: self.literal_fns,
             calls: self.calls,
             reads_env: self.reads_env,
+            truncated: self.truncated,
         }
     }
 
@@ -242,6 +277,7 @@ impl PackageFacts {
         self.literal_fns = shared.literal_fns;
         self.calls = shared.calls;
         self.reads_env = shared.reads_env;
+        self.truncated = shared.truncated;
     }
 
     /// Follows what was gathered to its conclusion.
@@ -250,7 +286,7 @@ impl PackageFacts {
     /// the moment the trees were also held, which on a large workspace is the
     /// difference between finishing and running out of address space.
     pub fn resolve(&mut self) {
-        propagate_env(&mut self.calls, &mut self.reads_env);
+        propagate_env(&mut self.calls, &mut self.reads_env, &mut self.truncated);
     }
 
     pub fn aliases_for(&self, rel_path: &str) -> HashMap<String, String> {
