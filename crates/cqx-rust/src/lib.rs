@@ -5,6 +5,7 @@
 //! because that is the only place a handler can exist.
 
 pub mod extract;
+pub mod manifest;
 mod prepass;
 mod visit;
 
@@ -65,15 +66,25 @@ fn cmd_extract(context: &Context) {
     let out_path = context.args.params.get("--out").map(PathBuf::from);
     let quiet = context.args.flags.get("--quiet").copied().unwrap_or(false);
 
+    // The one place a filesystem is touched, and it is not analysis — it is
+    // what happens before it.
+    let vfs = match cqx_vfs::from_dir(&root) {
+        Ok(vfs) => vfs,
+        Err(e) => {
+            fail(format!("{}: {e}", root.display()));
+            return;
+        }
+    };
+
     let result = match &out_path {
         Some(path) => match std::fs::File::create(path) {
-            Ok(file) => extract::run(&root, std::io::BufWriter::new(file)),
+            Ok(file) => extract::run(&vfs, std::io::BufWriter::new(file)),
             Err(e) => {
                 fail(format!("{}: {e}", path.display()));
                 return;
             }
         },
-        None => extract::run(&root, std::io::BufWriter::new(std::io::stdout().lock())),
+        None => extract::run(&vfs, std::io::BufWriter::new(std::io::stdout().lock())),
     };
 
     match result {

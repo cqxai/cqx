@@ -7,8 +7,8 @@
 //! not a question about the type system.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 
+use cqx_vfs::Vfs;
 use syn::visit::Visit;
 
 #[derive(Default)]
@@ -250,45 +250,35 @@ pub struct ParsedFile {
 /// Not every workspace uses that layout — deno declares `ext/fs/lib.rs` — and
 /// assuming it silently reported 81 packages holding 93 files.
 pub fn parse_package(
-    pkg_dir: &Path,
-    root: &Path,
-    roots: &[(PathBuf, bool)],
-    nested: &[PathBuf],
+    vfs: &Vfs,
+    roots: &[(String, bool)],
+    nested: &[String],
 ) -> (Vec<ParsedFile>, Vec<String>) {
     let mut parsed = Vec::new();
     let mut failures = Vec::new();
-    let mut seen: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
-    let _ = pkg_dir;
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     for (dir, is_test) in roots {
-        if !dir.is_dir() {
-            continue;
-        }
-        for entry in walkdir::WalkDir::new(dir)
-            .into_iter()
-            .filter_map(Result::ok)
-            .filter(|e| e.file_type().is_file())
-        {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+        for path in vfs.under(dir) {
+            if !path.ends_with(".rs") {
                 continue;
             }
-            if nested.iter().any(|n| path.starts_with(n)) {
+            if nested.iter().any(|n| crate::extract::is_inside(path, n)) {
                 continue; // belongs to a package nested inside this one
             }
-            if !seen.insert(path.to_path_buf()) {
+            if !seen.insert(path.to_string()) {
                 continue; // two roots can overlap; a file belongs to one package once
             }
-            let rel = crate::extract::rel(root, path);
-            match std::fs::read_to_string(path).map_err(|e| e.to_string()).and_then(
-                |source| syn::parse_file(&source).map_err(|e| e.to_string()),
-            ) {
+            let Some(source) = vfs.read(path) else {
+                continue;
+            };
+            match syn::parse_file(source) {
                 Ok(file) => parsed.push(ParsedFile {
                     module_prefix: crate::extract::module_prefix(dir, path),
-                    rel_path: rel,
+                    rel_path: path.to_string(),
                     parsed: file,
                     test_role: *is_test,
                 }),
-                Err(e) => failures.push(format!("{rel}: {e}")),
+                Err(e) => failures.push(format!("{path}: {e}")),
             }
         }
     }

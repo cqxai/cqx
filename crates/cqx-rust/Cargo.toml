@@ -8,6 +8,8 @@ description = "Rust extractor for cqx: emits facts from a cargo workspace."
 
 [dependencies]
 cqx-schema = { workspace = true }
+cqx-vfs = { workspace = true }
+toml = { workspace = true }
 deka-cli-core = { workspace = true }
 serde_json = { workspace = true }
 syn = { workspace = true }
