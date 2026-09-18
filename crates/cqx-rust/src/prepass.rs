@@ -8,8 +8,91 @@
 
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+
 use cqx_vfs::Vfs;
 use syn::visit::Visit;
+
+/// What one reader must tell the others.
+///
+/// Four of the five maps are keyed by a bare name and mean something across the
+/// whole workspace, so a reader holding one slice of it cannot resolve against
+/// them alone. The fifth — aliases — is keyed by file and only ever read back
+/// for that same file, so it stays where it was found and never crosses.
+///
+/// That distinction is most of the cost: makepad has six thousand files, and
+/// sending every file's aliases to every reader would be a large multiple of
+/// what actually needs sharing.
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct Shared {
+    pub constants: HashMap<String, String>,
+    pub literal_fns: HashMap<String, String>,
+    pub calls: HashMap<String, Vec<String>>,
+    pub reads_env: HashMap<String, Vec<String>>,
+}
+
+impl Shared {
+    /// Takes on everything another reader said.
+    ///
+    /// Later wins, exactly as a later file wins within one pass, so merging in
+    /// reading order reproduces reading them together. The two that accumulate
+    /// rather than replace are extended, and repeats dropped, because a name
+    /// seen twice says nothing new.
+    pub fn merge(&mut self, other: Shared) {
+        self.constants.extend(other.constants);
+        self.literal_fns.extend(other.literal_fns);
+        for (name, called) in other.calls {
+            let held = self.calls.entry(name).or_default();
+            for one in called {
+                if !held.contains(&one) {
+                    held.push(one);
+                }
+            }
+        }
+        for (name, vars) in other.reads_env {
+            let held = self.reads_env.entry(name).or_default();
+            for var in vars {
+                if !held.contains(&var) {
+                    held.push(var);
+                }
+            }
+        }
+    }
+
+    /// Walks `calls` to a fixpoint so a function that calls a function that
+    /// reads the environment is itself marked environment-derived.
+    ///
+    /// Done once, over everything, because a chain of calls routinely crosses
+    /// a crate boundary — deka's spawn target is three named hops away in two
+    /// different crates — and following it through part of a workspace would
+    /// find fewer of them.
+    pub fn resolve(&mut self) {
+        for _ in 0..8 {
+            let mut changed = false;
+            let snapshot = self.reads_env.clone();
+            for (caller, callees) in &self.calls {
+                let mut gained: Vec<String> = Vec::new();
+                for callee in callees {
+                    if let Some(vars) = snapshot.get(callee) {
+                        for var in vars {
+                            let known = snapshot.get(caller).is_some_and(|v| v.contains(var));
+                            if !known && !gained.contains(var) {
+                                gained.push(var.clone());
+                            }
+                        }
+                    }
+                }
+                if !gained.is_empty() {
+                    changed = true;
+                    self.reads_env.entry(caller.clone()).or_default().extend(gained);
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct PackageFacts {
@@ -42,6 +125,20 @@ impl PackageFacts {
     /// routinely crosses a crate boundary: deka's spawn target is three named
     /// hops away in two different crates.
     pub fn collect(files: &[&ParsedFile]) -> PackageFacts {
+        let mut facts = PackageFacts::gather(files);
+        facts.resolve();
+        facts
+    }
+
+    /// What one set of files says, before anything is followed across the
+    /// workspace.
+    ///
+    /// Separate from [`collect`] so the reading can be divided. Every map here
+    /// is keyed by a bare name and filled by insertion, so two sets gathered
+    /// apart and merged in the order they were read hold exactly what one pass
+    /// over the same files in the same order would hold — and the following,
+    /// which is a fixpoint over all of it, happens once afterwards.
+    pub fn gather(files: &[&ParsedFile]) -> PackageFacts {
         let mut facts = PackageFacts::default();
         for ParsedFile { rel_path, parsed, .. } in files.iter().copied() {
             let mut file_aliases = HashMap::new();
@@ -56,37 +153,33 @@ impl PackageFacts {
             collector.visit_file(parsed);
             facts.aliases.insert(rel_path.clone(), file_aliases);
         }
-        facts.propagate_env();
         facts
     }
 
-    /// Walks `calls` to a fixpoint so a function that calls a function that
-    /// reads the environment is itself marked environment-derived.
-    fn propagate_env(&mut self) {
-        for _ in 0..8 {
-            let mut changed = false;
-            let snapshot = self.reads_env.clone();
-            for (caller, callees) in &self.calls {
-                let mut gained: Vec<String> = Vec::new();
-                for callee in callees {
-                    if let Some(vars) = snapshot.get(callee) {
-                        for var in vars {
-                            let known = snapshot.get(caller).is_some_and(|v| v.contains(var));
-                            if !known && !gained.contains(var) {
-                                gained.push(var.clone());
-                            }
-                        }
-                    }
-                }
-                if !gained.is_empty() {
-                    changed = true;
-                    self.reads_env.entry(caller.clone()).or_default().extend(gained);
-                }
-            }
-            if !changed {
-                break;
-            }
+    /// What this reader must tell the others.
+    pub fn shared(&self) -> Shared {
+        Shared {
+            constants: self.constants.clone(),
+            literal_fns: self.literal_fns.clone(),
+            calls: self.calls.clone(),
+            reads_env: self.reads_env.clone(),
         }
+    }
+
+    /// Takes on what every reader found, keeping its own aliases — those are
+    /// file-scoped and were never anyone else's to know.
+    pub fn adopt(&mut self, shared: Shared) {
+        self.constants = shared.constants;
+        self.literal_fns = shared.literal_fns;
+        self.calls = shared.calls;
+        self.reads_env = shared.reads_env;
+    }
+
+    /// Follows what was gathered to its conclusion.
+    pub fn resolve(&mut self) {
+        let mut shared = self.shared();
+        shared.resolve();
+        self.adopt(shared);
     }
 
     pub fn aliases_for(&self, rel_path: &str) -> HashMap<String, String> {
