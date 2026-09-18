@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use config::{Config, Origin};
-use deka_cli_core::{CommandSpec, Context, FlagSpec, ParamSpec, Registry};
+use deka_cli_core::{CommandSpec, Context, FlagSpec, ParamSpec, Registry, SubcommandSpec};
 use metrics::Metrics;
 
 pub const SCORE_COMMAND: CommandSpec = CommandSpec {
@@ -25,8 +25,32 @@ pub const SCORE_COMMAND: CommandSpec = CommandSpec {
     handler: cmd_score,
 };
 
+pub const CONFIG_COMMAND: CommandSpec = CommandSpec {
+    name: "config",
+    owner: "cqx-score",
+    category: "index",
+    summary: "Read and change the rule configuration",
+    aliases: &[],
+    subcommands: &[
+        SubcommandSpec {
+            name: "show",
+            summary: "print the effective configuration",
+            aliases: &[],
+            handler: cmd_config_show,
+        },
+        SubcommandSpec {
+            name: "set",
+            summary: "change one field, e.g. cqx config set oversized-files.max_lines 2000",
+            aliases: &[],
+            handler: cmd_config_set,
+        },
+    ],
+    handler: cmd_config_show,
+};
+
 pub fn register(registry: &mut Registry) {
     registry.add_command(SCORE_COMMAND);
+    registry.add_command(CONFIG_COMMAND);
     registry.add_param(ParamSpec {
         name: "--config",
         description: "rule configuration (JSON); otherwise cqx.json is searched for upward",
@@ -126,11 +150,11 @@ fn cmd_score(context: &Context) {
             return;
         }
     };
-    let m = Metrics::compute(&stream, &config.exclude);
+    let m = Metrics::compute(&stream, &config);
     let (scores, deductions) = score(&config, &m);
 
     if context.args.flags.get("--json").copied().unwrap_or(false) {
-        print_json(&scores, &deductions, &m);
+        print_json(&config, &scores, &deductions, &m);
     } else {
         print_report(&config, &scores, &deductions, &m);
     }
@@ -151,6 +175,185 @@ static FAILED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::ne
 /// is a finding this tool reports.
 pub fn exit_code() -> i32 {
     i32::from(FAILED.load(std::sync::atomic::Ordering::Relaxed))
+}
+
+/// The whole effective configuration as data.
+///
+/// An agent asked to "stop cqx complaining about file length" should be able to
+/// read this, see `oversized-files` with its description and `max_lines`, and
+/// change one field — rather than infer the shape from a printed table.
+pub fn config_json(config: &Config) -> serde_json::Value {
+    let rules: serde_json::Map<String, serde_json::Value> = config
+        .rules
+        .iter()
+        .map(|(id, r)| {
+            (
+                id.clone(),
+                serde_json::json!({
+                    "category": r.category,
+                    "describes": r.describes,
+                    "weight": r.weight,
+                    "free": r.free,
+                    "full": r.full,
+                    "enabled": r.enabled,
+                    "params": r.params,
+                    "source": config.origins.get(id).map(|o| o.to_string()).unwrap_or_default(),
+                }),
+            )
+        })
+        .collect();
+    serde_json::json!({
+        "version": 1,
+        "config_path": config.loaded_from.as_ref().map(|p| p.display().to_string()),
+        "min_score": config.min_score,
+        "exclude": config.exclude,
+        "rules": rules,
+    })
+}
+
+fn cmd_config_show(context: &Context) {
+    let root = context.env.cwd.clone();
+    let config = match Config::resolve(
+        context.args.params.get("--config").map(std::path::Path::new),
+        &root,
+    ) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("cqx config: {e}");
+            FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
+            return;
+        }
+    };
+    if context.args.flags.get("--json").copied().unwrap_or(false) {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&config_json(&config)).unwrap_or_default()
+        );
+    } else {
+        explain(&config);
+    }
+}
+
+/// `cqx config set <rule>.<field> <value>` — one field at a time, rewriting the
+/// file rather than regenerating it, so nothing else in it is disturbed.
+fn cmd_config_set(context: &Context) {
+    let mut args = context.args.positionals.iter();
+    let (Some(target), Some(value)) = (args.next(), args.next()) else {
+        eprintln!("usage: cqx config set <rule>.<field> <value>");
+        eprintln!("  e.g. cqx config set oversized-files.max_lines 2000");
+        eprintln!("       cqx config set oversized-files.enabled false");
+        FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
+        return;
+    };
+    let Some((rule_id, field)) = target.rsplit_once('.') else {
+        eprintln!("cqx config set: expected <rule>.<field>, got '{target}'");
+        FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
+        return;
+    };
+    let defaults = config::defaults();
+    let Some(default_rule) = defaults.get(rule_id) else {
+        eprintln!("cqx config set: no rule named '{rule_id}'. `cqx config show` lists them.");
+        FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
+        return;
+    };
+
+    let path = context
+        .args
+        .params
+        .get("--config")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| context.env.cwd.join("cqx.json"));
+    let mut doc: serde_json::Value = if path.is_file() {
+        match std::fs::read_to_string(&path).ok().and_then(|t| serde_json::from_str(&t).ok()) {
+            Some(v) => v,
+            None => {
+                eprintln!("cqx config set: {} is not valid JSON", path.display());
+                FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
+                return;
+            }
+        }
+    } else {
+        serde_json::json!({ "version": 1, "rules": {} })
+    };
+
+    let known_field = matches!(field, "weight" | "free" | "full" | "enabled")
+        || default_rule.params.contains_key(field);
+    if !known_field {
+        eprintln!(
+            "cqx config set: rule '{rule_id}' has no field '{field}'. It accepts weight, free, full, enabled{}.",
+            if default_rule.params.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    ", and {}",
+                    default_rule.params.keys().cloned().collect::<Vec<_>>().join(", ")
+                )
+            }
+        );
+        FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
+        return;
+    }
+
+    let parsed: serde_json::Value = match field {
+        "enabled" => match value.as_str() {
+            "true" | "1" | "yes" => serde_json::Value::Bool(true),
+            "false" | "0" | "no" => serde_json::Value::Bool(false),
+            other => {
+                eprintln!("cqx config set: enabled expects true or false, got '{other}'");
+                FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
+                return;
+            }
+        },
+        _ => match value.parse::<f64>() {
+            // A whole number is written as one: this file is read by people as
+            // well as parsers, and `max_lines: 2500.0` reads like a mistake.
+            Ok(v) if v.fract() == 0.0 && v.abs() < 9e15 => serde_json::json!(v as i64),
+            Ok(v) => serde_json::json!(v),
+            Err(_) => {
+                eprintln!("cqx config set: {field} expects a number, got '{value}'");
+                FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
+                return;
+            }
+        },
+    };
+
+    let rules = doc
+        .as_object_mut()
+        .and_then(|o| {
+            o.entry("rules")
+                .or_insert_with(|| serde_json::json!({}))
+                .as_object_mut()
+        })
+        .expect("rules is an object");
+    let entry = rules
+        .entry(rule_id.to_string())
+        .or_insert_with(|| serde_json::json!({}));
+    let is_param = default_rule.params.contains_key(field);
+    if is_param {
+        entry
+            .as_object_mut()
+            .expect("rule entry is an object")
+            .entry("params")
+            .or_insert_with(|| serde_json::json!({}))
+            .as_object_mut()
+            .expect("params is an object")
+            .insert(field.to_string(), parsed);
+    } else {
+        entry
+            .as_object_mut()
+            .expect("rule entry is an object")
+            .insert(field.to_string(), parsed);
+    }
+
+    let mut text = serde_json::to_string_pretty(&doc).unwrap_or_default();
+    text.push('\n');
+    match std::fs::write(&path, text) {
+        Ok(()) => println!("{} · {rule_id}.{field} = {value}", path.display()),
+        Err(e) => {
+            eprintln!("cqx config set: {}: {e}", path.display());
+            FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
 }
 
 fn explain(config: &Config) {
@@ -174,6 +377,12 @@ fn explain(config: &Config) {
             origin,
             if rule.enabled { "" } else { "  (disabled)" }
         );
+        if !rule.describes.is_empty() {
+            println!("{:<26}{}", "", rule.describes);
+        }
+        for (name, value) in &rule.params {
+            println!("{:<26}  {name} = {value}", "");
+        }
     }
     println!(
         "\nOverride any of them with CQX_RULE_<RULE>_{{WEIGHT,FREE,FULL,ENABLED}},\n\
@@ -225,7 +434,12 @@ fn print_report(
     }
 }
 
-fn print_json(scores: &BTreeMap<String, u32>, deductions: &[Deduction], m: &Metrics) {
+fn print_json(
+    config: &Config,
+    scores: &BTreeMap<String, u32>,
+    deductions: &[Deduction],
+    m: &Metrics,
+) {
     let rules: Vec<serde_json::Value> = deductions
         .iter()
         .map(|d| {
@@ -236,10 +450,13 @@ fn print_json(scores: &BTreeMap<String, u32>, deductions: &[Deduction], m: &Metr
             })
         })
         .collect();
+    // The configuration travels with the result: a consumer that renders this
+    // should show the standards it was actually scored against.
     let out = serde_json::json!({
         "lines": m.lines,
         "scores": scores,
         "rules": rules,
+        "config": config_json(config),
     });
     println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
 }
