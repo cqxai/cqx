@@ -756,6 +756,7 @@ dependencies = [
 [[package]]
 name = "zega-core"
 version = "0.1.0"
+source = "git+https://github.com/samifouad/zega#483bcfe39cb67e06a84a353c1b990dac29dae7ee"
 dependencies = [
  "base64",
  "bincode",
@@ -777,6 +778,7 @@ dependencies = [
 [[package]]
 name = "zega-graph"
 version = "0.1.0"
+source = "git+https://github.com/samifouad/zega#483bcfe39cb67e06a84a353c1b990dac29dae7ee"
 dependencies = [
  "serde",
  "zega-parser",
@@ -785,6 +787,7 @@ dependencies = [
 [[package]]
 name = "zega-kv"
 version = "0.1.0"
+source = "git+https://github.com/samifouad/zega#483bcfe39cb67e06a84a353c1b990dac29dae7ee"
 dependencies = [
  "dashmap",
  "serde",
@@ -795,6 +798,7 @@ dependencies = [
 [[package]]
 name = "zega-parser"
 version = "0.1.0"
+source = "git+https://github.com/samifouad/zega#483bcfe39cb67e06a84a353c1b990dac29dae7ee"
 dependencies = [
  "serde",
  "thiserror",
@@ -803,6 +807,7 @@ dependencies = [
 [[package]]
 name = "zega-wal"
 version = "0.1.0"
+source = "git+https://github.com/samifouad/zega#483bcfe39cb67e06a84a353c1b990dac29dae7ee"
 dependencies = [
  "bincode",
  "crc32fast",
