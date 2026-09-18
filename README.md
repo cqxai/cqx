@@ -165,20 +165,50 @@ crates/
   cqx/             the binary — registry + dispatch, no handler bodies
   cqx-schema/      fact schema + stable ids (the contract everything else depends on)
   cqx-rust/        Rust extractor: owns the `extract` command
-samples/basic/     a workspace with deliberately planted facts
+fixtures/basic/     a workspace with deliberately planted facts
 ```
 
-Planned: `cqx-serve` (a local server for the explorer) and the web explorer
-itself. `deka explore` in the deka toolchain is a downstream consumer of this
-tool, not a part of it.
+The web explorer lives in [cqx-web](https://github.com/samifouad/cqx-web), so
+this repository stays Rust. `deka explore` in the deka toolchain is a downstream
+consumer of cqx, not a part of it.
+
+## Configuring the rules
+
+Defaults are calibrated against ripgrep, tokio and deno. Override any of them in
+a `cqx.json`, searched for upward from the scanned path:
+
+```json
+{
+  "version": 1,
+  "min_score": 70,
+  "rules": {
+    "exit-in-library": { "weight": 10 },
+    "duplicated-bodies": { "enabled": false }
+  }
+}
+```
+
+A file need only mention the rules it changes. Every field can also be set from
+the environment, which is how CI usually wants to do it:
+
+```
+CQX_RULE_EXIT_IN_LIBRARY_WEIGHT=10
+CQX_MIN_SCORE=70
+CQX_CONFIG=/path/to/cqx.json
+```
+
+Precedence is defaults, then file, then environment, then flags.
+`cqx score --explain` prints every rule with its thresholds and where each one
+came from. `--min-score` exits non-zero when any category falls below it, which
+is the CI gate.
 
 ## Try it
 
 ```
-cargo run -p cqx -- extract samples/basic
+cargo run -p cqx -- extract fixtures/basic
 cargo run -p cqx -- extract /path/to/a/workspace --out facts.ndjson
 ```
 
-`samples/basic` exists so output can be checked against a known answer instead of
+`fixtures/basic` exists so output can be checked against a known answer instead of
 eyeballed: a planted process spawn, two env reads, an unsafe block, a `static
 mut`, filesystem and network effects, and a library that calls `process::exit`.
