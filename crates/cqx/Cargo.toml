@@ -19,3 +19,4 @@ deka-cli-core = { workspace = true }
 cqx-rust = { path = "../cqx-rust" }
 cqx-store = { path = "../cqx-store" }
 cqx-score = { path = "../cqx-score" }
+cqx-history = { path = "../cqx-history" }
