@@ -1,6 +1,6 @@
-//! The Rust extractor, as a dcx command.
+//! The Rust extractor, as a cqx command.
 //!
-//! Per rfd#61 the handler body lives here, in the owning crate; the `dcx`
+//! Per rfd#61 the handler body lives here, in the owning crate; the `cqx`
 //! binary only registers it. Adding a command requires touching an owner crate
 //! because that is the only place a handler can exist.
 
@@ -17,7 +17,7 @@ pub use extract::{ExtractError, Stats};
 
 /// Handlers return `()`, so failure is recorded here and the binary exits with
 /// it. A library that calls `process::exit` steals that decision from its
-/// caller — which is a pattern dcx itself reports.
+/// caller — which is a pattern cqx itself reports.
 static EXIT_CODE: AtomicI32 = AtomicI32::new(0);
 
 pub fn exit_code() -> i32 {
@@ -25,13 +25,13 @@ pub fn exit_code() -> i32 {
 }
 
 fn fail(message: impl std::fmt::Display) {
-    eprintln!("dcx extract: {message}");
+    eprintln!("cqx extract: {message}");
     EXIT_CODE.store(1, Ordering::Relaxed);
 }
 
 pub const EXTRACT_COMMAND: CommandSpec = CommandSpec {
     name: "extract",
-    owner: "dcx-rust",
+    owner: "cqx-rust",
     category: "index",
     summary: "Scan a cargo workspace and emit facts as newline-delimited JSON",
     aliases: &["scan"],

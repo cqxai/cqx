@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use dcx_schema::{Edge, EdgeKind, Evidence, Id, Node, NodeKind, Writer};
+use cqx_schema::{Edge, EdgeKind, Evidence, Id, Node, NodeKind, Writer};
 
 use crate::prepass::PackageFacts;
 use proc_macro2::Span;

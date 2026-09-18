@@ -1,16 +1,16 @@
 [workspace]
 resolver = "2"
-members = ["crates/dcx", "crates/dcx-rust", "crates/dcx-schema", "crates/dcx-store"]
+members = ["crates/cqx", "crates/cqx-rust", "crates/cqx-schema", "crates/cqx-store"]
 exclude = ["samples"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/dekaruntime/dcx"
+repository = "https://github.com/samifouad/cqx"
 
 [workspace.dependencies]
-dcx-schema = { path = "crates/dcx-schema" }
+cqx-schema = { path = "crates/cqx-schema" }
 deka-cli-core = { version = "0.5", default-features = false, features = ["registry"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
