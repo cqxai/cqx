@@ -423,7 +423,14 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
                     let mut names: Vec<String> = vars.clone();
                     names.sort();
                     names.dedup();
-                    names.join(",")
+                    let mut listed = names.join(",");
+                    // Propagation stops naming variables once a function is
+                    // plainly environment derived, so say that these are some
+                    // of them rather than letting the list read as all of them.
+                    if self.facts.truncated.contains(&f) {
+                        listed.push_str(",…");
+                    }
+                    listed
                 });
                 match env {
                     Some(vars) if !vars.is_empty() => (
