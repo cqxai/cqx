@@ -1,0 +1,9 @@
+{
+  "title": "cqx",
+  "tag": "Cq",
+  "url": "cqx",
+  "code": "242",
+  "colour": "#dea584",
+  "size": "small",
+  "description": "CodeQuality Explorer — a queryable graph of a codebase: what it contains, what it touches, and what crosses its boundaries"
+}
