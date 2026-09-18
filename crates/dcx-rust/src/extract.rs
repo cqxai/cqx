@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use dcx_schema::{Edge, EdgeKind, Evidence, Fact, Id, Node, NodeKind, Writer};
 
+use crate::prepass::{self, PackageFacts, ParsedFile};
 use crate::visit::FileVisitor;
 
 pub struct Stats {
@@ -65,6 +66,26 @@ pub fn run(root: &Path, out: impl Write) -> Result<Stats, ExtractError> {
         unparsed: Vec::new(),
     };
 
+    // Parse the whole workspace before visiting any of it: a value's
+    // provenance routinely crosses a crate boundary.
+    let mut per_package: Vec<(Id, Vec<ParsedFile>)> = Vec::new();
+
+    for pkg in &packages {
+        let Some(name) = pkg["name"].as_str() else {
+            continue;
+        };
+        let manifest = PathBuf::from(pkg["manifest_path"].as_str().unwrap_or_default());
+        let Some(pkg_dir) = manifest.parent() else {
+            continue;
+        };
+        let (parsed, failures) = prepass::parse_package(pkg_dir, &root);
+        stats.unparsed.extend(failures);
+        per_package.push((Id::package(name), parsed));
+    }
+    let all_files: Vec<&ParsedFile> = per_package.iter().flat_map(|(_, f)| f.iter()).collect();
+    let facts = PackageFacts::collect(&all_files);
+    drop(all_files);
+
     for pkg in &packages {
         let Some(name) = pkg["name"].as_str() else {
             continue;
@@ -103,26 +124,12 @@ pub fn run(root: &Path, out: impl Write) -> Result<Stats, ExtractError> {
         w.node(Node::new(dir_id.clone(), NodeKind::Directory).attr("path", rel_dir.as_str()))?;
         w.edge(Edge::new(EdgeKind::Contains, pkg_id.clone(), dir_id))?;
 
-        for src_root in ["src", "tests", "benches"] {
-            let dir = pkg_dir.join(src_root);
-            if !dir.is_dir() {
-                continue;
-            }
-            for entry in walkdir::WalkDir::new(&dir)
-                .into_iter()
-                .filter_map(Result::ok)
-                .filter(|e| e.file_type().is_file())
-            {
-                let path = entry.path();
-                if path.extension().and_then(|e| e.to_str()) != Some("rs") {
-                    continue;
-                }
-                let test_role = src_root != "src";
-                match visit_file(&mut w, path, &root, &dir, &pkg_id, test_role, &known) {
-                    Ok(()) => stats.files += 1,
-                    Err(msg) => stats.unparsed.push(msg),
-                }
-            }
+        let Some((_, parsed)) = per_package.iter().find(|(id, _)| *id == pkg_id) else {
+            continue;
+        };
+        for file in parsed {
+            visit_file(&mut w, file, &root, &pkg_id, &known, &facts);
+            stats.files += 1;
         }
     }
 
@@ -133,20 +140,20 @@ pub fn run(root: &Path, out: impl Write) -> Result<Stats, ExtractError> {
 
 fn visit_file<W: Write>(
     w: &mut Writer<W>,
-    path: &Path,
+    file: &ParsedFile,
     root: &Path,
-    src_root: &Path,
     pkg_id: &Id,
-    test_role: bool,
     known: &HashMap<String, Id>,
-) -> Result<(), String> {
-    let rel_path = rel(root, path);
-    let source = std::fs::read_to_string(path).map_err(|e| format!("{rel_path}: {e}"))?;
-    let line_count = source.lines().count() as u64;
+    facts: &PackageFacts,
+) {
+    let rel_path = file.rel_path.clone();
+    let test_role = file.test_role;
+    let abs = root.join(&rel_path);
+    let line_count = std::fs::read_to_string(&abs)
+        .map(|s| s.lines().count() as u64)
+        .unwrap_or(0);
 
-    let parsed = syn::parse_file(&source).map_err(|e| format!("{rel_path}: {e}"))?;
-
-    let dir_id = Id::directory(&rel(root, path.parent().unwrap_or(root)));
+    let dir_id = Id::directory(&rel(root, abs.parent().unwrap_or(root)));
     let _ = w.node(
         Node::new(dir_id.clone(), NodeKind::Directory)
             .attr("path", dir_id.0.trim_start_matches("dir:")),
@@ -167,15 +174,21 @@ fn visit_file<W: Write>(
     let _ = w.node(file_node);
     let _ = w.edge(Edge::new(EdgeKind::Contains, dir_id, file_id));
 
-    let prefix = module_prefix(src_root, path);
-    let mut visitor = FileVisitor::new(w, pkg_id.clone(), rel_path, prefix, test_role, known);
-    syn::visit::Visit::visit_file(&mut visitor, &parsed);
-    Ok(())
+    let mut visitor = FileVisitor::new(
+        w,
+        pkg_id.clone(),
+        rel_path,
+        file.module_prefix.clone(),
+        test_role,
+        known,
+        facts,
+    );
+    syn::visit::Visit::visit_file(&mut visitor, &file.parsed);
 }
 
 /// `src/foo/bar.rs` -> `foo::bar`; `src/lib.rs`, `src/main.rs` and
 /// `src/foo/mod.rs` name the module they live in, not a child of it.
-fn module_prefix(src_root: &Path, path: &Path) -> String {
+pub(crate) fn module_prefix(src_root: &Path, path: &Path) -> String {
     let Ok(rel) = path.strip_prefix(src_root) else {
         return String::new();
     };
@@ -245,7 +258,7 @@ fn manifest_line(text: &str, dep: &str) -> Option<u32> {
     None
 }
 
-fn rel(root: &Path, path: &Path) -> String {
+pub(crate) fn rel(root: &Path, path: &Path) -> String {
     path.strip_prefix(root)
         .unwrap_or(path)
         .to_string_lossy()

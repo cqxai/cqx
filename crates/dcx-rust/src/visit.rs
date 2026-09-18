@@ -8,6 +8,8 @@
 use std::collections::HashMap;
 
 use dcx_schema::{Edge, EdgeKind, Evidence, Id, Node, NodeKind, Writer};
+
+use crate::prepass::PackageFacts;
 use proc_macro2::Span;
 use quote::ToTokens;
 use syn::spanned::Spanned;
@@ -34,6 +36,12 @@ pub struct FileVisitor<'a, W: std::io::Write> {
     cfg_test_depth: usize,
     /// Package name (underscored) -> node id, for resolving `use` targets.
     pub known_packages: &'a HashMap<String, Id>,
+    /// Names this file renamed via `use … as X` or `type X = …`.
+    aliases: HashMap<String, String>,
+    /// `let` bindings of the function currently being walked.
+    bindings: HashMap<String, Binding>,
+    /// Constants and literal-returning functions collected from the package.
+    facts: &'a PackageFacts,
 }
 
 impl<'a, W: std::io::Write> FileVisitor<'a, W> {
@@ -44,8 +52,10 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
         module_prefix: String,
         test_role: bool,
         known_packages: &'a HashMap<String, Id>,
+        facts: &'a PackageFacts,
     ) -> Self {
         let file_id = Id::file(&rel_path);
+        let aliases = facts.aliases_for(&rel_path);
         FileVisitor {
             out,
             package,
@@ -58,6 +68,9 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
             test_role,
             cfg_test_depth: 0,
             known_packages,
+            aliases,
+            bindings: HashMap::new(),
+            facts,
         }
     }
 
@@ -197,13 +210,133 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
     }
 
     fn effect(&mut self, kind: EdgeKind, to: Id, op: &str, span: Span) {
+        self.effect_via(kind, to, op, span, "literal");
+    }
+
+    fn effect_via(&mut self, kind: EdgeKind, to: Id, op: &str, span: Span, via: &str) {
+        self.effect_provenance(kind, to, op, span, via, None, None);
+    }
+
+    fn effect_provenance(
+        &mut self,
+        kind: EdgeKind,
+        to: Id,
+        op: &str,
+        span: Span,
+        via: &str,
+        source_fn: Option<String>,
+        env_var: Option<String>,
+    ) {
         let from = self.container();
         let ev = self.evidence(span);
         let mut edge = Edge::new(kind, from, to).attr("op", op).evidence(ev);
+        // Anything that took a step beyond the source as written says so.
+        if matches!(via, "const" | "fn" | "binding") {
+            edge = edge.inferred(via);
+        } else if matches!(via, "unresolved" | "env") {
+            edge = edge.attr("via", via);
+        }
+        if let Some(f) = source_fn {
+            edge = edge.attr("source_fn", f);
+        }
+        if let Some(var) = env_var {
+            edge = edge.attr("env_var", var);
+        }
         if self.is_test_context() {
             edge = edge.attr("role", "test");
         }
         let _ = self.out.edge(edge);
+    }
+
+    /// Rewrites a callee path through this file's aliases, so `Proc::new`
+    /// reads as `std::process::Command::new` when `Proc` was renamed.
+    fn canonical_path(&self, path: &str) -> String {
+        let Some((head, rest)) = path.split_once("::") else {
+            return self.aliases.get(path).cloned().unwrap_or_else(|| path.to_string());
+        };
+        match self.aliases.get(head) {
+            Some(full) => format!("{full}::{rest}"),
+            None => path.to_string(),
+        }
+    }
+
+    /// Resolves a call argument to the string it will hold, following at most
+    /// one constant or one literal-returning function.
+    ///
+    /// Returns the value and how it was reached; `None` means the extractor
+    /// genuinely cannot say, which is itself worth reporting.
+    fn resolve_string_arg(&self, expr: &syn::Expr) -> Resolved {
+        match expr {
+            syn::Expr::Lit(lit) => match &lit.lit {
+                syn::Lit::Str(s) => Resolved::Value(s.value(), "literal"),
+                _ => Resolved::Unresolved,
+            },
+            syn::Expr::Reference(r) => self.resolve_string_arg(&r.expr),
+            syn::Expr::Try(t) => self.resolve_string_arg(&t.expr),
+            syn::Expr::Path(p) => {
+                let Some(name) = p.path.segments.last().map(|s| s.ident.to_string()) else {
+                    return Resolved::Unresolved;
+                };
+                // A local binding first: `let dsc = dsc_bin()?;` then
+                // `Command::new(dsc)` is the shape real code actually uses.
+                match self.bindings.get(&name) {
+                    Some(Binding::Literal(v)) => return Resolved::Value(v.clone(), "binding"),
+                    Some(Binding::Call(f)) => {
+                        return match self.facts.literal_fns.get(f) {
+                            Some(v) => Resolved::Value(v.clone(), "fn"),
+                            None => Resolved::From(f.clone()),
+                        }
+                    }
+                    None => {}
+                }
+                match self.facts.constants.get(&name) {
+                    Some(v) => Resolved::Value(v.clone(), "const"),
+                    None => Resolved::Unresolved,
+                }
+            }
+            syn::Expr::Call(call) => {
+                let Some(path) = callee_path(&call.func) else {
+                    return Resolved::Unresolved;
+                };
+                let name = path.rsplit("::").next().unwrap_or(&path).to_string();
+                match self.facts.literal_fns.get(&name) {
+                    Some(v) => Resolved::Value(v.clone(), "fn"),
+                    None => Resolved::From(name),
+                }
+            }
+            syn::Expr::MethodCall(call) => match call.method.to_string().as_str() {
+                "to_string" | "to_owned" | "into" | "as_str" | "clone" | "as_ref"
+                | "to_path_buf" | "display" => self.resolve_string_arg(&call.receiver),
+                _ => Resolved::Unresolved,
+            },
+            _ => Resolved::Unresolved,
+        }
+    }
+
+    /// Turns a resolution outcome into the node id and the attributes that
+    /// explain how it was reached.
+    fn spawn_target(&self, resolved: Resolved) -> (String, &'static str, Option<String>, Option<String>) {
+        match resolved {
+            Resolved::Value(v, via) => (v, via, None, None),
+            Resolved::From(f) => {
+                // A target derived from the environment is the interesting
+                // case: it means the program launched is chosen at runtime by
+                // whoever sets that variable.
+                let env = self.facts.reads_env.get(&f).map(|vars| {
+                    let mut names: Vec<String> = vars.clone();
+                    names.sort();
+                    names.dedup();
+                    names.join(",")
+                });
+                match env {
+                    Some(vars) if !vars.is_empty() => {
+                        ("<dynamic>".to_string(), "env", Some(f), Some(vars))
+                    }
+                    _ => ("<dynamic>".to_string(), "fn", Some(f), None),
+                }
+            }
+            Resolved::Unresolved => ("<dynamic>".to_string(), "unresolved", None, None),
+        }
     }
 
     fn is_test_context(&self) -> bool {
@@ -240,6 +373,53 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
             }
         }
     }
+}
+
+/// Reads a `let` initialiser as a binding, when it is one syntax can follow.
+fn binding_of(expr: &syn::Expr) -> Option<Binding> {
+    match expr {
+        syn::Expr::Lit(lit) => match &lit.lit {
+            syn::Lit::Str(s) => Some(Binding::Literal(s.value())),
+            _ => None,
+        },
+        syn::Expr::Try(t) => binding_of(&t.expr),
+        syn::Expr::Reference(r) => binding_of(&r.expr),
+        // `let tool = match tool_path() { … }` — the value still comes from
+        // the scrutinee, whichever arm produced it.
+        syn::Expr::Match(m) => binding_of(&m.expr),
+        syn::Expr::Call(call) => {
+            let path = callee_path(&call.func)?;
+            Some(Binding::Call(
+                path.rsplit("::").next().unwrap_or(&path).to_string(),
+            ))
+        }
+        syn::Expr::MethodCall(call) => match call.method.to_string().as_str() {
+            "ok" | "unwrap" | "clone" | "to_path_buf" | "to_owned" | "into" => {
+                binding_of(&call.receiver)
+            }
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// What a `let` bound a name to, as far as syntax can tell.
+#[derive(Clone, Debug)]
+enum Binding {
+    Literal(String),
+    /// Bound to the result of a named function, which is where provenance
+    /// continues.
+    Call(String),
+}
+
+/// The outcome of asking what string a call argument will hold.
+enum Resolved {
+    /// A value we can name, and how we got to it.
+    Value(String, &'static str),
+    /// Cannot be named, but it comes from this function — which is usually more
+    /// informative than the value would be.
+    From(String),
+    Unresolved,
 }
 
 /// Renders a declared type as normalised source text, so that two spellings of
@@ -282,18 +462,6 @@ fn callee_path(expr: &syn::Expr) -> Option<String> {
     }
 }
 
-/// The first argument when it is a string literal — the process name in
-/// `Command::new("dsc")`, the variable name in `env::var("HOME")`.
-fn first_string_arg(args: &syn::punctuated::Punctuated<syn::Expr, syn::Token![,]>) -> Option<String> {
-    match args.first()? {
-        syn::Expr::Lit(lit) => match &lit.lit {
-            syn::Lit::Str(s) => Some(s.value()),
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
 impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
     fn visit_item_fn(&mut self, node: &'ast syn::ItemFn) {
         let id = self.emit_symbol(&node.sig.ident.to_string(), "fn", node.span());
@@ -307,7 +475,9 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
             );
         }
         self.symbol_stack.push(id);
+        let outer = std::mem::take(&mut self.bindings);
         syn::visit::visit_item_fn(self, node);
+        self.bindings = outer;
         self.symbol_stack.pop();
     }
 
@@ -323,7 +493,9 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
             );
         }
         self.symbol_stack.push(id);
+        let outer = std::mem::take(&mut self.bindings);
         syn::visit::visit_impl_item_fn(self, node);
+        self.bindings = outer;
         self.symbol_stack.pop();
     }
 
@@ -418,6 +590,18 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
         self.symbol_stack.pop();
     }
 
+    fn visit_local(&mut self, node: &'ast syn::Local) {
+        if let syn::Pat::Ident(ident) = &node.pat {
+            if let Some(init) = &node.init {
+                let name = ident.ident.to_string();
+                if let Some(binding) = binding_of(&init.expr) {
+                    self.bindings.insert(name, binding);
+                }
+            }
+        }
+        syn::visit::visit_local(self, node);
+    }
+
     fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
         let is_cfg_test = node.attrs.iter().any(is_cfg_test_attr);
         if is_cfg_test {
@@ -475,30 +659,45 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
     }
 
     fn visit_expr_call(&mut self, node: &'ast syn::ExprCall) {
-        if let Some(path) = callee_path(&node.func) {
+        if let Some(raw) = callee_path(&node.func) {
+            let path = self.canonical_path(&raw);
             let span = node.span();
             // A process boundary. At the binary zoom level these are most of
             // the edges that exist, and every one of them matters.
             if path.ends_with("Command::new") {
-                let name = first_string_arg(&node.args)
-                    .unwrap_or_else(|| "<dynamic>".to_string());
+                let resolved = match node.args.first() {
+                    Some(arg) => self.resolve_string_arg(arg),
+                    None => Resolved::Unresolved,
+                };
+                let (name, via, source_fn, env_var) = self.spawn_target(resolved);
                 let to = Id::process(&name);
                 let _ = self
                     .out
                     .node(Node::new(to.clone(), NodeKind::Process).attr("name", name.as_str()));
-                self.effect(EdgeKind::Spawns, to, &path, span);
+                self.effect_provenance(
+                    EdgeKind::Spawns,
+                    to,
+                    &path,
+                    span,
+                    via,
+                    source_fn,
+                    env_var,
+                );
             } else if path.ends_with("env::var")
                 || path.ends_with("env::var_os")
                 || path.ends_with("env::set_var")
                 || path.ends_with("env::remove_var")
             {
-                let name =
-                    first_string_arg(&node.args).unwrap_or_else(|| "<dynamic>".to_string());
+                let resolved = match node.args.first() {
+                    Some(arg) => self.resolve_string_arg(arg),
+                    None => Resolved::Unresolved,
+                };
+                let (name, via, _, _) = self.spawn_target(resolved);
                 let to = Id::env_var(&name);
                 let _ = self
                     .out
                     .node(Node::new(to.clone(), NodeKind::EnvVar).attr("name", name.as_str()));
-                self.effect(EdgeKind::ReadsEnv, to, &path, span);
+                self.effect_via(EdgeKind::ReadsEnv, to, &path, span, via);
             } else if path.ends_with("process::exit") || path.ends_with("process::abort") {
                 self.effect(EdgeKind::EffectExec, Id::capability("exec"), &path, span);
             } else if path.contains("fs::") {
