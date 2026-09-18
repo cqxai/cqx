@@ -2,10 +2,11 @@
 
 use std::collections::HashMap;
 use std::io::Write;
-use std::path::{Path, PathBuf};
 
 use cqx_schema::{Edge, EdgeKind, Evidence, Fact, Id, Node, NodeKind, Writer};
+use cqx_vfs::Vfs;
 
+use crate::manifest;
 use crate::prepass::{self, PackageFacts, ParsedFile};
 use crate::visit::FileVisitor;
 
@@ -38,13 +39,10 @@ impl From<std::io::Error> for ExtractError {
     }
 }
 
-pub fn run(root: &Path, out: impl Write) -> Result<Stats, ExtractError> {
-    let root = root
-        .canonicalize()
-        .map_err(|e| ExtractError::Metadata(format!("{}: {e}", root.display())))?;
-    let metadata = cargo_metadata(&root)?;
+pub fn run(vfs: &Vfs, out: impl Write) -> Result<Stats, ExtractError> {
+    let metadata = manifest::read(vfs).map_err(ExtractError::Metadata)?;
     let mut w = Writer::new(out);
-    w.fact(&Fact::header("rust", &root.display().to_string()))?;
+    w.fact(&Fact::header("rust", &vfs.label))?;
 
     let packages = metadata["packages"].as_array().cloned().unwrap_or_default();
 
@@ -68,13 +66,11 @@ pub fn run(root: &Path, out: impl Write) -> Result<Stats, ExtractError> {
 
     // Parse the whole workspace before visiting any of it: a value's
     // provenance routinely crosses a crate boundary.
-    let pkg_dirs: Vec<PathBuf> = packages
+    // Paths are relative to the snapshot throughout: there is no filesystem to
+    // be absolute against.
+    let pkg_dirs: Vec<String> = packages
         .iter()
-        .filter_map(|p| {
-            Path::new(p["manifest_path"].as_str()?)
-                .parent()
-                .map(Path::to_path_buf)
-        })
+        .filter_map(|p| p["manifest_path"].as_str().map(parent_of))
         .collect();
     let mut per_package: Vec<(Id, Vec<ParsedFile>)> = Vec::new();
 
@@ -82,24 +78,17 @@ pub fn run(root: &Path, out: impl Write) -> Result<Stats, ExtractError> {
         let Some(name) = pkg["name"].as_str() else {
             continue;
         };
-        let manifest = PathBuf::from(pkg["manifest_path"].as_str().unwrap_or_default());
-        let Some(pkg_dir) = manifest.parent() else {
-            continue;
-        };
+        let pkg_dir = parent_of(pkg["manifest_path"].as_str().unwrap_or_default());
         // A package owns its directory minus any package nested inside it:
         // deno has eleven such pairs, and dropping the parent outright lost 442
         // files while keeping it stole them from their real owner.
-        let nested: Vec<PathBuf> = pkg_dirs
+        let nested: Vec<String> = pkg_dirs
             .iter()
-            .filter(|o| o.as_path() != pkg_dir && o.starts_with(pkg_dir))
+            .filter(|o| **o != pkg_dir && is_inside(o, &pkg_dir))
             .cloned()
             .collect();
-        let (parsed, failures) = prepass::parse_package(
-            pkg_dir,
-            &root,
-            &source_roots(pkg, pkg_dir),
-            &nested,
-        );
+        let (parsed, failures) =
+            prepass::parse_package(vfs, &source_roots(pkg, &pkg_dir), &nested);
         stats.unparsed.extend(failures);
         per_package.push((Id::package(name), parsed));
     }
@@ -111,10 +100,8 @@ pub fn run(root: &Path, out: impl Write) -> Result<Stats, ExtractError> {
         let Some(name) = pkg["name"].as_str() else {
             continue;
         };
-        let manifest = PathBuf::from(pkg["manifest_path"].as_str().unwrap_or_default());
-        let Some(pkg_dir) = manifest.parent() else {
-            continue;
-        };
+        let manifest_path = pkg["manifest_path"].as_str().unwrap_or_default().to_string();
+        let pkg_dir = parent_of(&manifest_path);
         let pkg_id = Id::package(name);
         stats.packages += 1;
 
@@ -138,18 +125,17 @@ pub fn run(root: &Path, out: impl Write) -> Result<Stats, ExtractError> {
             w.edge(Edge::new(EdgeKind::Contains, pkg_id.clone(), bin_id))?;
         }
 
-        emit_dependencies(&mut w, &pkg_id, pkg, &manifest, &root, &known)?;
+        emit_dependencies(&mut w, &pkg_id, pkg, &manifest_path, vfs, &known)?;
 
-        let rel_dir = rel(&root, pkg_dir);
-        let dir_id = Id::directory(&rel_dir);
-        w.node(Node::new(dir_id.clone(), NodeKind::Directory).attr("path", rel_dir.as_str()))?;
+        let dir_id = Id::directory(&pkg_dir);
+        w.node(Node::new(dir_id.clone(), NodeKind::Directory).attr("path", pkg_dir.as_str()))?;
         w.edge(Edge::new(EdgeKind::Contains, pkg_id.clone(), dir_id))?;
 
         let Some((_, parsed)) = per_package.iter().find(|(id, _)| *id == pkg_id) else {
             continue;
         };
         for file in parsed {
-            visit_file(&mut w, file, &root, &pkg_id, &known, &facts);
+            visit_file(&mut w, file, vfs, &pkg_id, &known, &facts);
             stats.files += 1;
         }
     }
@@ -162,19 +148,19 @@ pub fn run(root: &Path, out: impl Write) -> Result<Stats, ExtractError> {
 fn visit_file<W: Write>(
     w: &mut Writer<W>,
     file: &ParsedFile,
-    root: &Path,
+    vfs: &Vfs,
     pkg_id: &Id,
     known: &HashMap<String, Id>,
     facts: &PackageFacts,
 ) {
     let rel_path = file.rel_path.clone();
     let test_role = file.test_role;
-    let abs = root.join(&rel_path);
-    let line_count = std::fs::read_to_string(&abs)
+    let line_count = vfs
+        .read(&rel_path)
         .map(|s| s.lines().count() as u64)
         .unwrap_or(0);
 
-    let dir_id = Id::directory(&rel(root, abs.parent().unwrap_or(root)));
+    let dir_id = Id::directory(&parent_of(&rel_path));
     let _ = w.node(
         Node::new(dir_id.clone(), NodeKind::Directory)
             .attr("path", dir_id.0.trim_start_matches("dir:")),
@@ -209,15 +195,13 @@ fn visit_file<W: Write>(
 
 /// The directories a package's sources actually live in, taken from its
 /// declared targets. Falls back to `src/` only when a manifest declares nothing.
-fn source_roots(pkg: &serde_json::Value, pkg_dir: &Path) -> Vec<(PathBuf, bool)> {
-    let mut roots: Vec<(PathBuf, bool)> = Vec::new();
+fn source_roots(pkg: &serde_json::Value, pkg_dir: &str) -> Vec<(String, bool)> {
+    let mut roots: Vec<(String, bool)> = Vec::new();
     for target in pkg["targets"].as_array().into_iter().flatten() {
         let Some(src) = target["src_path"].as_str() else {
             continue;
         };
-        let Some(dir) = Path::new(src).parent() else {
-            continue;
-        };
+        let dir = parent_of(src);
         let kinds = target["kind"].as_array().cloned().unwrap_or_default();
         // A build script commonly sits at the repository root, which would make
         // the whole repository this package's source root and parse every other
@@ -228,33 +212,44 @@ fn source_roots(pkg: &serde_json::Value, pkg_dir: &Path) -> Vec<(PathBuf, bool)>
         let is_test = kinds
             .iter()
             .any(|k| matches!(k.as_str(), Some("test") | Some("bench") | Some("example")));
-        let entry = (dir.to_path_buf(), is_test);
-        if !roots.iter().any(|(d, _)| d == &entry.0) {
-            roots.push(entry);
-        }
-    }
-    for extra in ["tests", "benches"] {
-        let dir = pkg_dir.join(extra);
-        if dir.is_dir() && !roots.iter().any(|(d, _)| d == &dir) {
-            roots.push((dir, true));
+        if !roots.iter().any(|(d, _)| *d == dir) {
+            roots.push((dir, is_test));
         }
     }
     if roots.is_empty() {
-        roots.push((pkg_dir.join("src"), false));
+        roots.push((join(pkg_dir, "src"), false));
     }
     roots
 }
 
+/// The directory a path sits in, in snapshot space.
+pub(crate) fn parent_of(path: &str) -> String {
+    match path.rfind('/') {
+        Some(i) => path[..i].to_string(),
+        None => String::new(),
+    }
+}
+
+pub(crate) fn is_inside(path: &str, dir: &str) -> bool {
+    dir.is_empty() || path.starts_with(&format!("{dir}/"))
+}
+
+pub(crate) fn join(dir: &str, rest: &str) -> String {
+    if dir.is_empty() {
+        rest.to_string()
+    } else {
+        format!("{dir}/{rest}")
+    }
+}
+
 /// `src/foo/bar.rs` -> `foo::bar`; `src/lib.rs`, `src/main.rs` and
 /// `src/foo/mod.rs` name the module they live in, not a child of it.
-pub(crate) fn module_prefix(src_root: &Path, path: &Path) -> String {
-    let Ok(rel) = path.strip_prefix(src_root) else {
-        return String::new();
+pub(crate) fn module_prefix(src_root: &str, path: &str) -> String {
+    let rest = match path.strip_prefix(&format!("{src_root}/")) {
+        Some(r) => r,
+        None => return String::new(),
     };
-    let mut parts: Vec<String> = rel
-        .components()
-        .map(|c| c.as_os_str().to_string_lossy().to_string())
-        .collect();
+    let mut parts: Vec<String> = rest.split('/').map(str::to_string).collect();
     let Some(last) = parts.pop() else {
         return String::new();
     };
@@ -271,12 +266,11 @@ fn emit_dependencies<W: Write>(
     w: &mut Writer<W>,
     pkg_id: &Id,
     pkg: &serde_json::Value,
-    manifest: &Path,
-    root: &Path,
+    manifest_path: &str,
+    vfs: &Vfs,
     known: &HashMap<String, Id>,
 ) -> Result<(), ExtractError> {
-    let manifest_rel = rel(root, manifest);
-    let manifest_text = std::fs::read_to_string(manifest).unwrap_or_default();
+    let manifest_text = vfs.read(manifest_path).unwrap_or_default();
 
     for dep in pkg["dependencies"].as_array().into_iter().flatten() {
         let Some(dep_name) = dep["name"].as_str() else {
@@ -289,12 +283,12 @@ fn emit_dependencies<W: Write>(
         if target.0.starts_with("ext:") {
             w.node(Node::new(target.clone(), NodeKind::External).attr("name", dep_name))?;
         }
-        let line = manifest_line(&manifest_text, dep_name).unwrap_or(1);
+        let line = manifest_line(manifest_text, dep_name).unwrap_or(1);
         let kind = dep["kind"].as_str().unwrap_or("normal");
         w.edge(
             Edge::new(EdgeKind::DependsOn, pkg_id.clone(), target)
                 .attr("kind", kind)
-                .evidence(Evidence::at(&manifest_rel, line, line)),
+                .evidence(Evidence::at(manifest_path, line, line)),
         )?;
     }
     Ok(())
@@ -317,24 +311,3 @@ fn manifest_line(text: &str, dep: &str) -> Option<u32> {
     None
 }
 
-pub(crate) fn rel(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .replace('\\', "/")
-}
-
-fn cargo_metadata(root: &Path) -> Result<serde_json::Value, ExtractError> {
-    let output = std::process::Command::new("cargo")
-        .args(["metadata", "--format-version", "1", "--no-deps"])
-        .current_dir(root)
-        .output()
-        .map_err(|e| ExtractError::Metadata(format!("could not run cargo: {e}")))?;
-    if !output.status.success() {
-        return Err(ExtractError::Metadata(
-            String::from_utf8_lossy(&output.stderr).trim().to_string(),
-        ));
-    }
-    serde_json::from_slice(&output.stdout)
-        .map_err(|e| ExtractError::Metadata(format!("unreadable output: {e}")))
-}
