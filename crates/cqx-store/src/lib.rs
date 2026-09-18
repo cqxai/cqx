@@ -15,7 +15,7 @@ use deka_cli_core::{CommandSpec, Context, FlagSpec, ParamSpec, Registry};
 
 pub const QUERY_COMMAND: CommandSpec = CommandSpec {
     name: "query",
-    owner: "dcx-store",
+    owner: "cqx-store",
     category: "index",
     summary: "Load a fact stream and run a query against it",
     aliases: &[],
@@ -46,13 +46,13 @@ pub fn register(registry: &mut Registry) {
 
 fn cmd_query(context: &Context) {
     let Some(path) = context.args.params.get("--facts").map(PathBuf::from) else {
-        eprintln!("dcx query: --facts <file> is required");
+        eprintln!("cqx query: --facts <file> is required");
         return;
     };
     let stream = match facts::Stream::load(&path) {
         Ok(stream) => stream,
         Err(e) => {
-            eprintln!("dcx query: {e}");
+            eprintln!("cqx query: {e}");
             return;
         }
     };
@@ -67,7 +67,7 @@ fn cmd_query(context: &Context) {
         let _ = context;
         stream.report();
         eprintln!(
-            "\ndcx was built without a graph backend, so only counting is available.\n\
+            "\ncqx was built without a graph backend, so only counting is available.\n\
              Rebuild with `--features zega` for traversal queries."
         );
     }
@@ -82,7 +82,7 @@ fn cmd_query(context: &Context) {
             .map(String::as_str)
             .or_else(|| context.args.positionals.first().map(String::as_str));
         if let Err(e) = zega::run(&stream, named, zql) {
-            eprintln!("dcx query: {e}");
+            eprintln!("cqx query: {e}");
         }
     }
 }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Elevations of a Codebase</title>
+<title>CodeQuality Explorer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;500;600;700&display=swap">
@@ -151,7 +151,7 @@ tbody tr:hover{background:var(--raised)}
 </head>
 <body>
 <header><div class="wrap hdr">
-  <span class="brand">d<b>c</b>x</span>
+  <span class="brand">c<b>q</b>x</span>
   <span class="repo" id="repo"></span>
   <div class="views" role="group" aria-label="View">
     <button data-view="grid" aria-pressed="true"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Grid</button>
@@ -164,7 +164,7 @@ tbody tr:hover{background:var(--raised)}
 <section class="scoreband"><div class="wrap">
   <div class="rings" id="rings"></div>
   <div class="legend"><span><i class="f"></i>0–49</span><span><i class="w"></i>50–89</span><span><i class="p"></i>90–100</span></div>
-  <p class="caveat">Every category starts at <b>100</b> and is degraded only by a named finding, each with a published weight and a cap. Nothing here is a curve fitted to an imaginary average codebase — a score is the list of deductions, and clicking a ring shows that list with the evidence behind it.</p>
+  <p class="caveat">Every <b>CodeQuality Score</b> starts at <b>100</b> and is degraded only by a named finding, each with a published weight and a cap. Nothing here is a curve fitted to an imaginary average codebase — a score is the list of deductions, and clicking a ring shows that list with the evidence behind it.</p>
   <div id="scoredetail"></div>
 </div></section>
 

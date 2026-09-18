@@ -1,5 +1,5 @@
 # Cases chosen because a syntactic pass should struggle with them. Each one
-# records what base dcx is expected to see, so the gap that `--enhanced` would
+# records what base cqx is expected to see, so the gap that `--enhanced` would
 # close is measured rather than argued about.
 [workspace]
 resolver = "2"

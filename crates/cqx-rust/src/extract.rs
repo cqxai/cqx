@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use dcx_schema::{Edge, EdgeKind, Evidence, Fact, Id, Node, NodeKind, Writer};
+use cqx_schema::{Edge, EdgeKind, Evidence, Fact, Id, Node, NodeKind, Writer};
 
 use crate::prepass::{self, PackageFacts, ParsedFile};
 use crate::visit::FileVisitor;

@@ -1,10 +1,10 @@
 [package]
-name = "dcx-schema"
+name = "cqx-schema"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Fact schema and stable identifiers for dcx."
+description = "Fact schema and stable identifiers for cqx."
 
 [dependencies]
 serde = { workspace = true }

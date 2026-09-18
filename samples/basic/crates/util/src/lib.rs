@@ -10,7 +10,7 @@ pub fn ping(host: &str) -> bool {
 }
 
 /// Planted: a library that exits the process, stealing the decision from its
-/// caller. This is the shape dcx should surface on its own.
+/// caller. This is the shape cqx should surface on its own.
 pub fn give_up(code: i32) -> ! {
     std::process::exit(code)
 }

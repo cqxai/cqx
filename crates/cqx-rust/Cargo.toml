@@ -1,13 +1,13 @@
 [package]
-name = "dcx-rust"
+name = "cqx-rust"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Rust extractor for dcx: emits facts from a cargo workspace."
+description = "Rust extractor for cqx: emits facts from a cargo workspace."
 
 [dependencies]
-dcx-schema = { workspace = true }
+cqx-schema = { workspace = true }
 deka-cli-core = { workspace = true }
 serde_json = { workspace = true }
 syn = { workspace = true }
