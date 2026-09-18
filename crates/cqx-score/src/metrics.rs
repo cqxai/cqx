@@ -276,19 +276,28 @@ impl Metrics {
                 .next()
                 .unwrap_or(written);
             let Some(owners) = type_owner.get(base) else { continue };
-            if owners.contains(p) {
+            // A name defined in more than one crate cannot be attributed
+            // without resolution, and guessing is not free: picking one owner
+            // arbitrarily out of a HashSet made this metric change between runs
+            // on identical input, because Rust seeds its hasher per process.
+            // An ambiguous name is skipped instead.
+            if owners.len() != 1 {
+                continue;
+            }
+            let owner = owners.iter().next().copied().unwrap_or_default();
+            if owner == p {
                 *own.entry(p).or_default() += 1;
             } else {
                 *foreign.entry(p).or_default() += 1;
-                if let Some(o) = owners.iter().next() {
-                    sources.entry(p).or_default().insert(o);
-                }
+                sources.entry(p).or_default().insert(owner);
             }
         }
         let mut scatter: Vec<Finding> = Vec::new();
-        for (pkg, f) in &foreign {
-            let total = own.get(pkg).copied().unwrap_or(0) + f;
-            let owners = sources.get(pkg).map(HashSet::len).unwrap_or(0);
+        let mut by_package: Vec<(&&str, &u32)> = foreign.iter().collect();
+        by_package.sort_by_key(|(p, _)| **p);
+        for (pkg, f) in by_package {
+            let total = own.get(*pkg).copied().unwrap_or(0) + f;
+            let owners = sources.get(*pkg).map(HashSet::len).unwrap_or(0);
             if total >= 12 && (*f as f64 / total as f64) > 0.30 && owners >= 3 {
                 scatter.push(Finding {
                     what: format!(
