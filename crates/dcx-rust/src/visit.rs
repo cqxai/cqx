@@ -138,9 +138,14 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
             .attr("lang:kind", lang_kind)
             .attr("lines", end.saturating_sub(start) + 1);
         if let Some(block) = body {
-            if let Some(hash) = body_fingerprint(block) {
-                node = node.attr("body", hash);
+            if !self.is_test_context() {
+                if let Some(hash) = body_fingerprint(block) {
+                    node = node.attr("body", hash);
+                }
             }
+        }
+        if self.is_test_context() {
+            node = node.attr("role", "test");
         }
         let node = node;
         let container = self.container();
@@ -368,26 +373,44 @@ impl<'a, W: std::io::Write> FileVisitor<'a, W> {
                 continue;
             };
             let mut lints: Vec<String> = Vec::new();
+            let mut documented = false;
             let _ = attr.parse_nested_meta(|meta| {
-                lints.push(
-                    meta.path
-                        .segments
-                        .iter()
-                        .map(|s| s.ident.to_string())
-                        .collect::<Vec<_>>()
-                        .join("::"),
-                );
+                let path = meta
+                    .path
+                    .segments
+                    .iter()
+                    .map(|s| s.ident.to_string())
+                    .collect::<Vec<_>>()
+                    .join("::");
+                // `reason = "..."` documents the suppression; it is not a lint,
+                // and counting it as one inflated deno's total by 99.
+                if path == "reason" {
+                    documented = true;
+                } else {
+                    lints.push(path);
+                }
                 Ok(())
             });
             let ev = self.evidence(attr.span());
             for lint in lints {
-                let _ = self.out.edge(
-                    Edge::new(EdgeKind::Silences, owner.clone(), Id::capability("lint"))
-                        .attr("lint", lint)
-                        .attr("scope", scope)
-                        .attr("form", kind)
-                        .evidence(ev.clone()),
-                );
+                // How broadly the lint is drawn matters far more than how many
+                // there are: naming one lint is a decision, switching off
+                // `clippy::all` hides every rule including future ones.
+                let breadth = if matches!(lint.as_str(), "all" | "clippy::all" | "warnings") {
+                    "broad"
+                } else {
+                    "named"
+                };
+                let mut edge = Edge::new(EdgeKind::Silences, owner.clone(), Id::capability("lint"))
+                    .attr("lint", lint)
+                    .attr("scope", scope)
+                    .attr("breadth", breadth)
+                    .attr("form", kind)
+                    .evidence(ev.clone());
+                if documented {
+                    edge = edge.attr("documented", true);
+                }
+                let _ = self.out.edge(edge);
             }
         }
     }
