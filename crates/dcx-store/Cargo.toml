@@ -1,0 +1,21 @@
+[package]
+name = "dcx-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Loads a dcx fact stream into a queryable graph."
+
+[features]
+# dcx is public and zega is not, so the graph backend is opt-in and built from a
+# sibling checkout. Without it dcx still loads and counts facts; it just cannot
+# answer a traversal.
+default = []
+zega = ["dep:zega-core", "dep:zega-parser"]
+
+[dependencies]
+dcx-schema = { workspace = true }
+deka-cli-core = { workspace = true }
+serde_json = { workspace = true }
+zega-core = { path = "../../../zega/zega-core", optional = true }
+zega-parser = { path = "../../../zega/zega-parser", optional = true }

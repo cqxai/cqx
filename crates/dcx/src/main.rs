@@ -10,6 +10,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 fn build_registry() -> Registry {
     RegistryBuilder::new()
         .with(dcx_rust::register)
+        .with(dcx_store::register)
         .flags([
             FlagSpec {
                 name: "--help",
