@@ -1,0 +1,9 @@
+# A sample workspace with deliberately planted facts, so the extractor's output
+# can be checked against a known answer rather than eyeballed.
+[workspace]
+resolver = "2"
+members = ["crates/app", "crates/engine", "crates/util"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"

@@ -100,15 +100,35 @@ rather than snapshots.
 
 ## Extractor contract
 
-The core knows nothing about any language. An extractor is any program that
-emits newline-delimited facts on stdout:
+The core knows nothing about any language, and there are two ways in.
+
+**Bundled extractors are crates.** Each one owns a command and registers it with
+the CLI registry from `deka-cli-core`; the `dcx` binary is composition only, so a
+handler can exist nowhere but its owning crate (the rfd#61 pattern, which exists
+precisely because implementations kept leaking into the core crate).
+
+```rust
+// crates/dcx-rust/src/lib.rs — the handler body lives with the language
+pub fn register(registry: &mut Registry) {
+    registry.add_command(EXTRACT_COMMAND);
+    registry.add_flag(FlagSpec { name: "--quiet", .. });
+}
+```
+
+```rust
+// crates/dcx/src/main.rs — the binary's whole job
+RegistryBuilder::new().with(dcx_rust::register)
+```
+
+**Out-of-tree extractors are programs.** Anything that writes the same facts to
+stdout participates without being in this repo:
 
 ```
-dcx-extract-<lang> <path> --schema <version>  >  facts.ndjson
+dcx-extract-<lang> <path>  >  facts.ndjson
 ```
 
-Language-specific vocabulary lives in a `lang:` attribute namespace, never in
-core node or edge kinds. A new language is a new binary and zero changes here.
+Either way the schema is identical. Language-specific vocabulary lives in a
+`lang:` attribute namespace, never in core node or edge kinds.
 
 ## Non-goals
 
@@ -122,10 +142,22 @@ core node or edge kinds. A new language is a new binary and zero changes here.
 
 ```
 crates/
-  dcx-schema/      fact schema + stable IDs (the contract; everything depends on this)
-  dcx-core/        load, query, diff
-  dcx-serve/       local server for the explorer
-  dcx-rust/        Rust extractor
-web/               the explorer (2D first)
-docs/              design notes
+  dcx/             the binary — registry + dispatch, no handler bodies
+  dcx-schema/      fact schema + stable ids (the contract everything else depends on)
+  dcx-rust/        Rust extractor: owns the `extract` command
+samples/basic/     a workspace with deliberately planted facts
 ```
+
+Planned: `dcx-core` (load, query, diff), `dcx-serve` (the local server behind
+`deka explore`), and the web explorer.
+
+## Try it
+
+```
+cargo run -p dcx -- extract samples/basic
+cargo run -p dcx -- extract /path/to/a/workspace --out facts.ndjson
+```
+
+`samples/basic` exists so output can be checked against a known answer instead of
+eyeballed: a planted process spawn, two env reads, an unsafe block, a `static
+mut`, filesystem and network effects, and a library that calls `process::exit`.

@@ -1,0 +1,15 @@
+[package]
+name = "dcx"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "deka code explorer."
+
+[[bin]]
+name = "dcx"
+path = "src/main.rs"
+
+[dependencies]
+deka-cli-core = { workspace = true }
+dcx-rust = { path = "../dcx-rust" }
