@@ -71,6 +71,10 @@ pub fn register(registry: &mut Registry) {
     });
 }
 
+/// Enough to show the shape of a problem without turning the output into the
+/// problem.
+const FINDINGS_PER_RULE: usize = 25;
+
 pub struct Deduction {
     pub rule: String,
     pub category: String,
@@ -197,6 +201,7 @@ pub fn config_json(config: &Config) -> serde_json::Value {
                     "full": r.full,
                     "enabled": r.enabled,
                     "params": r.params,
+                    "remedy": r.remedy,
                     "source": config.origins.get(id).map(|o| o.to_string()).unwrap_or_default(),
                 }),
             )
@@ -380,6 +385,9 @@ fn explain(config: &Config) {
         if !rule.describes.is_empty() {
             println!("{:<26}{}", "", rule.describes);
         }
+        if !rule.remedy.is_empty() {
+            println!("{:<26}→ {}", "", rule.remedy);
+        }
         for (name, value) in &rule.params {
             println!("{:<26}  {name} = {value}", "");
         }
@@ -443,10 +451,32 @@ fn print_json(
     let rules: Vec<serde_json::Value> = deductions
         .iter()
         .map(|d| {
+            // The findings travel with the number. A score a reader cannot open
+            // is a score they have to take on trust, and this one is meant to be
+            // argued with.
+            let measure = m.get(&d.rule);
+            let findings: Vec<serde_json::Value> = measure
+                .map(|measure| {
+                    measure
+                        .findings
+                        .iter()
+                        .take(FINDINGS_PER_RULE)
+                        .map(|f| {
+                            serde_json::json!({
+                                "what": f.what, "file": f.file, "line": f.line,
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
             serde_json::json!({
                 "rule": d.rule, "category": d.category,
+                "describes": config.rules.get(&d.rule).map(|r| r.describes.clone()).unwrap_or_default(),
+                "remedy": config.rules.get(&d.rule).map(|r| r.remedy.clone()).unwrap_or_default(),
                 "value": (d.value * 1000.0).round() / 1000.0,
                 "weight": d.weight, "deducted": d.taken, "capped": d.capped,
+                "total_findings": measure.map(|x| x.findings.len()).unwrap_or(0),
+                "findings": findings,
             })
         })
         .collect();
