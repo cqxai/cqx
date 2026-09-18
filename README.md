@@ -212,3 +212,18 @@ cargo run -p cqx -- extract /path/to/a/workspace --out facts.ndjson
 `fixtures/basic` exists so output can be checked against a known answer instead of
 eyeballed: a planted process spawn, two env reads, an unsafe block, a `static
 mut`, filesystem and network effects, and a library that calls `process::exit`.
+
+## Scoring a history
+
+```
+cqx history /path/to/repo --commits 20
+```
+
+Materialises each commit with `git archive` — the working tree is never touched,
+so this is safe against a repository somebody is using — extracts, scores, and
+writes `history.json` with a per-category score and the change against the
+previous commit.
+
+A commit's score can never change, so each one is written once and reread
+thereafter: twelve commits of a 75k-line workspace take 15 seconds cold and half
+a second warm.
