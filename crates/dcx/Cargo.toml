@@ -10,6 +10,11 @@ description = "deka code explorer."
 name = "dcx"
 path = "src/main.rs"
 
+[features]
+default = []
+zega = ["dcx-store/zega"]
+
 [dependencies]
 deka-cli-core = { workspace = true }
 dcx-rust = { path = "../dcx-rust" }
+dcx-store = { path = "../dcx-store" }

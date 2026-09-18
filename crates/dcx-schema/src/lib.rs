@@ -77,7 +77,7 @@ pub enum NodeKind {
     Type,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum EdgeKind {
     /// The zoom spine. The only edge every extractor must emit.
@@ -256,6 +256,10 @@ impl Fact {
 pub struct Writer<W: std::io::Write> {
     out: W,
     seen_nodes: std::collections::HashSet<Id>,
+    /// Structural edges carry no evidence, so the same one asserted twice says
+    /// nothing new — and a duplicated containment edge multiplies every path
+    /// through it when the stream is walked as a graph.
+    seen_structural: std::collections::HashSet<(EdgeKind, Id, Id)>,
     pub nodes: usize,
     pub edges: usize,
 }
@@ -265,6 +269,7 @@ impl<W: std::io::Write> Writer<W> {
         Writer {
             out,
             seen_nodes: std::collections::HashSet::new(),
+            seen_structural: std::collections::HashSet::new(),
             nodes: 0,
             edges: 0,
         }
@@ -284,6 +289,13 @@ impl<W: std::io::Write> Writer<W> {
     }
 
     pub fn edge(&mut self, edge: Edge) -> std::io::Result<()> {
+        if edge.ev.is_empty()
+            && !self
+                .seen_structural
+                .insert((edge.kind, edge.from.clone(), edge.to.clone()))
+        {
+            return Ok(());
+        }
         self.edges += 1;
         self.fact(&Fact::Edge(edge))
     }
