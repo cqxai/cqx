@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/dcx", "crates/dcx-rust", "crates/dcx-schema"]
+members = ["crates/dcx", "crates/dcx-rust", "crates/dcx-schema", "crates/dcx-store"]
 exclude = ["samples"]
 
 [workspace.package]
