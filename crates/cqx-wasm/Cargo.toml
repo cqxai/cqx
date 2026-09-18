@@ -1,0 +1,17 @@
+[package]
+name = "cqx-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The cqx analysis, callable from a browser."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+cqx-rust = { path = "../cqx-rust" }
+cqx-score = { path = "../cqx-score" }
+cqx-store = { path = "../cqx-store" }
+cqx-vfs = { workspace = true }
+serde_json = { workspace = true }

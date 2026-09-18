@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/cqx", "crates/cqx-rust", "crates/cqx-schema", "crates/cqx-history", "crates/cqx-score", "crates/cqx-store", "crates/cqx-vfs"]
+members = ["crates/cqx", "crates/cqx-rust", "crates/cqx-schema", "crates/cqx-history", "crates/cqx-score", "crates/cqx-store", "crates/cqx-vfs", "crates/cqx-wasm"]
 exclude = ["fixtures"]
 
 [workspace.package]
