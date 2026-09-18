@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["crates/cqx", "crates/cqx-rust", "crates/cqx-schema", "crates/cqx-store"]
-exclude = ["samples"]
+members = ["crates/cqx", "crates/cqx-rust", "crates/cqx-schema", "crates/cqx-score", "crates/cqx-store"]
+exclude = ["fixtures"]
 
 [workspace.package]
 version = "0.1.0"
