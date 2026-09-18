@@ -472,9 +472,21 @@ fn build_report(
                         .iter()
                         .take(FINDINGS_PER_RULE)
                         .map(|f| {
-                            serde_json::json!({
+                            // The span and the line itself travel with it, so
+                            // a reader is shown the code rather than sent to
+                            // find it. Both are omitted when absent rather
+                            // than sent empty: a column of zero would be a
+                            // claim about where the problem is.
+                            let mut one = serde_json::json!({
                                 "what": f.what, "file": f.file, "line": f.line,
-                            })
+                            });
+                            if f.col != [0, 0] {
+                                one["col"] = serde_json::json!(f.col);
+                            }
+                            if !f.text.is_empty() {
+                                one["text"] = serde_json::json!(f.text);
+                            }
+                            one
                         })
                         .collect()
                 })
