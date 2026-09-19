@@ -206,6 +206,10 @@ jobs:
       R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       TAG: ${{ needs.resolve.outputs.tag }}
       VERSION: ${{ needs.resolve.outputs.version }}
+      # This job downloads artefacts and never checks the source out, so there
+      # is no git repository for `gh` to infer the repository from. Saying it
+      # outright is cheaper than cloning the tree to answer one question.
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/download-artifact@v4
         with:
