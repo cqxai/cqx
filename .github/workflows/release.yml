@@ -52,3 +52,27 @@ jobs:
           gh release view "$TAG" >/dev/null 2>&1 \
             || gh release create "$TAG" --title "$TAG" --generate-notes
           gh release upload "$TAG" artefacts/* --clobber
+
+  # ---------------------------------------------------------------------------
+  # cqx.bio names the current release and links to what changed since the last
+  # one. It reads that when it is built, because the front page is prerendered
+  # and has to stay that way — so a new release has to ask it to build again.
+  #
+  # Guarded on the secret rather than requiring it: a release must not fail
+  # because a marketing site is not wired up yet. Set CQX_BIO_DEPLOY_HOOK to
+  # the deploy hook URL from the cqx-bio Worker's build settings.
+  refresh-site:
+    name: refresh cqx.bio
+    needs: artefacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask cqx.bio to rebuild
+        env:
+          HOOK: ${{ secrets.CQX_BIO_DEPLOY_HOOK }}
+        run: |
+          if [ -z "${HOOK:-}" ]; then
+            echo "No CQX_BIO_DEPLOY_HOOK set; the badge will refresh on the site's next deploy."
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK" -o /dev/null
+          echo "cqx.bio rebuild requested."
