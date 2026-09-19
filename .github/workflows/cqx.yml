@@ -1,0 +1,40 @@
+name: cqx
+
+# cqx, scored by cqx. The tool has to hold its own standard before it is worth
+# asking anybody else to, and this is also where the action is proved: if it
+# breaks, it breaks here first.
+#
+# Reporting only, for now. cqx is being written quickly and its own score
+# moves every day; a gate that fails the author of the gate teaches the author
+# to turn it off. It becomes a real check once the numbers settle.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Deep enough to reach the base of a pull request without a second
+          # fetch, which is what turns the score into a direction.
+          fetch-depth: 0
+
+      - uses: samifouad/cqx-action@main
+        id: cqx
+        with:
+          fail: 'false'
+
+      - name: What it said
+        run: |
+          echo "scores: ${{ steps.cqx.outputs.scores }}"
+          echo "passed: ${{ steps.cqx.outputs.passed }}"
+          echo "read it: ${{ steps.cqx.outputs.url }}"
