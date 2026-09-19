@@ -34,24 +34,39 @@ jobs:
     outputs:
       tag: ${{ steps.v.outputs.tag }}
       version: ${{ steps.v.outputs.version }}
+      ref: ${{ steps.v.outputs.ref }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
 
-      # A tag that disagrees with the manifest is the one mistake that cannot
-      # be fixed after the fact: the binaries would report a version nobody
-      # can find, and npm would refuse the second publish at that number.
       - id: v
         run: |
+          DRY="${{ github.event_name != 'push' && github.event.inputs.dry_run != 'false' }}"
+          MANIFEST="$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
+
+          if [ "$DRY" = "true" ]; then
+            # A dry run proves the code in front of us builds on four
+            # platforms. Building an old tag would prove something about the
+            # past — and would check out a tree without this workflow's own
+            # actions in it, which is exactly how the first attempt failed.
+            echo "ref=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+            echo "tag=v${MANIFEST}" >> "$GITHUB_OUTPUT"
+            echo "version=${MANIFEST}" >> "$GITHUB_OUTPUT"
+            echo "dry run against $(git rev-parse --short HEAD), which says ${MANIFEST}"
+            exit 0
+          fi
+
+          # A tag that disagrees with the manifest is the one mistake that
+          # cannot be fixed after the fact: the binaries would report a
+          # version nobody can find, and npm would refuse the second publish
+          # at that number.
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
-          MANIFEST="v$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
-          if [ "$TAG" != "$MANIFEST" ]; then
-            echo "::error::tag $TAG but Cargo.toml says $MANIFEST"
+          if [ "$TAG" != "v$MANIFEST" ]; then
+            echo "::error::tag $TAG but Cargo.toml says v$MANIFEST"
             exit 1
           fi
+          echo "ref=$TAG" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "version=$MANIFEST" >> "$GITHUB_OUTPUT"
           echo "building $TAG"
 
   # ---------------------------------------------------------------------------
@@ -86,7 +101,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve.outputs.tag }}
+          ref: ${{ needs.resolve.outputs.ref }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -149,7 +164,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve.outputs.tag }}
+          ref: ${{ needs.resolve.outputs.ref }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
