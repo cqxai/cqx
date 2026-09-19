@@ -1,7 +1,7 @@
 # cqx — CodeQuality Explorer
 
 <p align="left">
-  <img src="screenshot-deno.png" alt="CQX Screenshot" width="70%">
+  <img src="screenshot-deno.png" alt="CQX Screenshot" width="80%">
 </p>
 
 Live demo: https://explorer.deka.gg
