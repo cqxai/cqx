@@ -1,0 +1,54 @@
+# What each environment's credentials can actually reach.
+#
+# Run by hand. It exists because the two environments hold secrets under the
+# same names and different tokens behind them — `public-ci` should reach only
+# the build caches, `release` should reach those plus the buckets a release
+# writes to. Names cannot show that and neither can the dashboard once the
+# secret is sealed, so this asks R2 directly.
+#
+# It prints reachability, never a credential.
+
+name: r2-check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: ${{ matrix.environment }} can reach
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [public-ci, release]
+    runs-on: ubuntu-latest
+    environment: ${{ matrix.environment }}
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+    steps:
+      - name: Ask every bucket
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ]; then
+            echo "::error::${{ matrix.environment }} has no R2_SCCACHE_ACCESS_KEY_ID"
+            exit 1
+          fi
+          command -v aws >/dev/null 2>&1 || pip install --quiet --break-system-packages awscli
+          echo "| bucket | ${{ matrix.environment }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for b in cqx cqx-releases cqx-wasm \
+                   cqx-sccache-linux-x64 cqx-sccache-linux-arm64 \
+                   cqx-sccache-darwin-x64 cqx-sccache-darwin-arm64 \
+                   cqx-sccache-windows-x64; do
+            if aws s3 ls "s3://$b/" --endpoint-url "$R2_ENDPOINT" >/dev/null 2>&1; then
+              echo "  reachable   $b"
+              echo "| \`$b\` | reachable |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "  denied      $b"
+              echo "| \`$b\` | denied |" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
