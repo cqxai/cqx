@@ -153,6 +153,23 @@ fn run(context: &Context) -> Result<(), String> {
         None => None,
     };
 
+    // What it was compared against travels with the report. The movement is
+    // the point of a ratchet, and a consumer that only receives the new
+    // numbers has to score the base itself to find it — which is the work
+    // this command already did.
+    if let Some((reference, before)) = &against {
+        let was: serde_json::Map<String, serde_json::Value> = before
+            .scores()
+            .into_iter()
+            .map(|(k, v)| (k, serde_json::json!(v)))
+            .collect();
+        here.report["against"] = serde_json::json!({
+            "ref": reference,
+            "scores": was,
+            "lines": before.lines,
+        });
+    }
+
     // Written before the gate runs, and whatever it decides: a run that was
     // refused is exactly the one somebody wants the numbers from.
     if let Some(path) = context.args.params.get("--report") {
