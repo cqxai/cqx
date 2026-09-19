@@ -28,6 +28,23 @@ pub struct Finding {
     /// and find it. Filled in after scoring, by whoever still holds the
     /// source — the scorer sees a graph, not a repository.
     pub text: String,
+    /// The item the finding sits inside, so a reader can zoom out to the thing
+    /// that is wrong rather than the line it happens to be on.
+    ///
+    /// `None` where nothing encloses it: a rule about a whole file, or a
+    /// finding at module level.
+    pub item: Option<Item>,
+}
+
+/// A function, impl or module, and where it begins and ends.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Item {
+    pub name: String,
+    /// What the language calls it — `fn`, `impl`, `mod`.
+    pub kind: String,
+    /// Inclusive, 1-indexed, as the file counts.
+    pub from: u32,
+    pub to: u32,
 }
 
 /// Closures cannot express the lifetime tie between an edge and a string
@@ -87,6 +104,7 @@ fn finding(what: impl Into<String>, edge: &Edge) -> Finding {
         line,
         col,
         text: String::new(),
+        item: None,
     }
 }
 
@@ -99,6 +117,7 @@ pub fn about(what: impl Into<String>, file: impl Into<String>, line: u32) -> Fin
         line,
         col: [0, 0],
         text: String::new(),
+        item: None,
     }
 }
 
@@ -581,10 +600,72 @@ impl Metrics {
             },
         );
 
-        Metrics {
+        let mut metrics = Metrics {
             scale,
             lines,
             values,
+        };
+        metrics.locate(stream);
+        metrics
+    }
+
+    /// Says which item each finding sits inside.
+    ///
+    /// Done in one pass over every finding rather than at each of the twenty
+    /// places one is made: the answer comes from the graph either way, and a
+    /// rule that forgot to ask would be a rule whose card quietly offers one
+    /// zoom fewer than the others.
+    ///
+    /// The span is already there. A symbol is joined to whatever contains it
+    /// by a `Contains` edge, and that edge's evidence is the symbol's own
+    /// extent — so an index over those edges answers it without the extractor
+    /// writing anything new down.
+    fn locate(&mut self, stream: &Stream) {
+        let named: HashMap<&str, (&str, &str)> = stream
+            .nodes
+            .iter()
+            .filter(|n| n.kind == NodeKind::Symbol)
+            .filter_map(|n| {
+                let name = n.attrs.get("name")?.as_str()?;
+                let kind = n.attrs.get("lang:kind").and_then(|v| v.as_str()).unwrap_or("item");
+                Some((n.id.0.as_str(), (name, kind)))
+            })
+            .collect();
+
+        // file -> the items in it, each with its extent.
+        let mut items: HashMap<&str, Vec<Item>> = HashMap::new();
+        for edge in &stream.edges {
+            if edge.kind != EdgeKind::Contains {
+                continue;
+            }
+            let Some((name, kind)) = named.get(edge.to.0.as_str()) else { continue };
+            let Some(ev) = edge.ev.first() else { continue };
+            if ev.line[0] == 0 {
+                continue;
+            }
+            items.entry(ev.file.as_str()).or_default().push(Item {
+                name: (*name).to_string(),
+                kind: (*kind).to_string(),
+                from: ev.line[0],
+                to: ev.line[1].max(ev.line[0]),
+            });
+        }
+
+        for measure in self.values.values_mut() {
+            for finding in &mut measure.findings {
+                if finding.line == 0 {
+                    continue;
+                }
+                let Some(candidates) = items.get(finding.file.as_str()) else { continue };
+                // The innermost one: a call inside a closure inside a method is
+                // most usefully shown as the method, not as the impl block that
+                // also contains it.
+                finding.item = candidates
+                    .iter()
+                    .filter(|i| i.from <= finding.line && finding.line <= i.to)
+                    .min_by_key(|i| i.to - i.from)
+                    .cloned();
+            }
         }
     }
 }

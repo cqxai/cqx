@@ -38,6 +38,15 @@ impl std::fmt::Display for Origin {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Rule {
     pub category: String,
+    /// Which language the rule is about.
+    ///
+    /// It prefixes the rule's name everywhere it is shown —
+    /// `[rust/discarded-check]` — and names its page in the documentation, so
+    /// it is written down from the first frontend rather than assumed and
+    /// retrofitted from the second. Not patchable: a rule's language is a fact
+    /// about the rule, not a setting.
+    #[serde(default = "rust")]
+    pub language: String,
     /// What the rule measures, in one line. Present so that a reader — human or
     /// agent — can decide whether to change it without reading this source.
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -73,6 +82,10 @@ impl Rule {
 
 fn yes() -> bool {
     true
+}
+
+fn rust() -> String {
+    "rust".to_string()
 }
 
 /// The partial form: every field optional, so a file or an environment variable
@@ -131,6 +144,7 @@ pub fn defaults() -> BTreeMap<String, Rule> {
             id.to_string(),
             Rule {
                 category: category.to_string(),
+                language: rust(),
                 describes: describes.to_string(),
                 remedy: remedy.to_string(),
                 weight,

@@ -206,6 +206,7 @@ pub fn config_json(config: &Config) -> serde_json::Value {
                 id.clone(),
                 serde_json::json!({
                     "category": r.category,
+                    "language": r.language,
                     "describes": r.describes,
                     "weight": r.weight,
                     "free": r.free,
@@ -497,6 +498,15 @@ fn build_report(
                             if !f.text.is_empty() {
                                 one["text"] = serde_json::json!(f.text);
                             }
+                            // The item it sits inside, so a reader can zoom
+                            // out to the thing that is wrong rather than the
+                            // line it happens to be on.
+                            if let Some(item) = &f.item {
+                                one["item"] = serde_json::json!({
+                                    "name": item.name, "kind": item.kind,
+                                    "from": item.from, "to": item.to,
+                                });
+                            }
                             one
                         })
                         .collect()
@@ -504,6 +514,10 @@ fn build_report(
                 .unwrap_or_default();
             serde_json::json!({
                 "rule": d.rule, "category": d.category,
+                // The language prefixes the name wherever it is shown and
+                // names its page in the docs, so it travels with the rule
+                // rather than being assumed by whoever renders it.
+                "language": config.rules.get(&d.rule).map(|r| r.language.clone()).unwrap_or_default(),
                 "describes": config.rules.get(&d.rule).map(|r| r.describes.clone()).unwrap_or_default(),
                 "remedy": config.rules.get(&d.rule).map(|r| r.remedy.clone()).unwrap_or_default(),
                 "value": (d.value * 1000.0).round() / 1000.0,
