@@ -54,8 +54,12 @@ for (const [name, file] of [
   await chmod(to, 0o755);
 }
 
-execFileSync(process.execPath, [join(root, 'npm/build.mjs'), version, bins], { stdio: 'pipe' });
-check(`built five packages at ${version}`, existsSync(join(root, 'npm/dist/cqx-cli/package.json')));
+// Into the scratch directory, never npm/dist: these packages hold stubs for
+// every platform but this one, and leaving them where a publish would find
+// them is how stub binaries reach the registry.
+const built = join(work, 'packages');
+execFileSync(process.execPath, [join(root, 'npm/build.mjs'), version, bins, built], { stdio: 'pipe' });
+check(`built five packages at ${version}`, existsSync(join(built, 'cqx-cli/package.json')));
 
 // Installed the way a consumer installs, and with --ignore-scripts, which is
 // how a careful CI does it and the reason this package has no postinstall.
@@ -65,8 +69,8 @@ await writeFile(join(consumer, 'package.json'), '{"name":"c","private":true,"ver
 execFileSync(
   'npm',
   ['install', '--silent', '--ignore-scripts',
-   join(root, 'npm/dist/platform', here),
-   join(root, 'npm/dist/cqx-cli')],
+   join(built, 'platform', here),
+   join(built, 'cqx-cli')],
   { cwd: consumer, stdio: 'pipe' },
 );
 

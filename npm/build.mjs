@@ -17,16 +17,21 @@
  * resolve a binary from a different release than the wrapper expects, and the
  * two are one program.
  *
- *   node npm/build.mjs <version> <directory of binaries>
+ *   node npm/build.mjs <version> <directory of binaries> [output directory]
+ *
+ * The output directory is wiped before it is written. It defaults to
+ * npm/dist, which is why the test passes its own: a test that rebuilt the
+ * shared directory from stub binaries would leave five packages full of
+ * nothing behind it, ready to publish.
  */
 import { cp, mkdir, readFile, rm, writeFile, chmod } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const [version, from] = process.argv.slice(2);
+const [version, from, into] = process.argv.slice(2);
 if (!version || !from) {
-  console.error('usage: node npm/build.mjs <version> <dir containing cqx-<platform> binaries>');
+  console.error('usage: node npm/build.mjs <version> <dir of binaries> [output dir]');
   process.exit(2);
 }
 
@@ -38,7 +43,7 @@ const PLATFORMS = [
   { name: 'windows-x64', os: 'win32', cpu: 'x64', file: 'cqx-windows-x64.exe', bin: 'cqx.exe' },
 ];
 
-const out = join(root, 'npm', 'dist');
+const out = into ? resolve(into) : join(root, 'npm', 'dist');
 await rm(out, { recursive: true, force: true });
 
 const optional = {};

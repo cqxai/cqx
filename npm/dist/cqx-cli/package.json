@@ -1,6 +1,6 @@
 {
   "name": "cqx-cli",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "Read any Rust repository and see what it does at runtime: every process it can spawn, every environment variable it reads, and every check that was written and then ignored.",
   "license": "Apache-2.0",
   "type": "module",
@@ -29,10 +29,10 @@
     "node": ">=18"
   },
   "optionalDependencies": {
-    "@samifouad/cqx-darwin-arm64": "0.1.14",
-    "@samifouad/cqx-darwin-x64": "0.1.14",
-    "@samifouad/cqx-linux-x64": "0.1.14",
-    "@samifouad/cqx-windows-x64": "0.1.14"
+    "@samifouad/cqx-darwin-arm64": "0.1.15",
+    "@samifouad/cqx-darwin-x64": "0.1.15",
+    "@samifouad/cqx-linux-x64": "0.1.15",
+    "@samifouad/cqx-windows-x64": "0.1.15"
   },
   "publishConfig": {
     "access": "public"

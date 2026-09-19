@@ -1,6 +1,6 @@
 {
   "name": "@samifouad/cqx-darwin-x64",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "The cqx binary for darwin x64. Installed by cqx-cli; not meant to be depended on directly.",
   "license": "Apache-2.0",
   "repository": {

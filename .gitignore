@@ -2,3 +2,6 @@
 /.tmp/
 /target/
 /.reference/
+
+# Assembled from release binaries by npm/build.mjs; never committed.
+npm/dist/
