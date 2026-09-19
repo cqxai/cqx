@@ -1,8 +1,12 @@
 name: release
 
-# Tagging cuts a release and attaches the artefacts other things build against.
-# cqx-web fetches the wasm module by pinned version rather than carrying a
-# binary in git, so updating it is a one-line, reviewable diff.
+# Cutting a tag builds the tool for every platform it is distributed on,
+# proves each binary runs, and publishes them three ways: attached to the
+# GitHub release, mirrored into R2 for the installer, and — once the npm
+# packages exist — as the platform packages `cqx-cli` depends on.
+#
+# SCCACHE IS REQUIRED FOR ALL RUST COMPILATION.
+
 on:
   push:
     tags: ['v*']
@@ -11,59 +15,248 @@ on:
       tag:
         description: 'Tag to build (must already exist)'
         required: true
+      dry_run:
+        description: 'Build and smoke test every platform, publish nothing'
+        type: boolean
+        default: true
 
 permissions:
   contents: write
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  artefacts:
+  # ---------------------------------------------------------------------------
+  resolve:
+    name: version
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      version: ${{ steps.v.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
+
+      # A tag that disagrees with the manifest is the one mistake that cannot
+      # be fixed after the fact: the binaries would report a version nobody
+      # can find, and npm would refuse the second publish at that number.
+      - id: v
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          MANIFEST="v$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
+          if [ "$TAG" != "$MANIFEST" ]; then
+            echo "::error::tag $TAG but Cargo.toml says $MANIFEST"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "building $TAG"
+
+  # ---------------------------------------------------------------------------
+  build:
+    name: cqx (${{ matrix.platform }})
+    needs: resolve
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-latest
+            bucket: cqx-sccache-linux-x64
+          - platform: darwin-x64
+            runner: macos-15-intel
+            bucket: cqx-sccache-darwin-x64
+          - platform: darwin-arm64
+            runner: macos-14
+            bucket: cqx-sccache-darwin-arm64
+          - platform: windows-x64
+            runner: windows-latest
+            bucket: cqx-sccache-windows-x64
+            suffix: .exe
+    runs-on: ${{ matrix.runner }}
+    environment: release
+    env:
+      SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      SCCACHE_REGION: auto
+      SCCACHE_BUCKET: ${{ matrix.bucket }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.platform }}
+      - uses: ./.github/actions/sccache
+
+      - name: Build
+        shell: bash
+        run: cargo build --locked --release -p cqx
+
+      - name: Collect
+        shell: bash
+        run: |
+          mkdir -p dist
+          # The target directory is `.target` under some local configurations
+          # and `target` under others; the release must not care which.
+          for d in target .target; do
+            if [ -f "$d/release/cqx${{ matrix.suffix }}" ]; then
+              cp "$d/release/cqx${{ matrix.suffix }}" "dist/cqx-${{ matrix.platform }}${{ matrix.suffix }}"
+              break
+            fi
+          done
+          test -f "dist/cqx-${{ matrix.platform }}${{ matrix.suffix }}" \
+            || { echo "::error::no binary was produced"; exit 1; }
+          chmod +x "dist/cqx-${{ matrix.platform }}${{ matrix.suffix }}" || true
+
+      # The binary has to run on the machine that built it before anyone is
+      # asked to download it. Version, because it is the one answer that
+      # proves the whole thing linked and started rather than merely existing.
+      - name: It runs, and says who it is
+        shell: bash
+        run: |
+          BIN="dist/cqx-${{ matrix.platform }}${{ matrix.suffix }}"
+          SAID=$("./$BIN" --version)
+          echo "$SAID"
+          [ "$SAID" = "cqx ${{ needs.resolve.outputs.version }}" ] \
+            || { echo "::error::binary says '$SAID', expected 'cqx ${{ needs.resolve.outputs.version }}'"; exit 1; }
+
+      - uses: ./.github/actions/sccache-stats
+        if: always()
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cqx-${{ matrix.platform }}
+          path: dist/*
+          retention-days: 1
+
+  # ---------------------------------------------------------------------------
+  wasm:
+    name: cqx_wasm.wasm
+    needs: resolve
+    runs-on: ubuntu-latest
+    environment: release
+    env:
+      SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      SCCACHE_REGION: auto
+      SCCACHE_BUCKET: cqx-sccache-linux-x64
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
+      - uses: ./.github/actions/sccache
 
-      # The analysis, for a browser or any other wasm host.
-      - name: Build cqx_wasm.wasm
+      - name: Build
         run: cargo build --locked --release --target wasm32-unknown-unknown -p cqx-wasm
-
-      # And the command line tool, for CI and for a terminal.
-      - name: Build cqx
-        run: cargo build --locked --release -p cqx
 
       - name: Collect
         run: |
-          mkdir -p artefacts
-          cp target/wasm32-unknown-unknown/release/cqx_wasm.wasm artefacts/ 2>/dev/null \
-            || cp .target/wasm32-unknown-unknown/release/cqx_wasm.wasm artefacts/
-          cp target/release/cqx artefacts/cqx-linux-x86_64 2>/dev/null \
-            || cp .target/release/cqx artefacts/cqx-linux-x86_64
-          cd artefacts && sha256sum * > SHA256SUMS && cat SHA256SUMS
+          mkdir -p dist
+          for d in target .target; do
+            f="$d/wasm32-unknown-unknown/release/cqx_wasm.wasm"
+            [ -f "$f" ] && cp "$f" dist/ && break
+          done
+          test -f dist/cqx_wasm.wasm || { echo "::error::no wasm was produced"; exit 1; }
+          ls -l dist/cqx_wasm.wasm
 
-      - name: Attach to the release
+      - uses: ./.github/actions/sccache-stats
+        if: always()
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cqx-wasm
+          path: dist/*
+          retention-days: 1
+
+  # ---------------------------------------------------------------------------
+  publish:
+    name: publish
+    needs: [resolve, build, wasm]
+    if: ${{ github.event_name == 'push' || github.event.inputs.dry_run != 'true' }}
+    runs-on: ubuntu-latest
+    environment: release
+    env:
+      # Same spelling public-ci uses, deliberately: the environment decides
+      # which token a job gets, so a workflow never has to know which one it
+      # is holding. This one reaches the release buckets; that one does not.
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      TAG: ${{ needs.resolve.outputs.tag }}
+      VERSION: ${{ needs.resolve.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: incoming
+
+      - name: Gather
+        run: |
+          mkdir -p out
+          find incoming -type f -exec cp {} out/ \;
+          cd out
+          # Checksums over everything, in one file, so a download can be
+          # verified without trusting the page it came from.
+          sha256sum * > SHA256SUMS
+          ls -l
+          cat SHA256SUMS
+
+      - name: Attach to the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
           gh release view "$TAG" >/dev/null 2>&1 \
             || gh release create "$TAG" --title "$TAG" --generate-notes
-          gh release upload "$TAG" artefacts/* --clobber
+          gh release upload "$TAG" out/* --clobber
+
+      # R2 as well as GitHub: an installer that curls a versioned path wants a
+      # CDN and a stable URL, not a redirect chain through a release page.
+      - name: Mirror into R2
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$R2_ENDPOINT" ]; then
+            echo "::error::the release environment is missing R2 credentials"
+            exit 1
+          fi
+          command -v aws >/dev/null 2>&1 || pip install --quiet --break-system-packages awscli
+
+          # Binaries and checksums, under the version that produced them.
+          aws s3 sync out/ "s3://cqx-releases/${TAG}/" \
+            --endpoint-url "$R2_ENDPOINT" --exclude 'cqx_wasm.wasm'
+
+          # The wasm goes to its own bucket, which is the one browsers read.
+          aws s3 cp out/cqx_wasm.wasm "s3://cqx-wasm/${TAG}/cqx_wasm.wasm" \
+            --endpoint-url "$R2_ENDPOINT" --content-type application/wasm
+          aws s3 cp out/SHA256SUMS "s3://cqx-wasm/${TAG}/SHA256SUMS" \
+            --endpoint-url "$R2_ENDPOINT"
+
+          # And a pointer that does not move, so something can ask what the
+          # current release is without listing a bucket.
+          printf '{"tag":"%s","version":"%s"}\n' "$TAG" "$VERSION" > latest.json
+          aws s3 cp latest.json "s3://cqx-releases/latest.json" \
+            --endpoint-url "$R2_ENDPOINT" --content-type application/json
+
+          echo "published $TAG"
 
   # ---------------------------------------------------------------------------
-  # cqx.bio names the current release and links to what changed since the last
-  # one. It reads that when it is built, because the front page is prerendered
-  # and has to stay that way — so a new release has to ask it to build again.
+  # cqx.bio names the current release and links to it. It reads that when it is
+  # built, because the front page is prerendered and has to stay that way — so a
+  # new release has to ask it to build again.
   #
   # Guarded on the secret rather than requiring it: a release must not fail
-  # because a marketing site is not wired up yet. Set CQX_BIO_DEPLOY_HOOK to
-  # the deploy hook URL from the cqx-bio Worker's build settings.
+  # because a marketing site is not wired up yet.
   refresh-site:
     name: refresh cqx.bio
-    needs: artefacts
+    needs: publish
     runs-on: ubuntu-latest
     steps:
       - name: Ask cqx.bio to rebuild

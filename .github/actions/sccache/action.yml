@@ -1,18 +1,29 @@
 name: sccache
-description: Install sccache, point it at R2, and make every later cargo step use it.
+description: Install sccache, prove it is pointed at R2, and cache every later cargo step.
 
 # SCCACHE IS REQUIRED FOR ALL RUST COMPILATION.
 #
-# One place rather than one per job, because three jobs repeating five
-# environment variables is three chances for them to stop agreeing. The job
-# supplies the credentials and the bucket; this installs the binary, proves it
-# can reach the bucket, and exports RUSTC_WRAPPER so every cargo step after it
-# is cached without having to remember to say so.
+# One place rather than the same five environment variables in every job,
+# which is one chance per job for them to stop agreeing. The job supplies the
+# credentials and the bucket; this installs the binary, proves the
+# configuration took, and exports RUSTC_WRAPPER so every cargo step after it
+# is cached without anyone having to remember.
 #
-# It fails loudly when the credentials are missing, with one exception: a pull
+# Proving it took matters because sccache fails soft in both directions: a
+# missing bucket name silently means "local disk", and unreachable credentials
+# silently mean "compile everything, write nothing". Both look like an
+# ordinary slow build. So this asks sccache what it thinks its cache is, and
+# the companion `sccache-stats` action checks afterwards that writing worked.
+#
+# Asking sccache rather than the AWS CLI is deliberate: it needs no extra
+# tool, so it behaves the same on Linux, macOS and Windows runners, and it
+# reports the view that actually governs the build rather than a second
+# opinion from a different client.
+#
+# It fails loudly when credentials are missing, with one exception: a pull
 # request from a fork, where GitHub withholds secrets by design. Failing there
 # would mean an outside contributor cannot get a green check on a public
-# repository, which is a worse outcome than an uncached build.
+# repository, which is worse than an uncached build.
 
 runs:
   using: composite
@@ -29,28 +40,28 @@ runs:
         [ -n "$AWS_SECRET_ACCESS_KEY" ] || missing="$missing AWS_SECRET_ACCESS_KEY"
 
         if [ -n "$missing" ]; then
-          # A fork never receives secrets, however the workflow is written.
           if [ "${{ github.event.pull_request.head.repo.fork }}" = "true" ]; then
-            echo "::warning::No R2 credentials (fork pull request). Building uncached — this will be slow but correct."
+            echo "::warning::No R2 credentials (fork pull request). Building uncached — slow, but correct."
             exit 0
           fi
           echo "::error::R2 sccache credentials are missing:$missing. SCCACHE IS REQUIRED FOR ALL RUST COMPILATION."
           exit 1
         fi
 
-        if ! command -v sccache >/dev/null 2>&1; then
+        command -v sccache >/dev/null 2>&1 || {
           echo "::error::sccache is not on PATH. SCCACHE IS REQUIRED FOR ALL RUST COMPILATION."
           exit 1
-        fi
+        }
 
-        # Proves the credentials reach *this* bucket before a build depends on
-        # it. sccache itself fails soft — it would compile everything and write
-        # nothing, which looks like a slow build rather than a broken cache.
-        command -v aws >/dev/null 2>&1 || pip install --quiet --break-system-packages awscli
-        if ! aws s3 ls "s3://${SCCACHE_BUCKET}/" --endpoint-url "$SCCACHE_ENDPOINT" >/dev/null; then
-          echo "::error::Cannot reach s3://${SCCACHE_BUCKET}/ with these credentials."
-          exit 1
-        fi
+        where=$(sccache --show-stats | grep -i 'Cache location' || true)
+        case "$where" in
+          *s3*"$SCCACHE_BUCKET"*)
+            echo "$where"
+            ;;
+          *)
+            echo "::error::sccache is not using R2. It reports: ${where:-nothing}"
+            exit 1
+            ;;
+        esac
 
         echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
-        echo "sccache → ${SCCACHE_BUCKET}"

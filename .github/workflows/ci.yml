@@ -43,16 +43,8 @@ jobs:
       # separately rather than hidden inside the default path.
       - run: cargo build --locked -p cqx --features zega
 
-      - name: What the cache did
+      - uses: ./.github/actions/sccache-stats
         if: always()
-        run: |
-          sccache --show-stats
-          {
-            echo '### sccache'
-            echo '```'
-            sccache --show-stats
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
 
   wasm:
     name: analysis compiles for wasm
@@ -81,16 +73,8 @@ jobs:
           ls -l .target/wasm32-unknown-unknown/release/cqx_wasm.wasm || \
             ls -l target/wasm32-unknown-unknown/release/cqx_wasm.wasm
 
-      - name: What the cache did
+      - uses: ./.github/actions/sccache-stats
         if: always()
-        run: |
-          sccache --show-stats
-          {
-            echo '### sccache'
-            echo '```'
-            sccache --show-stats
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
 
   conformance:
     name: manifest parser agrees with cargo
@@ -151,13 +135,5 @@ jobs:
           CQX_REFERENCE_DIR: ${{ github.workspace }}/.reference
         run: cargo test --locked -p cqx-rust --test conformance -- --nocapture
 
-      - name: What the cache did
+      - uses: ./.github/actions/sccache-stats
         if: always()
-        run: |
-          sccache --show-stats
-          {
-            echo '### sccache'
-            echo '```'
-            sccache --show-stats
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"

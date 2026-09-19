@@ -1,0 +1,34 @@
+name: sccache-stats
+description: Report what the cache did, and fail if it could not write.
+
+# Run after the compiling, where the numbers mean something.
+#
+# The failure this catches is the quiet one. sccache treats an unreachable
+# bucket as a cache miss, so a job with bad credentials compiles everything,
+# writes nothing, and passes — indistinguishable from a cold cache until
+# somebody notices the build never gets faster. A write error is the one
+# symptom that separates them, so it is an error here rather than a number in
+# a log nobody reads.
+
+runs:
+  using: composite
+  steps:
+    - name: What the cache did
+      if: always()
+      shell: bash
+      run: |
+        command -v sccache >/dev/null 2>&1 || exit 0
+        stats=$(sccache --show-stats)
+        echo "$stats"
+        {
+          echo "### sccache — ${SCCACHE_BUCKET:-local}"
+          echo '```'
+          echo "$stats"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        errors=$(echo "$stats" | awk '/Cache write errors/ { print $NF }')
+        if [ -n "$errors" ] && [ "$errors" != "0" ]; then
+          echo "::error::sccache could not write to ${SCCACHE_BUCKET}: $errors write error(s). The cache is not working."
+          exit 1
+        fi
