@@ -104,9 +104,13 @@ jobs:
           key: ${{ matrix.platform }}
       - uses: ./.github/actions/sccache
 
+      # With the graph engine in it. Without `--features zega` every binary
+      # anybody downloads refuses `--zql` and `--named` — CI built it only to
+      # prove it compiled, and the feature shipped switched off for four
+      # releases. It costs about 1.2 MB.
       - name: Build
         shell: bash
-        run: cargo build --locked --release -p cqx
+        run: cargo build --locked --release -p cqx --features zega
 
       - name: Collect
         shell: bash

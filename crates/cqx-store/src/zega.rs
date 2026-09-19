@@ -162,7 +162,12 @@ pub const NAMED: &[(&str, &str, &str)] = &[
     ),
 ];
 
-pub fn run(stream: &Stream, named: Option<&str>, zql: Option<&str>) -> Result<(), String> {
+pub fn run(
+    stream: &Stream,
+    named: Option<&str>,
+    zql: Option<&str>,
+    json: bool,
+) -> Result<(), String> {
     if named == Some("list") {
         println!("named queries:");
         for (name, about, _) in NAMED {
@@ -191,9 +196,23 @@ pub fn run(stream: &Stream, named: Option<&str>, zql: Option<&str>) -> Result<()
         .map_err(|e| format!("{e:?}"))?;
     let took = began.elapsed();
 
-    for row in rows.iter().take(40) {
-        println!("  {row:?}");
+    if json {
+        let out: Vec<serde_json::Value> = rows
+            .iter()
+            .map(|row| {
+                serde_json::Value::Object(
+                    row.fields
+                        .iter()
+                        .map(|(k, v)| (k.clone(), as_json(v)))
+                        .collect(),
+                )
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+        return Ok(());
     }
+
+    table(query, &rows);
     println!(
         "\n{} rows · loaded {} nodes and {} edges in {:.2}s · query {:.1}ms",
         rows.len(),
@@ -203,4 +222,146 @@ pub fn run(stream: &Stream, named: Option<&str>, zql: Option<&str>) -> Result<()
         took.as_secs_f64() * 1000.0
     );
     Ok(())
+}
+
+/// How many rows a terminal can be shown before it stops being a terminal.
+const ROWS: usize = 40;
+
+/// The widest a single cell is allowed to get before it is cut.
+const CELL: usize = 44;
+
+/// What a query asked for, in the order it asked.
+///
+/// `Row.fields` is a `HashMap`, so iterating it gives a different column order
+/// every run — which is why the first version of this printed
+/// `Row { fields: {...} }` and left the reader to find the field they wanted.
+/// The RETURN clause already names the columns in order, and its text is
+/// exactly what the engine keyed the map by, so it is read from there.
+fn columns(query: &str, rows: &[zega_core::Row]) -> Vec<String> {
+    let lower = query.to_lowercase();
+    if let Some(at) = lower.rfind("return ") {
+        let tail = &query[at + "return ".len()..];
+        // Stop at the clauses that may follow a RETURN.
+        let end = ["order by", "limit", "skip"]
+            .iter()
+            .filter_map(|k| tail.to_lowercase().find(k))
+            .min()
+            .unwrap_or(tail.len());
+        let named: Vec<String> = tail[..end]
+            .split(',')
+            .map(|part| part.trim().to_string())
+            .filter(|part| !part.is_empty())
+            .collect();
+        // Only trust it when the names are the keys the engine actually used;
+        // an aliased or computed projection is not worth guessing at.
+        if !named.is_empty()
+            && rows
+                .first()
+                .map(|r| named.iter().all(|n| r.fields.contains_key(n)))
+                .unwrap_or(true)
+        {
+            return named;
+        }
+    }
+    let mut keys: Vec<String> = rows
+        .first()
+        .map(|r| r.fields.keys().cloned().collect())
+        .unwrap_or_default();
+    keys.sort();
+    keys
+}
+
+fn show(value: &Value) -> String {
+    match value {
+        Value::String(s) => s.clone(),
+        Value::Int(i) => i.to_string(),
+        Value::Float(bits) => format!("{}", f64::from_bits(*bits)),
+        Value::Bool(b) => b.to_string(),
+        Value::Null => "—".to_string(),
+        Value::List(items) => items.iter().map(show).collect::<Vec<_>>().join(", "),
+        Value::Map(_) => "{…}".to_string(),
+    }
+}
+
+fn as_json(value: &Value) -> serde_json::Value {
+    match value {
+        Value::String(s) => serde_json::Value::String(s.clone()),
+        Value::Int(i) => serde_json::Value::from(*i),
+        Value::Float(bits) => serde_json::Value::from(f64::from_bits(*bits)),
+        Value::Bool(b) => serde_json::Value::Bool(*b),
+        Value::Null => serde_json::Value::Null,
+        Value::List(items) => serde_json::Value::Array(items.iter().map(as_json).collect()),
+        Value::Map(m) => {
+            serde_json::Value::Object(m.iter().map(|(k, v)| (k.clone(), as_json(v))).collect())
+        }
+    }
+}
+
+fn clip(text: &str) -> String {
+    if text.chars().count() <= CELL {
+        return text.to_string();
+    }
+    text.chars().take(CELL - 1).collect::<String>() + "…"
+}
+
+/// Rows as a table, because a person asked.
+fn table(query: &str, rows: &[zega_core::Row]) {
+    if rows.is_empty() {
+        println!("  no rows");
+        return;
+    }
+    let cols = columns(query, rows);
+    let shown: Vec<Vec<String>> = rows
+        .iter()
+        .take(ROWS)
+        .map(|row| {
+            cols.iter()
+                .map(|c| clip(&row.fields.get(c).map(show).unwrap_or_default()))
+                .collect()
+        })
+        .collect();
+
+    let width: Vec<usize> = cols
+        .iter()
+        .enumerate()
+        .map(|(i, c)| {
+            shown
+                .iter()
+                .map(|r| r[i].chars().count())
+                .chain(std::iter::once(c.chars().count()))
+                .max()
+                .unwrap_or(0)
+        })
+        .collect();
+
+    let pad = |text: &str, w: usize| {
+        let mut out = text.to_string();
+        out.push_str(&" ".repeat(w.saturating_sub(text.chars().count())));
+        out
+    };
+
+    println!(
+        "  {}",
+        cols.iter()
+            .enumerate()
+            .map(|(i, c)| pad(c, width[i]))
+            .collect::<Vec<_>>()
+            .join("  ")
+            .trim_end()
+    );
+    println!("  {}", width.iter().map(|w| "─".repeat(*w)).collect::<Vec<_>>().join("  "));
+    for row in &shown {
+        println!(
+            "  {}",
+            row.iter()
+                .enumerate()
+                .map(|(i, cell)| pad(cell, width[i]))
+                .collect::<Vec<_>>()
+                .join("  ")
+                .trim_end()
+        );
+    }
+    if rows.len() > ROWS {
+        println!("  … {} more", rows.len() - ROWS);
+    }
 }

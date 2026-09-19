@@ -110,7 +110,8 @@ Rebuild with `--features zega`, or use --stats for counts.",
             .get("--zql")
             .map(String::as_str)
             .or_else(|| context.args.positionals.first().map(String::as_str));
-        if let Err(e) = zega::run(&stream, named, zql) {
+        let json = context.args.flags.get("--json").copied().unwrap_or(false);
+        if let Err(e) = zega::run(&stream, named, zql, json) {
             fail(e);
         }
     }
