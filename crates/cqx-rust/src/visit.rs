@@ -665,14 +665,69 @@ fn called_name(expr: &syn::Expr) -> Option<String> {
     }
 }
 
+/// The impl's own type parameters that actually appear in the type it is for.
+///
+/// `unsafe impl<T> Send for Handle` promises nothing about `T`, because `T`
+/// is not in the type; `unsafe impl<T> Send for Handle<T>` promises everything
+/// about it.
+fn params_in_self_type(node: &syn::ItemImpl) -> Vec<String> {
+    let target = node.self_ty.to_token_stream().to_string();
+    node.generics
+        .params
+        .iter()
+        .filter_map(|p| match p {
+            syn::GenericParam::Type(t) => Some(t.ident.to_string()),
+            _ => None,
+        })
+        .filter(|name| {
+            // Token-level, so `T` does not match `Target`.
+            target
+                .split(|c: char| !c.is_alphanumeric() && c != '_')
+                .any(|tok| tok == name)
+        })
+        .collect()
+}
+
+/// Whether every one of those parameters carries some thread-safety bound.
+///
+/// Either bound counts, and deliberately: `unsafe impl<T: Send> Sync for
+/// Mutex<T>` is how the standard library writes a mutex and is correct. What
+/// is being looked for is an impl with no such bound anywhere — a promise made
+/// unconditionally.
+fn thread_bound_on_all(generics: &syn::Generics, params: &[String]) -> bool {
+    fn is_thread_bound(bounds: &syn::punctuated::Punctuated<syn::TypeParamBound, syn::Token![+]>) -> bool {
+        bounds.iter().any(|b| match b {
+            syn::TypeParamBound::Trait(t) => t
+                .path
+                .segments
+                .last()
+                .map(|s| matches!(s.ident.to_string().as_str(), "Send" | "Sync"))
+                .unwrap_or(false),
+            _ => false,
+        })
+    }
+    params.iter().all(|name| {
+        let inline = generics.params.iter().any(|p| match p {
+            syn::GenericParam::Type(t) => t.ident == name && is_thread_bound(&t.bounds),
+            _ => false,
+        });
+        let in_where = generics.where_clause.iter().flat_map(|w| &w.predicates).any(|p| match p {
+            syn::WherePredicate::Type(t) => {
+                t.bounded_ty.to_token_stream().to_string() == *name && is_thread_bound(&t.bounds)
+            }
+            _ => false,
+        });
+        inline || in_where
+    })
+}
+
 /// A format string that is building JSON rather than a message.
 fn looks_structured(text: &str) -> bool {
-    // Braces are how a format string names its holes, so a doubled brace is
-    // the only way one can contain a literal `{` — which is what building an
-    // object by hand looks like.
-    (text.contains("{{") && text.contains("}}"))
-        || text.contains("\":")
-        || text.contains("\"{}\"")
+    // A quoted key against a colon, and nothing looser. Doubled braces catch
+    // every generated stylesheet and migration; a quoted hole, `"{}"`, is how
+    // a shell argument gets quoted. Both were in the first draft and both were
+    // wrong.
+    text.contains("\":") || text.contains("\" :")
 }
 
 /// An arm body that does nothing at all: `{}`, `()`, or `{ () }`.
@@ -965,11 +1020,31 @@ impl<'ast, 'a, W: std::io::Write> Visit<'ast> for FileVisitor<'a, W> {
         if node.unsafety.is_some() {
             self.declare_capability(&Id::capability("unsafe"));
             let ev = self.evidence(node.span());
-            let _ = self.out.edge(
-                Edge::new(EdgeKind::UnsafeAt, id.clone(), Id::capability("unsafe"))
-                    .attr("form", "unsafe impl")
-                    .evidence(ev),
-            );
+            let mut edge = Edge::new(EdgeKind::UnsafeAt, id.clone(), Id::capability("unsafe"))
+                .attr("form", "unsafe impl")
+                .evidence(ev);
+            if let Some((_, path, _)) = &node.trait_ {
+                let trait_name = path
+                    .segments
+                    .last()
+                    .map(|s| s.ident.to_string())
+                    .unwrap_or_default();
+                edge = edge.attr("trait", trait_name.as_str());
+                // `Send` and `Sync` are the two claims whose truth rests
+                // entirely on a bound. `unsafe impl<T> Sync for Holder<T> {}`
+                // says every `Holder` is safe to share, including one holding
+                // an `Rc` — which is the single most repeated defect in the
+                // RustSec database.
+                if matches!(trait_name.as_str(), "Send" | "Sync") {
+                    let used = params_in_self_type(node);
+                    if !used.is_empty() {
+                        edge = edge
+                            .attr("generics", used.len() as u64)
+                            .attr("bounded", thread_bound_on_all(&node.generics, &used));
+                    }
+                }
+            }
+            let _ = self.out.edge(edge);
         }
         self.symbol_stack.push(id);
         self.path_stack.push(type_name);

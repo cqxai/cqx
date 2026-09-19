@@ -154,6 +154,12 @@ pub fn defaults() -> BTreeMap<String, Rule> {
     // Security — reach that an attacker could steer.
     add("env-controlled-spawn", "security", 30.0, 0.0, 2.0, "spawn targets chosen by an environment variable, per 10k lines", "Resolve the program from a known location, or validate it before spawning. As it stands, whoever sets the variable chooses what runs.");
     add("shell-invocation", "security", 20.0, 0.0, 1.0, "spawning a shell, which turns an argument into a command, per 10k lines", "Pass the program and its arguments directly rather than through a shell. A shell turns an argument into a command.");
+    add("shell-argument-unchecked", "security", 30.0, 0.0, 1.0, "a shell handed an argument the extractor could not resolve, per 10k lines", "Check every program the script invokes, not only the first word, or refuse anything but a single command. Validating the head of a string and running the whole of it through a shell means `git status; rm -rf ~` passes a check for `git`.");
+    add("discarded-check", "security", 30.0, 0.0, 1.0, "a permission or validation call whose answer is thrown away, per 10k lines", "Handle the result. `let _ = enforce_read(path)` reads as enforcement at a glance and performs none — it is worse than no call at all, because a reviewer counts it.");
+    add("default-allow-dispatch", "security", 25.0, 0.0, 1.0, "a dispatch that checks in its arms and does nothing in its catch-all, per 10k lines", "Match the action exhaustively, with no catch-all, so a new action cannot be added without deciding what it is allowed to do. As written, everything nobody listed is permitted.");
+    add("permission-granting-argument", "security", 25.0, 0.0, 1.0, "a subprocess handed a literal argument that relaxes its own checks, per 10k lines", "Forward the caller's policy instead of overriding it. A child spawned with the permission checks turned off does not inherit the parent's answer, it discards it.");
+    add("unbounded-send-sync", "security", 30.0, 0.0, 1.0, "unsafe impl Send/Sync for a generic type with no thread-safety bound, per 10k lines", "Add the bound the promise depends on: `unsafe impl<T: Send> Sync for Holder<T>`. Without it the type claims every `T` is safe to share, including an `Rc`. This shape accounts for sixteen of sixty-five RustSec advisories sampled — and tokio writes it twenty-three times deliberately, which is why this rule is off until you turn it on: cqx config enable unbounded-send-sync.");
+    add("hand-built-json", "quality", 10.0, 0.0, 2.0, "JSON assembled by interpolation rather than serialised, per 10k lines", "Serialise with serde. A value interpolated into a format string decides the structure around it, which is the same mistake as building SQL by concatenation.");
     // Modularity — house style, so the defaults are deliberately lenient.
     //
     // Across the five reference projects, files over 1000 lines run from 1.07
@@ -164,6 +170,11 @@ pub fn defaults() -> BTreeMap<String, Rule> {
     add("oversized-files", "modularity", 25.0, 3.5, 12.0, "files longer than max_lines, per 10k lines — a house standard, not a fact", "Split the file, or raise the standard if this is simply how the project is written: cqx config set oversized-files.max_lines N. Measured across ripgrep, tokio and deno, file length tracks habit rather than quality.");
     add("oversized-line-share", "modularity", 15.0, 0.70, 0.95, "share of all lines living in files longer than max_lines", "Same standard as oversized-files, measured by weight rather than count: it catches a codebase where most of the code lives in a handful of very large files.");
     add("crate-type-scatter", "modularity", 10.0, 0.20, 1.50, "crates whose signatures are mostly built from three or more other crates' types", "A crate built mostly from other crates' types, pulled from several of them, usually wants splitting or absorbing. One strong pull is an adapter and perfectly fine.");
+    // Reports a judgement rather than a defect. Every hit is worth a human
+    // reading it; not every hit is wrong, and a rule that docks tokio thirty
+    // points for twenty-three deliberate impls would be discarded rather than
+    // read. Off until a repository asks for it.
+    rules.get_mut("unbounded-send-sync").unwrap().enabled = false;
     rules.get_mut("oversized-files").unwrap().params.insert("max_lines".into(), 1000.0);
     rules
         .get_mut("oversized-line-share")
