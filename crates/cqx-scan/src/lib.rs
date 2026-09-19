@@ -153,6 +153,16 @@ fn run(context: &Context) -> Result<(), String> {
         None => None,
     };
 
+    // What the run itself cost. The human output has always said "58 files ·
+    // 7,802 lines · 0.1s" and the report carried only the lines, so anything
+    // drawing from the JSON could not say the same sentence.
+    here.report["scan"] = serde_json::json!({
+        "files": here.files,
+        "lines": here.lines,
+        "ms": here.ms,
+        "cqx": env!("CARGO_PKG_VERSION"),
+    });
+
     // What it was compared against travels with the report. The movement is
     // the point of a ratchet, and a consumer that only receives the new
     // numbers has to score the base itself to find it — which is the work
