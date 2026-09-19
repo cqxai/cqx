@@ -48,6 +48,10 @@ pub fn register(registry: &mut Registry) {
         description: "write a Markdown summary (point it at $GITHUB_STEP_SUMMARY)",
     });
     registry.add_param(ParamSpec {
+        name: "--report",
+        description: "write the whole report as JSON to a file, as well as reading it here",
+    });
+    registry.add_param(ParamSpec {
         name: "--against",
         description: "also score this git ref, and fail if any category is worse than it",
     });
@@ -123,7 +127,22 @@ fn run(context: &Context) -> Result<(), String> {
         .copied()
         .unwrap_or(false);
 
-    let here = scan(&root, config_path, quote)?;
+    let mut here = scan(&root, config_path, quote)?;
+
+    // `--min-score` is a `cqx.json` field first and an override second, so it
+    // is applied to the report rather than carried beside it: everything that
+    // reads the floor — the gate, the summary, whatever reads the JSON — then
+    // sees the same number.
+    if let Some(min) = context
+        .args
+        .params
+        .get("--min-score")
+        .and_then(|s| s.parse::<u64>().ok())
+    {
+        if let Some(config) = here.report.get_mut("config") {
+            config["min_score"] = serde_json::json!(min);
+        }
+    }
 
     // The ref this branch would merge into, scored the same way. Materialised
     // into a scratch directory rather than checked out: a CI job's working
@@ -133,6 +152,13 @@ fn run(context: &Context) -> Result<(), String> {
         Some(reference) => Some((reference.clone(), scan_ref(&root, reference, config_path)?)),
         None => None,
     };
+
+    // Written before the gate runs, and whatever it decides: a run that was
+    // refused is exactly the one somebody wants the numbers from.
+    if let Some(path) = context.args.params.get("--report") {
+        write(Path::new(path), &format!("{:#}\n", here.report))?;
+        eprintln!("cqx scan: report \u{2192} {path}");
+    }
 
     if let Some(path) = context.args.params.get("--sarif") {
         let doc = sarif::build(&here.report, &root);
