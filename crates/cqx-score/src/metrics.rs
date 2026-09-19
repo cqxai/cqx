@@ -43,6 +43,30 @@ fn package_of(id: &str) -> Option<&str> {
     id.strip_prefix("sym:").and_then(|r| r.split("::").next())
 }
 
+/// The vocabulary a permission check is usually written in.
+///
+/// Deliberately narrow. A first draft accepted any name beginning `check` or
+/// `validate`, which fired on every `match` in a type checker — `check_expr`
+/// and `enforce_read` share a verb and nothing else. A rule that cannot tell
+/// them apart is worse than no rule, because it teaches a reader to skip the
+/// category. A repository with its own vocabulary will be able to say so in
+/// cqx.json once a rule parameter can hold a word rather than a number.
+const DEFAULT_CHECKS: &[&str] = &[
+    "enforce", "authorize", "authorise", "permit", "require_cap", "check_permission",
+    "check_access", "check_cap",
+];
+
+/// Literal arguments that hand a child process fewer checks than its parent.
+fn relaxes_policy(value: &str) -> bool {
+    value.starts_with("--allow-all")
+        || value.starts_with("--dangerously")
+        || value.starts_with("--disable-")
+        || matches!(
+            value,
+            "--no-verify" | "--insecure" | "--no-check-certificate" | "--trust-all"
+        )
+}
+
 fn is_product(e: &Edge) -> bool {
     e.attrs.get("role").and_then(|v| v.as_str()) != Some("test")
 }
@@ -381,6 +405,131 @@ impl Metrics {
                 },
                 findings: unproven,
             },
+        );
+
+        // --- security: the shapes an audit went looking for by hand ---------
+        //
+        // Each of these was a real finding in a real workspace before it was a
+        // rule here. What they have in common is that the fact was always in
+        // the graph and nothing was asking.
+
+        // Who calls what, by name, so a rule can ask whether a function ever
+        // reaches a check. The names that count as a check are a parameter,
+        // because whose vocabulary it is depends on the repository.
+        // Not yet a parameter: `Rule::params` holds numbers, and a vocabulary
+        // is the first thing that wants to be a string. Until it is one, this
+        // is the default and a repository cannot yet name its own.
+        let is_check = |name: &str| DEFAULT_CHECKS.iter().any(|w| name.starts_with(w));
+
+        let discarded: Vec<Finding> = stream
+            .edges
+            .iter()
+            .filter(|e| e.kind == EdgeKind::Discards && is_product(e))
+            .filter(|e| is_check(e.to.0.trim_start_matches("ext:")))
+            .map(|e| {
+                finding(
+                    format!("{}(..) called, answer discarded", e.to.0.trim_start_matches("ext:")),
+                    e,
+                )
+            })
+            .collect();
+        values.insert(
+            "discarded-check".into(),
+            Measure { value: discarded.len() as f64 / scale, findings: discarded },
+        );
+
+        // A catch-all that does nothing, in a function that checks elsewhere.
+        // The second half is what makes it a hole rather than a default.
+        let mut checks_in: HashMap<&str, bool> = HashMap::new();
+        for e in &stream.edges {
+            if e.kind == EdgeKind::Calls && is_check(e.to.0.trim_start_matches("ext:")) {
+                checks_in.insert(e.from.0.as_str(), true);
+            }
+        }
+        let open_dispatch: Vec<Finding> = stream
+            .edges
+            .iter()
+            .filter(|e| e.kind == EdgeKind::DefaultArm && is_product(e))
+            .filter(|e| e.attrs.get("empty").and_then(serde_json::Value::as_bool) == Some(true))
+            .filter(|e| checks_in.contains_key(e.from.0.as_str()))
+            .map(|e| {
+                let arms = e.attrs.get("arms").and_then(serde_json::Value::as_u64).unwrap_or(0);
+                finding(format!("{arms} arms check; the catch-all does nothing"), e)
+            })
+            .collect();
+        values.insert(
+            "default-allow-dispatch".into(),
+            Measure { value: open_dispatch.len() as f64 / scale, findings: open_dispatch },
+        );
+
+        // A shell, and an argument nobody could follow. Either alone is
+        // ordinary; together they are a command the caller writes.
+        let shells: HashSet<&str> = stream
+            .edges
+            .iter()
+            .filter(|e| e.kind == EdgeKind::Spawns && is_product(e))
+            .filter(|e| {
+                let program = e.to.0.trim_start_matches("proc:");
+                let bare = program.rsplit('/').next().unwrap_or(program);
+                matches!(bare, "sh" | "zsh" | "bash" | "dash" | "ksh" | "fish" | "cmd.exe" | "powershell")
+            })
+            .map(|e| e.from.0.as_str())
+            .collect();
+        let loose: Vec<Finding> = stream
+            .edges
+            .iter()
+            .filter(|e| e.kind == EdgeKind::SpawnArg && is_product(e))
+            .filter(|e| attr(e, "via") == "unresolved" && shells.contains(e.from.0.as_str()))
+            .map(|e| finding("a shell, handed an argument that was not resolved", e))
+            .collect();
+        values.insert(
+            "shell-argument-unchecked".into(),
+            Measure { value: loose.len() as f64 / scale, findings: loose },
+        );
+
+        // A literal that turns a child's own checks off.
+        let granting: Vec<Finding> = stream
+            .edges
+            .iter()
+            .filter(|e| e.kind == EdgeKind::SpawnArg && is_product(e))
+            .filter(|e| relaxes_policy(attr(e, "value")))
+            .map(|e| finding(format!("passes {}", attr(e, "value")), e))
+            .collect();
+        values.insert(
+            "permission-granting-argument".into(),
+            Measure { value: granting.len() as f64 / scale, findings: granting },
+        );
+
+        // A promise about every `T`, made without asking anything of `T`.
+        let unbounded: Vec<Finding> = stream
+            .edges
+            .iter()
+            .filter(|e| e.kind == EdgeKind::UnsafeAt && is_product(e))
+            .filter(|e| attr(e, "form") == "unsafe impl")
+            .filter(|e| matches!(attr(e, "trait"), "Send" | "Sync"))
+            .filter(|e| e.attrs.get("bounded").and_then(serde_json::Value::as_bool) == Some(false))
+            .map(|e| {
+                finding(
+                    format!("unsafe impl {} with no Send or Sync bound", attr(e, "trait")),
+                    e,
+                )
+            })
+            .collect();
+        values.insert(
+            "unbounded-send-sync".into(),
+            Measure { value: unbounded.len() as f64 / scale, findings: unbounded },
+        );
+
+        // JSON assembled by interpolation.
+        let hand_built: Vec<Finding> = stream
+            .edges
+            .iter()
+            .filter(|e| e.kind == EdgeKind::Interpolates && is_product(e))
+            .map(|e| finding(format!("{}! builds the object", attr(e, "via")), e))
+            .collect();
+        values.insert(
+            "hand-built-json".into(),
+            Measure { value: hand_built.len() as f64 / scale, findings: hand_built },
         );
 
         // --- modularity: a house standard, so the threshold is a parameter ---
