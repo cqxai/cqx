@@ -59,7 +59,7 @@ for (const [name, file] of [
 // them is how stub binaries reach the registry.
 const built = join(work, 'packages');
 execFileSync(process.execPath, [join(root, 'npm/build.mjs'), version, bins, built], { stdio: 'pipe' });
-check(`built five packages at ${version}`, existsSync(join(built, 'cqx-cli/package.json')));
+check(`built five packages at ${version}`, existsSync(join(built, 'cli/package.json')));
 
 // Installed the way a consumer installs, and with --ignore-scripts, which is
 // how a careful CI does it and the reason this package has no postinstall.
@@ -70,7 +70,7 @@ execFileSync(
   'npm',
   ['install', '--silent', '--ignore-scripts',
    join(built, 'platform', here),
-   join(built, 'cqx-cli')],
+   join(built, 'cli')],
   { cwd: consumer, stdio: 'pipe' },
 );
 

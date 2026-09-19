@@ -75,7 +75,7 @@ if (!binary) {
   // minute and an afternoon.
   console.error(
     `cqx: ${pkg} is not installed, so there is no binary to run.\n` +
-      `It is an optional dependency of cqx-cli and something skipped it —\n` +
+      `It is an optional dependency of @samifouad/cqx and something skipped it —\n` +
       `a network failure during install, or --omit=optional.\n` +
       `Try: npm install ${pkg}`,
   );

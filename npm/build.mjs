@@ -1,9 +1,11 @@
 /**
  * Turns the binaries a release built into packages npm can serve.
  *
- * Five packages: one per platform holding a single executable, and `cqx-cli`
- * which holds no binary at all and depends on all four as
- * `optionalDependencies`. npm installs the one whose `os` and `cpu` match and
+ * Five packages: one per platform holding a single executable, and
+ * `@samifouad/cqx` which holds no binary at all and depends on all four as
+ * `optionalDependencies`. Scoped, because the unscoped names are not
+ * available — `cqx` belongs to someone else and `cqx-cli` is refused as too
+ * similar to `cp-cli`. A scope is exempt from that check. npm installs the one whose `os` and `cpu` match and
  * silently skips the others, so a Linux machine downloads a Linux binary and
  * nothing else.
  *
@@ -82,12 +84,12 @@ for (const p of PLATFORMS) {
 }
 
 // The wrapper, which is the only name anybody types.
-const cli = join(out, 'cqx-cli');
+const cli = join(out, 'cli');
 await mkdir(cli, { recursive: true });
-await cp(join(root, 'npm', 'cqx-cli', 'bin'), join(cli, 'bin'), { recursive: true });
-const manifest = JSON.parse(await readFile(join(root, 'npm', 'cqx-cli', 'package.json'), 'utf8'));
+await cp(join(root, 'npm', 'cli', 'bin'), join(cli, 'bin'), { recursive: true });
+const manifest = JSON.parse(await readFile(join(root, 'npm', 'cli', 'package.json'), 'utf8'));
 manifest.version = version;
 manifest.optionalDependencies = optional;
 await writeFile(join(cli, 'package.json'), JSON.stringify(manifest, null, 2) + '\n');
 await cp(join(root, 'README.md'), join(cli, 'README.md')).catch(() => {});
-console.log(`  cqx-cli@${version} → ${Object.keys(optional).length} platforms`);
+console.log(`  ${manifest.name}@${version} → ${Object.keys(optional).length} platforms`);
