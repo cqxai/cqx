@@ -41,7 +41,7 @@ jobs:
           echo "| bucket | ${{ matrix.environment }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
           for b in cqx cqx-releases cqx-wasm \
-                   cqx-sccache-linux-x64 cqx-sccache-linux-arm64 \
+                   cqx-sccache-linux-x64 \
                    cqx-sccache-darwin-x64 cqx-sccache-darwin-arm64 \
                    cqx-sccache-windows-x64; do
             if aws s3 ls "s3://$b/" --endpoint-url "$R2_ENDPOINT" >/dev/null 2>&1; then

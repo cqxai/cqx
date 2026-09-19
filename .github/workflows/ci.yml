@@ -1,5 +1,8 @@
 name: ci
 
+# SCCACHE IS REQUIRED FOR ALL RUST COMPILATION.
+# Every cargo invocation here runs through it; see .github/actions/sccache.
+
 on:
   push:
     branches: [main]
@@ -8,16 +11,27 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+# One bucket for this runner's platform. The wasm job shares it: sccache keys
+# on the target triple, so cross-target output cannot collide.
+
 jobs:
   check:
     name: build · clippy · test
     runs-on: ubuntu-latest
+    environment: public-ci
+    env:
+      SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      SCCACHE_REGION: auto
+      SCCACHE_BUCKET: cqx-sccache-linux-x64
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
+      - uses: ./.github/actions/sccache
       - run: cargo build --locked --workspace --all-targets
       # Clippy is clean, so it is enforced rather than tracked. A tool that
       # reports lint suppression has no business carrying warnings of its own.
@@ -27,15 +41,34 @@ jobs:
       # separately rather than hidden inside the default path.
       - run: cargo build --locked -p cqx --features zega
 
+      - name: What the cache did
+        if: always()
+        run: |
+          sccache --show-stats
+          {
+            echo '### sccache'
+            echo '```'
+            sccache --show-stats
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   wasm:
     name: analysis compiles for wasm
     runs-on: ubuntu-latest
+    environment: public-ci
+    env:
+      SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      SCCACHE_REGION: auto
+      SCCACHE_BUCKET: cqx-sccache-linux-x64
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
+      - uses: ./.github/actions/sccache
       # cqx is meant to run in a browser, which means the analysis path must not
       # acquire a dependency that cannot go there. This job is what notices.
       - run: |
@@ -46,13 +79,32 @@ jobs:
           ls -l .target/wasm32-unknown-unknown/release/cqx_wasm.wasm || \
             ls -l target/wasm32-unknown-unknown/release/cqx_wasm.wasm
 
+      - name: What the cache did
+        if: always()
+        run: |
+          sccache --show-stats
+          {
+            echo '### sccache'
+            echo '```'
+            sccache --show-stats
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   conformance:
     name: manifest parser agrees with cargo
     runs-on: ubuntu-latest
+    environment: public-ci
+    env:
+      SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      SCCACHE_REGION: auto
+      SCCACHE_BUCKET: cqx-sccache-linux-x64
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: ./.github/actions/sccache
 
       # Keyed on the pinned revisions, so updating a pin fetches afresh and
       # leaving them alone costs nothing.
@@ -96,3 +148,14 @@ jobs:
         env:
           CQX_REFERENCE_DIR: ${{ github.workspace }}/.reference
         run: cargo test --locked -p cqx-rust --test conformance -- --nocapture
+
+      - name: What the cache did
+        if: always()
+        run: |
+          sccache --show-stats
+          {
+            echo '### sccache'
+            echo '```'
+            sccache --show-stats
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
