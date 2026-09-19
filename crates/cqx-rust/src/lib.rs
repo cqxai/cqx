@@ -34,8 +34,11 @@ pub const EXTRACT_COMMAND: CommandSpec = CommandSpec {
     name: "extract",
     owner: "cqx-rust",
     category: "index",
-    summary: "Scan a cargo workspace and emit facts as newline-delimited JSON",
-    aliases: &["scan"],
+    summary: "Read a cargo workspace and emit facts as newline-delimited JSON",
+    // `scan` was an alias here. It is now its own command — the one the front
+    // page has always shown — and the registry took the second registration
+    // without a word, so `cqx scan` quietly went on emitting facts.
+    aliases: &[],
     subcommands: &[],
     handler: cmd_extract,
 };

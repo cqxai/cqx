@@ -1,10 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["crates/cqx", "crates/cqx-rust", "crates/cqx-view", "crates/cqx-schema", "crates/cqx-history", "crates/cqx-score", "crates/cqx-store", "crates/cqx-vfs", "crates/cqx-wasm"]
+members = ["crates/cqx", "crates/cqx-rust", "crates/cqx-scan", "crates/cqx-view", "crates/cqx-schema", "crates/cqx-history", "crates/cqx-score", "crates/cqx-store", "crates/cqx-vfs", "crates/cqx-wasm"]
 exclude = ["fixtures"]
 
 [workspace.package]
-version = "0.1.16"
+version = "0.1.17"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/samifouad/cqx"

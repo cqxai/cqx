@@ -1,0 +1,16 @@
+[package]
+name = "cqx-scan"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "One command: read a tree, score it, and say whether it may merge."
+
+[dependencies]
+cqx-rust = { path = "../cqx-rust" }
+cqx-score = { path = "../cqx-score" }
+cqx-store = { path = "../cqx-store" }
+cqx-vfs = { workspace = true }
+cqx-view = { path = "../cqx-view" }
+deka-cli-core = { workspace = true }
+serde_json = { workspace = true }

@@ -20,3 +20,4 @@ cqx-rust = { path = "../cqx-rust" }
 cqx-store = { path = "../cqx-store" }
 cqx-score = { path = "../cqx-score" }
 cqx-history = { path = "../cqx-history" }
+cqx-scan = { path = "../cqx-scan" }

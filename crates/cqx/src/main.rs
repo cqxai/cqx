@@ -13,6 +13,7 @@ fn build_registry() -> Registry {
         .with(cqx_store::register)
         .with(cqx_score::register)
         .with(cqx_history::register)
+        .with(cqx_scan::register)
         .flags([
             FlagSpec {
                 name: "--help",
@@ -65,7 +66,8 @@ fn main() {
         cqx_rust::exit_code()
             .max(cqx_score::exit_code())
             .max(cqx_store::exit_code())
-            .max(cqx_history::exit_code()),
+            .max(cqx_history::exit_code())
+            .max(cqx_scan::exit_code()),
     );
 }
 
