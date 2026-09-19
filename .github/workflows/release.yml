@@ -74,7 +74,9 @@ jobs:
     name: cqx (${{ matrix.platform }})
     needs: resolve
     strategy:
-      fail-fast: true
+      # Every platform reports. One failing runner hiding the other three is
+      # how a dry run costs two attempts to learn one thing.
+      fail-fast: false
       matrix:
         include:
           - platform: linux-x64

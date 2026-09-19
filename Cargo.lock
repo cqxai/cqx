@@ -900,12 +900,13 @@ dependencies = [
 [[package]]
 name = "zega-core"
 version = "0.1.0"
-source = "git+https://github.com/samifouad/zega#483bcfe39cb67e06a84a353c1b990dac29dae7ee"
+source = "git+https://github.com/samifouad/zega#bce1980d6902596e4c61a3a1e165019f3055d9d7"
 dependencies = [
  "base64",
  "bincode",
  "getrandom",
  "hmac",
+ "js-sys",
  "rsa",
  "serde",
  "serde_json",
@@ -922,7 +923,7 @@ dependencies = [
 [[package]]
 name = "zega-graph"
 version = "0.1.0"
-source = "git+https://github.com/samifouad/zega#483bcfe39cb67e06a84a353c1b990dac29dae7ee"
+source = "git+https://github.com/samifouad/zega#bce1980d6902596e4c61a3a1e165019f3055d9d7"
 dependencies = [
  "serde",
  "zega-parser",
@@ -931,9 +932,10 @@ dependencies = [
 [[package]]
 name = "zega-kv"
 version = "0.1.0"
-source = "git+https://github.com/samifouad/zega#483bcfe39cb67e06a84a353c1b990dac29dae7ee"
+source = "git+https://github.com/samifouad/zega#bce1980d6902596e4c61a3a1e165019f3055d9d7"
 dependencies = [
  "dashmap",
+ "js-sys",
  "serde",
  "tokio",
  "zega-parser",
@@ -942,7 +944,7 @@ dependencies = [
 [[package]]
 name = "zega-parser"
 version = "0.1.0"
-source = "git+https://github.com/samifouad/zega#483bcfe39cb67e06a84a353c1b990dac29dae7ee"
+source = "git+https://github.com/samifouad/zega#bce1980d6902596e4c61a3a1e165019f3055d9d7"
 dependencies = [
  "serde",
  "thiserror",
@@ -951,7 +953,7 @@ dependencies = [
 [[package]]
 name = "zega-wal"
 version = "0.1.0"
-source = "git+https://github.com/samifouad/zega#483bcfe39cb67e06a84a353c1b990dac29dae7ee"
+source = "git+https://github.com/samifouad/zega#bce1980d6902596e4c61a3a1e165019f3055d9d7"
 dependencies = [
  "bincode",
  "crc32fast",
