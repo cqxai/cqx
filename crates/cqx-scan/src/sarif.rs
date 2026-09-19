@@ -35,7 +35,7 @@ fn level(weight: f64, deducted: f64) -> &'static str {
     }
 }
 
-pub fn build(report: &Value, root: &Path) -> Value {
+pub fn build(report: &Value, root: &Path, scanned: &[String]) -> Value {
     let empty = Vec::new();
     let rules = report
         .get("rules")
@@ -126,6 +126,15 @@ pub fn build(report: &Value, root: &Path) -> Value {
         }
     }
 
+    // Every file the scan read, in SARIF's own vocabulary. Without it the
+    // code scanning page says "no summary of scanned files reported by cqx",
+    // which reads as a tool that did not look rather than one that found
+    // nothing here.
+    let artifacts: Vec<Value> = scanned
+        .iter()
+        .map(|path| json!({ "location": { "uri": path }, "roles": ["analysisTarget"] }))
+        .collect();
+
     json!({
         "$schema": SCHEMA,
         "version": "2.1.0",
@@ -137,6 +146,7 @@ pub fn build(report: &Value, root: &Path) -> Value {
                 "informationUri": "https://cqx.bio",
                 "rules": descriptors,
             }},
+            "artifacts": artifacts,
             "results": results,
             // Results are for the whole tree, not only what the pull request
             // touched. Saying so is what stops GitHub treating the ones it did

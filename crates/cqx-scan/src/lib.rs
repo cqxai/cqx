@@ -91,6 +91,11 @@ struct Scanned {
     files: usize,
     lines: u64,
     ms: u128,
+    /// Every path the scan actually read. SARIF has a place for this, and
+    /// GitHub's code scanning page says "no summary of scanned files
+    /// reported by cqx" when it is left out — a reader cannot tell a tool
+    /// that found nothing from one that looked at nothing.
+    paths: Vec<String>,
 }
 
 impl Scanned {
@@ -188,7 +193,7 @@ fn run(context: &Context) -> Result<(), String> {
     }
 
     if let Some(path) = context.args.params.get("--sarif") {
-        let doc = sarif::build(&here.report, &root);
+        let doc = sarif::build(&here.report, &root, &here.paths);
         write(Path::new(path), &format!("{doc:#}\n"))?;
         eprintln!("cqx scan: SARIF → {path}");
     }
@@ -218,6 +223,7 @@ fn scan(root: &Path, config_path: Option<&Path>, quote: bool) -> Result<Scanned,
     let started = std::time::Instant::now();
     let snapshot = cqx_vfs::from_dir(root).map_err(|e| format!("{}: {e}", root.display()))?;
     let files = snapshot.len();
+    let paths: Vec<String> = snapshot.paths().map(str::to_string).collect();
 
     let mut facts: Vec<u8> = Vec::new();
     cqx_rust::extract::run(&snapshot, &mut facts).map_err(|e| format!("{e}"))?;
@@ -241,6 +247,7 @@ fn scan(root: &Path, config_path: Option<&Path>, quote: bool) -> Result<Scanned,
     Ok(Scanned {
         lines: metrics.lines,
         files,
+        paths,
         report,
         ms: started.elapsed().as_millis(),
     })
