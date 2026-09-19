@@ -7,6 +7,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # So a cache question can be asked without inventing a commit.
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
