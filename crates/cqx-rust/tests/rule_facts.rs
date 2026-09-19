@@ -218,6 +218,89 @@ pub fn report() {
     );
 }
 
+/// Quoting a string is not building an object, and a first draft that could
+/// not tell them apart flagged every shell-escape in the workspace.
+#[test]
+fn quoting_a_string_is_not_building_an_object() {
+    let stream = facts(
+        r#"
+pub fn quote_if_needed(value: &str) -> String {
+    format!("\"{}\"", value)
+}
+"#,
+    );
+    assert!(
+        edges(&stream, EdgeKind::Interpolates).is_empty(),
+        "a quoted hole is how an argument gets quoted"
+    );
+}
+
+/// `unsafe impl<T> Sync for Holder<T> {}` promises that every `T` is safe to
+/// share, including an `Rc`. Sixteen of sixty-five RustSec advisories sampled
+/// are this exact shape.
+#[test]
+fn an_unconditional_send_or_sync_promise_is_recorded() {
+    let stream = facts(
+        r#"
+pub struct Holder<T> { value: T }
+unsafe impl<T> Sync for Holder<T> {}
+
+pub struct Guarded<T> { value: T }
+unsafe impl<T: Send> Sync for Guarded<T> {}
+
+pub struct Opaque<T> { value: T }
+unsafe impl<T> Send for Opaque<T> where T: Sync {}
+"#,
+    );
+    let mut seen: Vec<(String, bool)> = stream
+        .edges
+        .iter()
+        .filter(|e| e.kind == EdgeKind::UnsafeAt)
+        .filter(|e| e.attrs.get("form").and_then(|v| v.as_str()) == Some("unsafe impl"))
+        .filter_map(|e| {
+            Some((
+                e.from.0.clone(),
+                e.attrs.get("bounded")?.as_bool()?,
+            ))
+        })
+        .collect();
+    seen.sort();
+    assert_eq!(seen.len(), 3, "three unsafe impls: {seen:?}");
+    assert!(
+        seen.iter().any(|(id, bounded)| id.contains("Holder") && !bounded),
+        "the unconditional one is unbounded: {seen:?}"
+    );
+    assert!(
+        seen.iter().all(|(id, bounded)| !id.contains("Guarded") || *bounded),
+        "an inline bound counts: {seen:?}"
+    );
+    assert!(
+        seen.iter().all(|(id, bounded)| !id.contains("Opaque") || *bounded),
+        "a where clause counts too: {seen:?}"
+    );
+}
+
+/// A parameter the type does not mention is not a promise about anything.
+#[test]
+fn a_parameter_the_type_does_not_use_is_not_a_promise() {
+    let stream = facts(
+        r#"
+pub struct Handle { raw: usize }
+unsafe impl<T> Send for Handle { }
+"#,
+    );
+    let promises: Vec<_> = stream
+        .edges
+        .iter()
+        .filter(|e| e.kind == EdgeKind::UnsafeAt)
+        .filter(|e| e.attrs.contains_key("bounded"))
+        .collect();
+    assert!(
+        promises.is_empty(),
+        "`T` is not in `Handle`, so nothing was promised about it: {promises:?}"
+    );
+}
+
 /// Code a macro *generates* is not what this function does, and guessing at it
 /// would fill the graph with facts about a template.
 #[test]
