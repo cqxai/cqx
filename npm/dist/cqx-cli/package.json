@@ -1,0 +1,40 @@
+{
+  "name": "cqx-cli",
+  "version": "0.1.14",
+  "description": "Read any Rust repository and see what it does at runtime: every process it can spawn, every environment variable it reads, and every check that was written and then ignored.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/samifouad/cqx.git"
+  },
+  "homepage": "https://cqx.bio",
+  "bugs": "https://github.com/samifouad/cqx/issues",
+  "keywords": [
+    "cqx",
+    "rust",
+    "code-quality",
+    "static-analysis",
+    "ci",
+    "code-graph"
+  ],
+  "bin": {
+    "cqx": "bin/cqx.js"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@samifouad/cqx-darwin-arm64": "0.1.14",
+    "@samifouad/cqx-darwin-x64": "0.1.14",
+    "@samifouad/cqx-linux-x64": "0.1.14",
+    "@samifouad/cqx-windows-x64": "0.1.14"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

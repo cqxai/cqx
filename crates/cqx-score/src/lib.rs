@@ -125,7 +125,7 @@ pub fn score(config: &Config, m: &Metrics) -> (BTreeMap<String, u32>, Vec<Deduct
 fn cmd_score(context: &Context) {
     let facts = context.args.params.get("--facts").map(PathBuf::from);
     let Some(facts) = facts else {
-        eprintln!("cqx score: --facts <file> is required");
+        fail("--facts <file> is required");
         return;
     };
     let root = facts.parent().unwrap_or(&context.env.cwd).to_path_buf();
@@ -134,7 +134,7 @@ fn cmd_score(context: &Context) {
     let mut config = match Config::resolve(explicit.as_deref(), &root) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("cqx score: {e}");
+            fail(e);
             return;
         }
     };
@@ -150,7 +150,7 @@ fn cmd_score(context: &Context) {
     let stream = match cqx_store::facts::Stream::load(&facts) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("cqx score: {e}");
+            fail(e);
             return;
         }
     };
@@ -174,6 +174,17 @@ fn cmd_score(context: &Context) {
 }
 
 static FAILED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Reports a problem, and makes the process say so.
+///
+/// Every error path in `score` goes through this. `score` is the command a
+/// CI job gates on, and it used to print "no such file" to stderr and then
+/// exit zero — so a mistyped `--facts` path did not fail a build, it passed
+/// one without measuring anything. A gate that cannot fail is a decoration.
+fn fail(message: impl std::fmt::Display) {
+    eprintln!("cqx score: {message}");
+    FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
+}
 
 /// The binary reads this and exits with it; a library that calls `process::exit`
 /// is a finding this tool reports.

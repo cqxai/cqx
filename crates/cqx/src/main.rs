@@ -59,7 +59,14 @@ fn main() {
         std::process::exit(2);
     }
 
-    std::process::exit(cqx_rust::exit_code().max(cqx_score::exit_code()).max(cqx_history::exit_code()));
+    // Every crate that can fail gets a say. cqx-store was missing from this
+    // list, which is why `query` could report an error and exit zero.
+    std::process::exit(
+        cqx_rust::exit_code()
+            .max(cqx_score::exit_code())
+            .max(cqx_store::exit_code())
+            .max(cqx_history::exit_code()),
+    );
 }
 
 fn usage(registry: &Registry) {

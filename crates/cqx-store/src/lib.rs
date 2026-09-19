@@ -44,15 +44,31 @@ pub fn register(registry: &mut Registry) {
     });
 }
 
+static FAILED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// What `cqx query` should exit with. Read by the binary; a library that
+/// calls `process::exit` is a finding this tool reports.
+pub fn exit_code() -> i32 {
+    i32::from(FAILED.load(std::sync::atomic::Ordering::Relaxed))
+}
+
+/// Reports a problem, and makes the process say so. `query` reported a bad
+/// query on stderr and exited zero, so a script could not tell a query that
+/// found nothing from one that never ran.
+fn fail(message: impl std::fmt::Display) {
+    eprintln!("cqx query: {message}");
+    FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
 fn cmd_query(context: &Context) {
     let Some(path) = context.args.params.get("--facts").map(PathBuf::from) else {
-        eprintln!("cqx query: --facts <file> is required");
+        fail("--facts <file> is required");
         return;
     };
     let stream = match facts::Stream::load(&path) {
         Ok(stream) => stream,
         Err(e) => {
-            eprintln!("cqx query: {e}");
+            fail(e);
             return;
         }
     };
@@ -64,10 +80,23 @@ fn cmd_query(context: &Context) {
 
     #[cfg(not(feature = "zega"))]
     {
-        let _ = context;
+        // Asked for something this build cannot do. Printing a node count and
+        // exiting zero answered a different question than the one asked — and
+        // a script could not tell that from a query that ran and matched
+        // nothing.
+        let asked = context.args.params.contains_key("--zql")
+            || context.args.params.contains_key("--named")
+            || !context.args.positionals.is_empty();
+        if asked {
+            fail(
+                "this build has no graph backend, so --zql and --named cannot run. \
+Rebuild with `--features zega`, or use --stats for counts.",
+            );
+            return;
+        }
         stream.report();
         eprintln!(
-            "\ncqx was built without a graph backend, so only counting is available.\n\
+            "\nThis build has no graph backend, so only counting is available.\n\
              Rebuild with `--features zega` for traversal queries."
         );
     }
@@ -82,7 +111,7 @@ fn cmd_query(context: &Context) {
             .map(String::as_str)
             .or_else(|| context.args.positionals.first().map(String::as_str));
         if let Err(e) = zega::run(&stream, named, zql) {
-            eprintln!("cqx query: {e}");
+            fail(e);
         }
     }
 }
