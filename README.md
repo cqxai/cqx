@@ -4,17 +4,25 @@
   <img src="screenshot-deno.png" alt="CQX Screenshot" width="80%">
 </p>
 
-Live demo: https://explorer.deka.gg
+See it in your browser: https://cqx.bio/
 
 A queryable graph of a codebase: what it contains, what it touches, and what
 crosses its boundaries — and a **CodeQuality Score** derived from it.
 
-cqx is repository-agnostic. It was built while auditing a large Rust workspace
+<p align="left">
+  <img src="cqx-action.png" alt="CQX Screenshot" width="80%">
+</p>
+
+`cqx` has an [official github action](https://github.com/samifouad/cqx-action). it is repository-agnostic. It was built while auditing a large Rust workspace
 and is calibrated against ripgrep, tokio and deno, but nothing in it is specific
 to any project.
 
 `cqx` scans source, emits a language-agnostic stream of facts, loads them into a
 graph database, and serves a web explorer over the result.
+
+<p align="left">
+  <img src="cqx-zega-deka.png" alt="CQX Screenshot" width="80%">
+</p>
 
 It is two halves, and they are deliberately separable:
 
