@@ -7,6 +7,7 @@
 
 pub mod config;
 pub mod metrics;
+pub mod edit;
 pub mod ratchet;
 
 use std::collections::BTreeMap;
@@ -74,6 +75,10 @@ pub fn register(registry: &mut Registry) {
         name: "--tighten-only",
         aliases: &[],
         description: "refuse a change that lowers the standard; what an agent is given",
+    });
+    registry.add_param(ParamSpec {
+        name: "--why",
+        description: "the reason for a rule change, kept beside it in cqx.json",
     });
 }
 
@@ -262,20 +267,14 @@ fn cmd_config_show(context: &Context) {
 fn cmd_config_set(context: &Context) {
     let mut args = context.args.positionals.iter();
     let (Some(target), Some(value)) = (args.next(), args.next()) else {
-        eprintln!("usage: cqx config set <rule>.<field> <value>");
+        eprintln!("usage: cqx config set <rule>.<field> <value> [--why \"...\"]");
         eprintln!("  e.g. cqx config set oversized-files.max_lines 2000");
         eprintln!("       cqx config set oversized-files.enabled false");
         FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
         return;
     };
-    let Some((rule_id, field)) = target.rsplit_once('.') else {
+    let Some((rule, field)) = target.rsplit_once('.') else {
         eprintln!("cqx config set: expected <rule>.<field>, got '{target}'");
-        FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
-        return;
-    };
-    let defaults = config::defaults();
-    let Some(default_rule) = defaults.get(rule_id) else {
-        eprintln!("cqx config set: no rule named '{rule_id}'. `cqx config show` lists them.");
         FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
         return;
     };
@@ -286,167 +285,56 @@ fn cmd_config_set(context: &Context) {
         .get("--config")
         .map(PathBuf::from)
         .unwrap_or_else(|| context.env.cwd.join("cqx.json"));
-    let mut doc: serde_json::Value = if path.is_file() {
-        match std::fs::read_to_string(&path).ok().and_then(|t| serde_json::from_str(&t).ok()) {
-            Some(v) => v,
-            None => {
-                eprintln!("cqx config set: {} is not valid JSON", path.display());
-                FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
-                return;
-            }
+
+    // Worked out in full before anything is written — see `edit.rs`. The same
+    // function answers for the desktop application and for an agent over MCP,
+    // so a change cannot mean one thing here and another there.
+    let proposal = match edit::propose(
+        &path,
+        &context.env.cwd,
+        rule,
+        field,
+        value,
+        context.args.params.get("--why").map(String::as_str),
+    ) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("cqx config set: {e}");
+            FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
+            return;
         }
-    } else {
-        serde_json::json!({ "version": 1, "rules": {} })
     };
 
-    let known_field = matches!(field, "weight" | "free" | "full" | "enabled")
-        || default_rule.params.contains_key(field);
-    if !known_field {
-        eprintln!(
-            "cqx config set: rule '{rule_id}' has no field '{field}'. It accepts weight, free, full, enabled{}.",
-            if default_rule.params.is_empty() {
-                String::new()
-            } else {
-                format!(
-                    ", and {}",
-                    default_rule.params.keys().cloned().collect::<Vec<_>>().join(", ")
-                )
-            }
-        );
-        FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
-        return;
-    }
-
-    let parsed: serde_json::Value = match field {
-        "enabled" => match value.as_str() {
-            "true" | "1" | "yes" => serde_json::Value::Bool(true),
-            "false" | "0" | "no" => serde_json::Value::Bool(false),
-            other => {
-                eprintln!("cqx config set: enabled expects true or false, got '{other}'");
-                FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
-                return;
-            }
-        },
-        _ => match value.parse::<f64>() {
-            // A whole number is written as one: this file is read by people as
-            // well as parsers, and `max_lines: 2500.0` reads like a mistake.
-            Ok(v) if v.fract() == 0.0 && v.abs() < 9e15 => serde_json::json!(v as i64),
-            Ok(v) => serde_json::json!(v),
-            Err(_) => {
-                eprintln!("cqx config set: {field} expects a number, got '{value}'");
-                FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
-                return;
-            }
-        },
-    };
-
-    let rules = doc
-        .as_object_mut()
-        .and_then(|o| {
-            o.entry("rules")
-                .or_insert_with(|| serde_json::json!({}))
-                .as_object_mut()
-        })
-        .expect("rules is an object");
-    let entry = rules
-        .entry(rule_id.to_string())
-        .or_insert_with(|| serde_json::json!({}));
-    let is_param = default_rule.params.contains_key(field);
-    if is_param {
-        entry
-            .as_object_mut()
-            .expect("rule entry is an object")
-            .entry("params")
-            .or_insert_with(|| serde_json::json!({}))
-            .as_object_mut()
-            .expect("params is an object")
-            .insert(field.to_string(), parsed.clone());
-    } else {
-        entry
-            .as_object_mut()
-            .expect("rule entry is an object")
-            .insert(field.to_string(), parsed.clone());
-    }
-
-    // Which way this moves the standard, and whether the caller is allowed to
-    // move it that way.
-    //
-    // Said on every set, not only under the flag. A person changing a rule
-    // deserves to be told which direction they just went — "looser" in the
-    // output is the difference between a decision and a drift, and it costs a
-    // line. The flag is what turns being told into being stopped, and it is
-    // what an agent is given.
-    let before = config::Config::resolve(Some(&path), &context.env.cwd).unwrap_or_else(|_| {
-        // An unreadable file has already been reported above; fall back to the
-        // defaults so the direction is still reported rather than skipped.
-        config::Config {
-            rules: config::defaults(),
-            origins: std::collections::BTreeMap::new(),
-            min_score: None,
-            exclude: Vec::new(),
-            loaded_from: None,
-        }
-    });
-    let mut after = before.clone();
-    if let Some(rule) = after.rules.get_mut(rule_id) {
-        apply(rule, field, &parsed);
-    }
-    let moves = ratchet::compare(&before, &after);
-
-    if context.args.flags.get("--tighten-only").copied().unwrap_or(false)
-        && !ratchet::tightens(&moves)
-    {
+    // Which way it moves, said on every set and not only under the flag. A
+    // person changing a rule deserves to be told which direction they went:
+    // "looser" on screen is the difference between a decision and a drift,
+    // and it costs a line.
+    if context.args.flags.get("--tighten-only").copied().unwrap_or(false) && !proposal.tightens {
         eprintln!("cqx config set: refused — --tighten-only, and this does not tighten.");
-        for objection in ratchet::objections(&moves) {
+        for objection in proposal.objections() {
             eprintln!(
                 "  {}.{}  {} → {}  {}",
                 objection.rule, objection.field, objection.before, objection.after, objection.why
             );
         }
-        if moves.is_empty() {
+        if proposal.changes.is_empty() {
             eprintln!("  nothing would change");
         }
         FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
         return;
     }
 
-    let mut text = serde_json::to_string_pretty(&doc).unwrap_or_default();
-    text.push('\n');
-    match std::fs::write(&path, text) {
-        Ok(()) => {
-            println!("{} · {rule_id}.{field} = {value}", path.display());
-            for moved in &moves {
-                println!(
-                    "  {} → {}  {}: {}",
-                    moved.before, moved.after, moved.direction, moved.why
-                );
-            }
-        }
-        Err(e) => {
-            eprintln!("cqx config set: {}: {e}", path.display());
-            FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
-        }
+    if let Err(e) = proposal.write() {
+        eprintln!("cqx config set: {e}");
+        FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
+        return;
     }
-}
-
-/// Apply one `set` to a rule in memory, the way the file will apply it.
-///
-/// Kept beside the writer rather than inside `config`, because it exists to
-/// answer "what would this file say afterwards" for the ratchet, and a second
-/// path that could disagree with the writer is the thing to avoid. The writer
-/// above and this function take the same `field` and the same parsed value.
-fn apply(rule: &mut config::Rule, field: &str, value: &serde_json::Value) {
-    match field {
-        "enabled" => rule.enabled = value.as_bool().unwrap_or(rule.enabled),
-        "weight" => rule.weight = value.as_f64().unwrap_or(rule.weight),
-        "free" => rule.free = value.as_f64().unwrap_or(rule.free),
-        "full" => rule.full = value.as_f64().unwrap_or(rule.full),
-        // A parameter, which the caller has already checked the rule accepts.
-        other => {
-            if let Some(v) = value.as_f64() {
-                rule.params.insert(other.to_string(), v);
-            }
-        }
+    println!("{} · {rule}.{field} = {value}", path.display());
+    for moved in &proposal.changes {
+        println!(
+            "  {} → {}  {}: {}",
+            moved.before, moved.after, moved.direction, moved.why
+        );
     }
 }
 

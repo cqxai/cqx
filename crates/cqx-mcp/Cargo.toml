@@ -8,6 +8,7 @@ description = "Read-only MCP server, so an agent can ask cqx about the code."
 
 [dependencies]
 cqx-scan = { path = "../cqx-scan" }
+cqx-score = { path = "../cqx-score" }
 deka-cli-core = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

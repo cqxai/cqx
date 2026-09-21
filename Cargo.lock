@@ -104,6 +104,7 @@ name = "cqx-mcp"
 version = "0.1.22"
 dependencies = [
  "cqx-scan",
+ "cqx-score",
  "deka-cli-core",
  "serde",
  "serde_json",

@@ -229,8 +229,40 @@ Point the agent at the local command. For Claude Code:
 claude mcp add cqx -- cqx mcp
 ```
 
-It is read-only: the agent can ask what cqx thinks of a tree, and nothing
-leaves the machine.
+Nothing leaves the machine. Four of the five tools are read-only — `score`,
+`findings`, `rules`, `explain`.
+
+The fifth is `propose_rule`, and it is the point. An agent may make a rule
+**stricter** and may not make it looser:
+
+```
+propose_rule oversized-files.weight 40
+  because "we split files at review anyway"
+→ written, 25 → 40, tighter
+
+propose_rule oversized-files.free 9
+→ Refused: this would lower the standard, and only a person may do that.
+```
+
+Without that asymmetry, "make the score go up" has two solutions — write
+better code, or lower the bar — and the second is faster, always available,
+and looks identical in a diff to anybody skimming. It is also why letting an
+agent do this is safe rather than merely guarded: tightening a rule makes the
+number it is measured by harder to reach, so it is never in its short-term
+interest. What it is good for is the thing a reviewer does by hand today —
+noticing that a standard should be higher, and saying so once instead of
+correcting the same thing every week.
+
+`because` is required, and is kept in `cqx.json` beside the rule. A threshold
+somebody finds in a year with no explanation is a threshold nobody dares
+change.
+
+A person may go either way:
+
+```
+cqx config set oversized-files.free 9        # allowed, and it says "looser"
+cqx config set oversized-files.free 9 --tighten-only   # refused
+```
 
 ## Scoring a history
 
