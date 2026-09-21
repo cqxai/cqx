@@ -54,6 +54,42 @@ pub(crate) fn list() -> Value {
                 "annotations": { "readOnlyHint": true },
             },
             {
+                "name": "propose_rule",
+                "description": "Raise the standard: change a rule, but only in the direction that makes it stricter. A change that would lower it is refused and the reason is returned — only a person may loosen a rule. Say why; the reason is kept beside the rule in cqx.json.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "path": path_prop(),
+                        "rule": {
+                            "type": "string",
+                            "description": "The rule to change, for example oversized-files.",
+                        },
+                        "field": {
+                            "type": "string",
+                            "description": "weight, free, full, enabled, or one of the rule's own parameters. Call explain to see them.",
+                        },
+                        "value": {
+                            "description": "The new value. A number, or true/false for enabled.",
+                        },
+                        "because": {
+                            "type": "string",
+                            "description": "Why this rule should be stricter. Kept in cqx.json beside the rule, for whoever reads it next.",
+                        },
+                    },
+                    "required": ["rule", "field", "value", "because"],
+                },
+                // Not read-only, and it says so. It writes exactly one file,
+                // `cqx.json`, and only ever in the stricter direction — which
+                // is why it is not destructive either: the worst it can do is
+                // hold this repository to a higher standard than somebody
+                // wanted, and a person can undo that in one command.
+                "annotations": {
+                    "readOnlyHint": false,
+                    "destructiveHint": false,
+                    "idempotentHint": true,
+                },
+            },
+            {
                 "name": "explain",
                 "description": "One rule, named, in full, plus its findings in this repository.",
                 "inputSchema": {
@@ -88,9 +124,10 @@ pub(crate) fn call(server: &mut Server, params: &Value) -> Value {
         "findings" => wrap(findings(server, &args)),
         "rules" => wrap(rules(server, &args)),
         "explain" => wrap(explain(server, &args)),
+        "propose_rule" => wrap(propose_rule(server, &args)),
         "" => fail("tools/call needs the name of a tool."),
         other => fail(format!(
-            "there is no tool named '{other}'. cqx mcp has score, findings, rules and explain."
+            "there is no tool named '{other}'. cqx mcp has score, findings, rules, explain and propose_rule."
         )),
     }
 }
@@ -141,6 +178,98 @@ fn explain(server: &mut Server, args: &Value) -> Result<Value, Trouble> {
         }));
     }
     Err(Trouble::NoSuchRule(want.to_string()))
+}
+
+/// Raise the standard, and only ever raise it.
+///
+/// This is the one thing in `cqx mcp` that writes, and the asymmetry is the
+/// reason it is allowed to. **An agent may tighten a rule; only a person may
+/// loosen one.** Without that, "make the score go up" has two solutions —
+/// write better code, or lower the bar — and the second is faster, always
+/// available, and looks identical in a diff to anybody skimming.
+///
+/// It is also why this is safe rather than merely guarded. Tightening a rule
+/// is never in an agent's short-term interest: it makes the score it is being
+/// measured by harder to reach. What it is good for is the thing a reviewer
+/// currently does by hand — noticing that a standard should be higher, and
+/// saying so once instead of correcting the same thing every week.
+///
+/// `because` is required. A threshold somebody finds in a year with no
+/// explanation is a threshold nobody dares change, and it is written into
+/// `cqx.json` beside the rule rather than into a log nobody keeps.
+fn propose_rule(server: &mut Server, args: &Value) -> Result<Value, Trouble> {
+    let rule = text(args, "rule", "propose_rule needs the name of a rule.")?;
+    let field = text(args, "field", "propose_rule needs the name of a field.")?;
+    let because = text(
+        args,
+        "because",
+        "propose_rule needs `because`: why this rule should be stricter. It is kept in cqx.json beside the rule.",
+    )?;
+    let value = match args.get("value") {
+        Some(Value::Bool(b)) => b.to_string(),
+        Some(Value::Number(n)) => n.to_string(),
+        Some(Value::String(s)) => s.clone(),
+        _ => {
+            return Err(Trouble::Missing(
+                "propose_rule needs a value: a number, or true/false for enabled.",
+            ))
+        }
+    };
+
+    let root = crate::root_from(args)?.canonicalize().map_err(|e| Trouble::Unreadable {
+        path: crate::root_from(args).unwrap_or_default(),
+        why: e.to_string(),
+    })?;
+
+    let proposal = cqx_score::edit::propose(
+        &root.join("cqx.json"),
+        &root,
+        &rule,
+        &field,
+        &value,
+        Some(&because),
+    )
+    .map_err(Trouble::Analysis)?;
+
+    if !proposal.tightens {
+        let objections = proposal.objections();
+        return Err(Trouble::NotATightening {
+            rule: rule.clone(),
+            field: field.clone(),
+            loosening: objections
+                .iter()
+                .any(|c| c.direction == cqx_score::ratchet::Direction::Looser),
+            objections: objections
+                .iter()
+                .map(|c| format!("{} {} → {}: {}", c.field, c.before, c.after, c.why))
+                .collect(),
+            nothing: proposal.changes.is_empty(),
+        });
+    }
+
+    proposal.write().map_err(Trouble::Analysis)?;
+    // The next question after changing a rule is what it did to the score, and
+    // the cached scan was computed under the old rules.
+    server.forget();
+
+    Ok(json!({
+        "written": proposal.path.display().to_string(),
+        "rule": rule,
+        "field": field,
+        "value": proposal.value,
+        "because": because,
+        "changes": proposal.changes,
+        "note": "The standard is now stricter. Re-run score to see what it cost.",
+    }))
+}
+
+fn text(args: &Value, key: &str, missing: &'static str) -> Result<String, Trouble> {
+    args.get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .ok_or(Trouble::Missing(missing))
 }
 
 fn describe(rule: &Value, want: &str) -> Value {

@@ -5,8 +5,14 @@
 //! started. The whole point is that the agent talks to the tool that is
 //! already there.
 //!
-//! Nothing here writes a file, changes a rule, or runs anything. A later
-//! change adds `propose_rule`; this one must not.
+//! Four of the five tools are read-only. The fifth, `propose_rule`, writes
+//! exactly one file — `cqx.json` — and only ever in the direction that makes
+//! a rule stricter. **An agent may tighten a rule; only a person may loosen
+//! one.** Without that asymmetry, "make the score go up" has two solutions and
+//! the faster one is to lower the bar.
+//!
+//! Nothing here runs anything, and nothing here reads a file outside the tree
+//! it was pointed at.
 
 mod tools;
 
@@ -33,6 +39,24 @@ pub enum Trouble {
     Missing(&'static str),
     /// It named a rule this tree does not have.
     NoSuchRule(String),
+    /// It asked to change a rule in a direction it may not change it in.
+    ///
+    /// Its own variant rather than a sentence, because the answer has
+    /// structure worth giving an agent: which objections, whether any of them
+    /// is an actual loosening, and whether the proposal would have changed
+    /// anything at all. A caller that cannot tell "this would lower the
+    /// standard" from "this is already the value" is a caller that will retry
+    /// the second one forever.
+    NotATightening {
+        rule: String,
+        field: String,
+        objections: Vec<String>,
+        /// At least one objection is a loosening rather than merely unclear.
+        /// The two deserve different sentences: "you are lowering the bar" is
+        /// an accusation, and "this cannot be shown to raise it" is not.
+        loosening: bool,
+        nothing: bool,
+    },
 }
 
 impl std::fmt::Display for Trouble {
@@ -45,6 +69,27 @@ impl std::fmt::Display for Trouble {
                 f,
                 "there is no rule named '{name}' in this tree. Call rules to see the ones in force."
             ),
+            Trouble::NotATightening { rule, field, objections, loosening, nothing } => {
+                if *nothing {
+                    return write!(f, "{rule}.{field} is already that. Nothing to change.");
+                }
+                writeln!(
+                    f,
+                    "{}",
+                    if *loosening {
+                        "Refused: this would lower the standard, and only a person may do that."
+                    } else {
+                        "Refused: this cannot be shown to raise the standard, so only a person may make it."
+                    }
+                )?;
+                for objection in objections {
+                    writeln!(f, "  {rule}.{objection}")?;
+                }
+                write!(
+                    f,
+                    "You may make {rule} stricter. If this change is the right one, say so to the person you are working with and let them run: cqx config set {rule}.{field} <value>"
+                )
+            }
         }
     }
 }
@@ -113,6 +158,15 @@ impl Server {
     /// The report for this `path`, scanning only when the root is new.
     fn report_for(&mut self, args: &Value) -> Result<Value, Trouble> {
         Ok(self.scanned(root_from(args)?)?.report.clone())
+    }
+
+    /// Throw the cached scan away.
+    ///
+    /// Wanted when the rules change: the tree is identical and the score is
+    /// not, and a cache keyed on the root knows nothing about which rules
+    /// were applied to it.
+    pub(crate) fn forget(&mut self) {
+        self.cached = None;
     }
 
     fn scanned(&mut self, root: PathBuf) -> Result<&cqx_scan::Scanned, Trouble> {
@@ -280,23 +334,196 @@ mod tests {
     }
 
     #[test]
-    fn tools_list_has_exactly_four_tools_each_with_a_schema() {
+    fn tools_list_has_five_tools_and_only_one_of_them_writes() {
         let reply = rpc(
             &mut Server::default(),
             r#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#,
         );
         let tools = reply["result"]["tools"].as_array().expect("tools array");
-        assert_eq!(tools.len(), 4);
+        assert_eq!(tools.len(), 5);
         let names: Vec<&str> = tools
             .iter()
             .map(|t| t["name"].as_str().expect("name"))
             .collect();
-        assert_eq!(names, ["score", "findings", "rules", "explain"]);
+        assert_eq!(
+            names,
+            ["score", "findings", "rules", "propose_rule", "explain"]
+        );
         for tool in tools {
             let schema = tool.get("inputSchema").expect("inputSchema");
             assert_eq!(schema["type"], "object");
             assert!(schema.get("properties").is_some());
         }
+
+        // The annotation a client shows a person when it asks whether to allow
+        // a call. Exactly one tool here writes anything, and if that ever
+        // stops being true it must stop being true on purpose.
+        let writers: Vec<&str> = tools
+            .iter()
+            .filter(|t| t["annotations"]["readOnlyHint"] == json!(false))
+            .map(|t| t["name"].as_str().expect("name"))
+            .collect();
+        assert_eq!(writers, ["propose_rule"]);
+        for tool in tools {
+            assert_ne!(
+                tool["annotations"]["destructiveHint"],
+                json!(true),
+                "{} claims to be destructive",
+                tool["name"]
+            );
+        }
+    }
+
+    /// A copy of a fixture, so a test that writes `cqx.json` writes it
+    /// somewhere disposable rather than into the repository it was read from.
+    fn sandbox(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("cqx-mcp-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        copy(Path::new(&fixture("hard")), &dir);
+        dir
+    }
+
+    fn copy(from: &Path, to: &Path) {
+        std::fs::create_dir_all(to).expect("mkdir");
+        for entry in std::fs::read_dir(from).expect("readdir").flatten() {
+            let target = to.join(entry.file_name());
+            if entry.path().is_dir() {
+                copy(&entry.path(), &target);
+            } else {
+                std::fs::copy(entry.path(), target).expect("copy");
+            }
+        }
+    }
+
+    fn propose(server: &mut Server, dir: &Path, field: &str, value: Value, because: Value) -> Value {
+        let mut arguments = json!({
+            "path": dir.display().to_string(),
+            "rule": "env-controlled-spawn",
+            "field": field,
+            "value": value,
+        });
+        if !because.is_null() {
+            arguments["because"] = because;
+        }
+        call(server, 9, "propose_rule", arguments)
+    }
+
+    #[test]
+    fn a_tightening_is_written_with_its_reason() {
+        let dir = sandbox("tighten");
+        let mut server = Server::default();
+        let reply = propose(&mut server, &dir, "weight", json!(45), json!("it keeps reaching production"));
+        assert!(reply["result"]["isError"].is_null(), "{reply:#}");
+
+        let written: Value = serde_json::from_str(tool_text(&reply)).expect("json");
+        assert_eq!(written["changes"][0]["direction"], "tighter");
+
+        // The file, and the reason beside the rule.
+        let text = std::fs::read_to_string(dir.join("cqx.json")).expect("cqx.json");
+        assert!(text.contains("\"weight\": 45"), "{text}");
+        assert!(text.contains("it keeps reaching production"), "{text}");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The whole point. An agent may not lower the bar.
+    #[test]
+    fn a_loosening_is_refused_and_nothing_is_written() {
+        let dir = sandbox("loosen");
+        let mut server = Server::default();
+        let reply = propose(&mut server, &dir, "weight", json!(5), json!("it is noisy"));
+        assert_eq!(reply["result"]["isError"], json!(true), "{reply:#}");
+
+        let said = tool_text(&reply);
+        assert!(said.contains("lower the standard"), "{said}");
+        assert!(said.contains("cqx config set"), "it should say who can: {said}");
+        assert!(!dir.join("cqx.json").exists(), "a refused proposal wrote a file");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A parameter is stricter and still refused, because the direction
+    /// depends on what it measures. The refusal must not accuse the agent of
+    /// lowering the bar — it did not, and telling it so would be wrong.
+    #[test]
+    fn an_unprovable_change_is_refused_in_different_words() {
+        let dir = sandbox("unclear");
+        let mut server = Server::default();
+        let reply = call(
+            &mut server,
+            9,
+            "propose_rule",
+            json!({
+                "path": dir.display().to_string(),
+                "rule": "oversized-files",
+                "field": "max_lines",
+                "value": 400,
+                "because": "we keep files small",
+            }),
+        );
+        assert_eq!(reply["result"]["isError"], json!(true));
+        let said = tool_text(&reply);
+        assert!(said.contains("cannot be shown to raise"), "{said}");
+        assert!(!said.contains("lower the standard"), "{said}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A no-op is its own answer. An agent told "this would lower the
+    /// standard" about a change that changes nothing will try again forever.
+    #[test]
+    fn proposing_the_value_it_already_has_says_so() {
+        let dir = sandbox("noop");
+        let mut server = Server::default();
+        propose(&mut server, &dir, "weight", json!(45), json!("first"));
+        let again = propose(&mut server, &dir, "weight", json!(45), json!("second"));
+        assert_eq!(again["result"]["isError"], json!(true));
+        assert!(tool_text(&again).contains("already that"), "{}", tool_text(&again));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_proposal_without_a_reason_is_refused() {
+        let dir = sandbox("why");
+        let mut server = Server::default();
+        let reply = propose(&mut server, &dir, "weight", json!(45), Value::Null);
+        assert_eq!(reply["result"]["isError"], json!(true));
+        assert!(tool_text(&reply).contains("because"), "{}", tool_text(&reply));
+        assert!(!dir.join("cqx.json").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The cached scan was computed under the old rules. A score asked for
+    /// straight after a rule change must not be the one from before it.
+    #[test]
+    fn changing_a_rule_throws_away_the_cached_scan() {
+        let dir = sandbox("cache");
+        let mut server = Server::default();
+        let before: Value = serde_json::from_str(tool_text(&call(
+            &mut server,
+            1,
+            "score",
+            json!({ "path": dir.display().to_string() }),
+        )))
+        .expect("json");
+
+        propose(&mut server, &dir, "weight", json!(45), json!("stricter"));
+
+        let after: Value = serde_json::from_str(tool_text(&call(
+            &mut server,
+            2,
+            "score",
+            json!({ "path": dir.display().to_string() }),
+        )))
+        .expect("json");
+
+        // env-controlled-spawn is a security rule and the fixture trips it, so
+        // weighting it more heavily must move that score. An unchanged number
+        // here means the cache answered.
+        assert_ne!(
+            before["scores"]["security"], after["scores"]["security"],
+            "the score did not change after the rule did: {before:#} vs {after:#}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
