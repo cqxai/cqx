@@ -86,21 +86,27 @@ fn cmd_scan(context: &Context) {
 const SHOWN: usize = 8;
 
 /// What one pass over a tree produced.
-struct Scanned {
-    report: serde_json::Value,
-    files: usize,
-    lines: u64,
-    ms: u128,
+///
+/// Public because `cqx scan` is not the only thing that wants it. The desktop
+/// application scores the tree a person is editing, and an MCP server answers
+/// an agent asking about that same tree — both want the pipeline and none of
+/// the terminal around it. A command is a way to reach a library, not the
+/// place the work should live.
+pub struct Scanned {
+    pub report: serde_json::Value,
+    pub files: usize,
+    pub lines: u64,
+    pub ms: u128,
     /// Every path the scan actually read. SARIF has a place for this, and
     /// GitHub's code scanning page says "no summary of scanned files
     /// reported by cqx" when it is left out — a reader cannot tell a tool
     /// that found nothing from one that looked at nothing.
-    paths: Vec<String>,
+    pub paths: Vec<String>,
 }
 
 impl Scanned {
     /// The category scores, in the order they are printed.
-    fn scores(&self) -> Vec<(String, u64)> {
+    pub fn scores(&self) -> Vec<(String, u64)> {
         self.report
             .get("scores")
             .and_then(serde_json::Value::as_object)
@@ -132,7 +138,7 @@ fn run(context: &Context) -> Result<(), String> {
         .copied()
         .unwrap_or(false);
 
-    let mut here = scan(&root, config_path, quote)?;
+    let mut here = tree(&root, config_path, quote)?;
 
     // `--min-score` is a `cqx.json` field first and an override second, so it
     // is applied to the report rather than carried beside it: everything that
@@ -157,16 +163,6 @@ fn run(context: &Context) -> Result<(), String> {
         Some(reference) => Some((reference.clone(), scan_ref(&root, reference, config_path)?)),
         None => None,
     };
-
-    // What the run itself cost. The human output has always said "58 files ·
-    // 7,802 lines · 0.1s" and the report carried only the lines, so anything
-    // drawing from the JSON could not say the same sentence.
-    here.report["scan"] = serde_json::json!({
-        "files": here.files,
-        "lines": here.lines,
-        "ms": here.ms,
-        "cqx": env!("CARGO_PKG_VERSION"),
-    });
 
     // What it was compared against travels with the report. The movement is
     // the point of a ratchet, and a consumer that only receives the new
@@ -219,7 +215,7 @@ fn run(context: &Context) -> Result<(), String> {
 /// The facts never reach a file. `extract` writes them and `score` reads them,
 /// and the only reason that was a file is that two commands cannot hand each
 /// other a value.
-fn scan(root: &Path, config_path: Option<&Path>, quote: bool) -> Result<Scanned, String> {
+pub fn tree(root: &Path, config_path: Option<&Path>, quote: bool) -> Result<Scanned, String> {
     let started = std::time::Instant::now();
     let snapshot = cqx_vfs::from_dir(root).map_err(|e| format!("{}: {e}", root.display()))?;
     let files = snapshot.len();
@@ -244,12 +240,26 @@ fn scan(root: &Path, config_path: Option<&Path>, quote: bool) -> Result<Scanned,
         });
     }
 
+    let ms = started.elapsed().as_millis();
+
+    // What the run itself cost, stamped here rather than by the caller. The
+    // human output has always said "58 files · 7,802 lines · 0.1s" and for a
+    // while the report carried only the lines, so anything drawing from the
+    // JSON could not say the same sentence. Every caller wants it, so no
+    // caller has to remember it.
+    report["scan"] = serde_json::json!({
+        "files": files,
+        "lines": metrics.lines,
+        "ms": ms,
+        "cqx": env!("CARGO_PKG_VERSION"),
+    });
+
     Ok(Scanned {
         lines: metrics.lines,
         files,
         paths,
         report,
-        ms: started.elapsed().as_millis(),
+        ms,
     })
 }
 
@@ -265,7 +275,7 @@ fn scan_ref(repo: &Path, reference: &str, config_path: Option<&Path>) -> Result<
     // The comparison is of the code, not of the configuration: both sides are
     // scored against the standards in force now, so a rule added today does
     // not read as a regression introduced yesterday.
-    let scanned = scan(&scratch, config_path, false);
+    let scanned = tree(&scratch, config_path, false);
     let _ = std::fs::remove_dir_all(&scratch);
     scanned
 }
