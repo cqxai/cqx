@@ -10,6 +10,47 @@
 
 mod tools;
 
+/// What can go wrong answering an agent.
+///
+/// Not `Result<_, String>`, and cqx itself is the reason: `result-string-density`
+/// found this crate the moment it was written, which is the loop this whole
+/// product is about — the tool said so before a person had to.
+///
+/// It is also better. `explain` failing because a rule does not exist and
+/// `explain` failing because the folder cannot be read are different answers
+/// to an agent, and as prose they were distinguishable only by reading the
+/// sentence. Now they can be matched on, which is what will let a later
+/// version answer "did you mean exit-in-library?" without parsing its own
+/// error message.
+#[derive(Debug)]
+pub enum Trouble {
+    /// The path given is not something we can read as a directory.
+    Unreadable { path: PathBuf, why: String },
+    /// The analysis itself refused. Carries what it said, because it is the
+    /// only thing that knows why.
+    Analysis(String),
+    /// The call left out something it has to give.
+    Missing(&'static str),
+    /// It named a rule this tree does not have.
+    NoSuchRule(String),
+}
+
+impl std::fmt::Display for Trouble {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Trouble::Unreadable { path, why } => write!(f, "could not read {}: {why}", path.display()),
+            Trouble::Analysis(why) => f.write_str(why),
+            Trouble::Missing(what) => write!(f, "{what}"),
+            Trouble::NoSuchRule(name) => write!(
+                f,
+                "there is no rule named '{name}' in this tree. Call rules to see the ones in force."
+            ),
+        }
+    }
+}
+
+impl std::error::Error for Trouble {}
+
 use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
 
@@ -70,14 +111,15 @@ struct Server {
 
 impl Server {
     /// The report for this `path`, scanning only when the root is new.
-    fn report_for(&mut self, args: &Value) -> Result<Value, String> {
+    fn report_for(&mut self, args: &Value) -> Result<Value, Trouble> {
         Ok(self.scanned(root_from(args)?)?.report.clone())
     }
 
-    fn scanned(&mut self, root: PathBuf) -> Result<&cqx_scan::Scanned, String> {
-        let root = root
-            .canonicalize()
-            .map_err(|e| format!("could not read {}: {e}", root.display()))?;
+    fn scanned(&mut self, root: PathBuf) -> Result<&cqx_scan::Scanned, Trouble> {
+        let root = root.canonicalize().map_err(|e| Trouble::Unreadable {
+            path: root.clone(),
+            why: e.to_string(),
+        })?;
         let hit = self.cached.as_ref().is_some_and(|(have, _)| *have == root);
         if !hit {
             // `tree` searches upward when this is `None`. Passing a path
@@ -94,7 +136,7 @@ impl Server {
             // Quote so a finding arrives with the line of code. An agent
             // that has to open the file to see what it was asked about is
             // doing the work this tool exists to save.
-            let scanned = cqx_scan::tree(&root, rules.as_deref(), true)?;
+            let scanned = cqx_scan::tree(&root, rules.as_deref(), true).map_err(Trouble::Analysis)?;
             self.cached = Some((root, scanned));
         }
         Ok(&self
@@ -105,11 +147,13 @@ impl Server {
     }
 }
 
-fn root_from(args: &Value) -> Result<PathBuf, String> {
+fn root_from(args: &Value) -> Result<PathBuf, Trouble> {
     match args.get("path").and_then(Value::as_str) {
         Some(path) if !path.is_empty() => Ok(PathBuf::from(path)),
-        _ => std::env::current_dir()
-            .map_err(|e| format!("could not read the current directory: {e}")),
+        _ => std::env::current_dir().map_err(|e| Trouble::Unreadable {
+            path: PathBuf::from("."),
+            why: e.to_string(),
+        }),
     }
 }
 

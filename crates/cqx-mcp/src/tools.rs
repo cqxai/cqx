@@ -7,7 +7,7 @@
 
 use serde_json::{json, Value};
 
-use crate::Server;
+use crate::{Server, Trouble};
 
 pub(crate) fn list() -> Value {
     json!({
@@ -95,7 +95,7 @@ pub(crate) fn call(server: &mut Server, params: &Value) -> Value {
     }
 }
 
-fn score(server: &mut Server, args: &Value) -> Result<Value, String> {
+fn score(server: &mut Server, args: &Value) -> Result<Value, Trouble> {
     let report = server.report_for(args)?;
     Ok(json!({
         "scores": report.get("scores").cloned().unwrap_or(json!({})),
@@ -103,25 +103,25 @@ fn score(server: &mut Server, args: &Value) -> Result<Value, String> {
     }))
 }
 
-fn findings(server: &mut Server, args: &Value) -> Result<Value, String> {
+fn findings(server: &mut Server, args: &Value) -> Result<Value, Trouble> {
     let report = server.report_for(args)?;
     let rule_filter = args.get("rule").and_then(Value::as_str);
     let file_filter = args.get("file").and_then(Value::as_str);
     Ok(json!({ "findings": collect_findings(&report, rule_filter, file_filter) }))
 }
 
-fn rules(server: &mut Server, args: &Value) -> Result<Value, String> {
+fn rules(server: &mut Server, args: &Value) -> Result<Value, Trouble> {
     let report = server.report_for(args)?;
     Ok(json!({ "rules": collect_rules(&report) }))
 }
 
-fn explain(server: &mut Server, args: &Value) -> Result<Value, String> {
+fn explain(server: &mut Server, args: &Value) -> Result<Value, Trouble> {
     let want = args
         .get("rule")
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| "explain needs the name of a rule.".to_string())?;
+        .ok_or(Trouble::Missing("explain needs the name of a rule."))?;
     let report = server.report_for(args)?;
     if let Some(rule) = rule_in_report(&report, want) {
         return Ok(describe(rule, want));
@@ -140,9 +140,7 @@ fn explain(server: &mut Server, args: &Value) -> Result<Value, String> {
             "findings": [],
         }));
     }
-    Err(format!(
-        "there is no rule named '{want}' in this tree. Call rules to see the ones in force."
-    ))
+    Err(Trouble::NoSuchRule(want.to_string()))
 }
 
 fn describe(rule: &Value, want: &str) -> Value {
@@ -256,10 +254,12 @@ fn file_matches(file: &str, filter: &str) -> bool {
     file == filter || file.ends_with(&format!("/{filter}"))
 }
 
-fn wrap(result: Result<Value, String>) -> Value {
+fn wrap(result: Result<Value, Trouble>) -> Value {
     match result {
         Ok(value) => ok(value),
-        Err(message) => fail(message),
+        // The sentence an agent reads is the error's own Display. One place
+        // decides how each kind of trouble is worded.
+        Err(trouble) => fail(trouble.to_string()),
     }
 }
 
