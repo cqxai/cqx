@@ -70,6 +70,11 @@ pub fn register(registry: &mut Registry) {
         aliases: &[],
         description: "emit the result as JSON",
     });
+    registry.add_flag(FlagSpec {
+        name: "--tighten-only",
+        aliases: &[],
+        description: "refuse a change that lowers the standard; what an agent is given",
+    });
 }
 
 /// Enough to show the shape of a problem without turning the output into the
@@ -355,21 +360,92 @@ fn cmd_config_set(context: &Context) {
             .or_insert_with(|| serde_json::json!({}))
             .as_object_mut()
             .expect("params is an object")
-            .insert(field.to_string(), parsed);
+            .insert(field.to_string(), parsed.clone());
     } else {
         entry
             .as_object_mut()
             .expect("rule entry is an object")
-            .insert(field.to_string(), parsed);
+            .insert(field.to_string(), parsed.clone());
+    }
+
+    // Which way this moves the standard, and whether the caller is allowed to
+    // move it that way.
+    //
+    // Said on every set, not only under the flag. A person changing a rule
+    // deserves to be told which direction they just went — "looser" in the
+    // output is the difference between a decision and a drift, and it costs a
+    // line. The flag is what turns being told into being stopped, and it is
+    // what an agent is given.
+    let before = config::Config::resolve(Some(&path), &context.env.cwd).unwrap_or_else(|_| {
+        // An unreadable file has already been reported above; fall back to the
+        // defaults so the direction is still reported rather than skipped.
+        config::Config {
+            rules: config::defaults(),
+            origins: std::collections::BTreeMap::new(),
+            min_score: None,
+            exclude: Vec::new(),
+            loaded_from: None,
+        }
+    });
+    let mut after = before.clone();
+    if let Some(rule) = after.rules.get_mut(rule_id) {
+        apply(rule, field, &parsed);
+    }
+    let moves = ratchet::compare(&before, &after);
+
+    if context.args.flags.get("--tighten-only").copied().unwrap_or(false)
+        && !ratchet::tightens(&moves)
+    {
+        eprintln!("cqx config set: refused — --tighten-only, and this does not tighten.");
+        for objection in ratchet::objections(&moves) {
+            eprintln!(
+                "  {}.{}  {} → {}  {}",
+                objection.rule, objection.field, objection.before, objection.after, objection.why
+            );
+        }
+        if moves.is_empty() {
+            eprintln!("  nothing would change");
+        }
+        FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
+        return;
     }
 
     let mut text = serde_json::to_string_pretty(&doc).unwrap_or_default();
     text.push('\n');
     match std::fs::write(&path, text) {
-        Ok(()) => println!("{} · {rule_id}.{field} = {value}", path.display()),
+        Ok(()) => {
+            println!("{} · {rule_id}.{field} = {value}", path.display());
+            for moved in &moves {
+                println!(
+                    "  {} → {}  {}: {}",
+                    moved.before, moved.after, moved.direction, moved.why
+                );
+            }
+        }
         Err(e) => {
             eprintln!("cqx config set: {}: {e}", path.display());
             FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+}
+
+/// Apply one `set` to a rule in memory, the way the file will apply it.
+///
+/// Kept beside the writer rather than inside `config`, because it exists to
+/// answer "what would this file say afterwards" for the ratchet, and a second
+/// path that could disagree with the writer is the thing to avoid. The writer
+/// above and this function take the same `field` and the same parsed value.
+fn apply(rule: &mut config::Rule, field: &str, value: &serde_json::Value) {
+    match field {
+        "enabled" => rule.enabled = value.as_bool().unwrap_or(rule.enabled),
+        "weight" => rule.weight = value.as_f64().unwrap_or(rule.weight),
+        "free" => rule.free = value.as_f64().unwrap_or(rule.free),
+        "full" => rule.full = value.as_f64().unwrap_or(rule.full),
+        // A parameter, which the caller has already checked the rule accepts.
+        other => {
+            if let Some(v) = value.as_f64() {
+                rule.params.insert(other.to_string(), v);
+            }
         }
     }
 }

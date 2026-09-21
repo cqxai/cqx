@@ -46,6 +46,16 @@ pub enum Direction {
     Unclear,
 }
 
+impl std::fmt::Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Direction::Tighter => "tighter",
+            Direction::Looser => "looser",
+            Direction::Unclear => "unclear",
+        })
+    }
+}
+
 /// One field, moved.
 #[derive(Debug, Clone, Serialize)]
 pub struct Change {
