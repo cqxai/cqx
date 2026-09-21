@@ -76,6 +76,7 @@ name = "cqx"
 version = "0.1.22"
 dependencies = [
  "cqx-history",
+ "cqx-mcp",
  "cqx-rust",
  "cqx-scan",
  "cqx-score",
@@ -93,6 +94,16 @@ dependencies = [
  "cqx-store",
  "cqx-vfs",
  "cqx-view",
+ "deka-cli-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "cqx-mcp"
+version = "0.1.22"
+dependencies = [
+ "cqx-scan",
  "deka-cli-core",
  "serde",
  "serde_json",

@@ -21,3 +21,4 @@ cqx-store = { path = "../cqx-store" }
 cqx-score = { path = "../cqx-score" }
 cqx-history = { path = "../cqx-history" }
 cqx-scan = { path = "../cqx-scan" }
+cqx-mcp = { path = "../cqx-mcp" }

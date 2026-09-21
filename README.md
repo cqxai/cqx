@@ -221,6 +221,17 @@ cargo run -p cqx -- extract /path/to/a/workspace --out facts.ndjson
 eyeballed: a planted process spawn, two env reads, an unsafe block, a `static
 mut`, filesystem and network effects, and a library that calls `process::exit`.
 
+## Asking cqx from an agent
+
+Point the agent at the local command. For Claude Code:
+
+```
+claude mcp add cqx -- cqx mcp
+```
+
+It is read-only: the agent can ask what cqx thinks of a tree, and nothing
+leaves the machine.
+
 ## Scoring a history
 
 ```
