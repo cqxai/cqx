@@ -7,6 +7,7 @@
 
 pub mod config;
 pub mod metrics;
+pub mod ratchet;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
