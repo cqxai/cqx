@@ -145,13 +145,38 @@ fn serve<R: BufRead, W: Write>(reader: R, mut writer: W) -> io::Result<()> {
     Ok(())
 }
 
-/// Last tree we scored. Keyed only on the canonical root: two calls about
-/// the same path in one session must not walk the tree twice, and watching
-/// mtimes can wait. An agent that asks `score` and then `explain` is the
-/// common case, not a different repository.
+/// One conversation with one client.
+///
+/// Public because stdio is not the only way to reach this. The desktop
+/// application serves the same tools over HTTP on a port, so that an agent
+/// talks to the process that already has the tree warm instead of starting a
+/// fresh one per question — and it must be the *same* dispatch, not a second
+/// implementation that answers `tools/list` slightly differently.
+///
+/// It also holds the last tree scored, keyed on the canonical root: two calls
+/// about the same path must not walk it twice. An agent that asks `score` and
+/// then `explain` is the common case, not a different repository.
 #[derive(Default)]
-struct Server {
+pub struct Session {
     cached: Option<(PathBuf, cqx_scan::Scanned)>,
+}
+
+/// The name this crate has used internally since it was written.
+type Server = Session;
+
+impl Session {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// One JSON-RPC message in, at most one line out.
+    ///
+    /// `None` means the message was a notification and must not be answered.
+    /// A caller serving HTTP replies `202 Accepted` with no body in that case;
+    /// a caller serving stdio writes nothing.
+    pub fn handle(&mut self, line: &str) -> Option<String> {
+        handle_line(self, line)
+    }
 }
 
 impl Server {
@@ -406,6 +431,28 @@ mod tests {
             arguments["because"] = because;
         }
         call(server, 9, "propose_rule", arguments)
+    }
+
+    /// The public door, used the way the desktop application uses it.
+    ///
+    /// Not a duplicate of the tests below: those call `handle_line` directly,
+    /// and this one proves the exported type reaches the same dispatch. A
+    /// second implementation of `tools/list` in the HTTP caller is the thing
+    /// this type exists to prevent.
+    #[test]
+    fn the_public_session_answers_the_same_as_the_stdio_loop() {
+        let mut session = Session::new();
+        let reply = session
+            .handle(r#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#)
+            .expect("a reply");
+        let parsed: Value = serde_json::from_str(&reply).expect("json");
+        assert_eq!(parsed["result"]["tools"].as_array().expect("tools").len(), 5);
+
+        // And a notification is still silence, which an HTTP caller turns
+        // into 202 rather than into an empty body with a content type.
+        assert!(session
+            .handle(r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#)
+            .is_none());
     }
 
     #[test]
