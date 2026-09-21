@@ -14,6 +14,7 @@ fn build_registry() -> Registry {
         .with(cqx_score::register)
         .with(cqx_history::register)
         .with(cqx_scan::register)
+        .with(cqx_mcp::register)
         .flags([
             FlagSpec {
                 name: "--help",
