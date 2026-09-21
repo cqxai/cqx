@@ -74,17 +74,42 @@ pub fn propose(
     value: &str,
     why: Option<&str>,
 ) -> Result<Proposal, String> {
+    let before = Config::resolve(Some(path), root).or_else(|_| Config::resolve(None, root))?;
+    propose_from(path, read(path)?, before, rule, field, value, why)
+}
+
+/// The same, for a caller that already knows what is in force and what the
+/// file says.
+///
+/// The desktop application needs this, and the reason is worth writing down.
+/// Its rules can come from `~/.config/cqx/rules.json` when a repository has no
+/// `cqx.json` of its own — so "what is in force" is not something `resolve`
+/// can work out from the repository alone. And when it writes the first
+/// `cqx.json`, that file must be **seeded from what was in force**, or every
+/// other global setting silently reverts to a default and the change reports
+/// as one tightening while quietly being several loosenings.
+///
+/// `document` is what the file says now, or the seed for one that does not
+/// exist yet. `before` must be the configuration that `document` produces,
+/// which is what makes the classification about the same two states the
+/// reader is looking at.
+pub fn propose_from(
+    path: &Path,
+    mut document: Value,
+    before: Config,
+    rule: &str,
+    field: &str,
+    value: &str,
+    why: Option<&str>,
+) -> Result<Proposal, String> {
     let defaults = defaults();
     let default_rule = defaults.get(rule).ok_or_else(|| {
         format!("no rule named '{rule}'. `cqx config show` lists them.")
     })?;
 
     let parsed = parse(default_rule, field, value)?;
-
-    let mut document = read(path)?;
     put(&mut document, rule, field, &parsed, default_rule, why);
 
-    let before = Config::resolve(Some(path), root).or_else(|_| Config::resolve(None, root))?;
     let mut after = before.clone();
     if let Some(r) = after.rules.get_mut(rule) {
         apply(r, field, &parsed);
@@ -327,6 +352,63 @@ mod tests {
         // refusing the document.
         let config = Config::resolve(Some(&file), &dir).expect("cqx can still read it");
         assert_eq!(config.rules["oversized-files"].weight, 40.0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The case `propose_from` exists for: a first `cqx.json` written for a
+    /// repository whose rules came from somewhere else.
+    ///
+    /// Seeded, the one change is one change. Unseeded, writing a single field
+    /// would drop every other setting back to a default — and the proposal
+    /// would report one tightening while being several loosenings.
+    #[test]
+    fn a_seeded_first_file_does_not_quietly_revert_everything_else() {
+        let dir = sandbox("seed");
+        let file = dir.join("cqx.json");
+
+        // What is in force comes from somewhere this repository cannot see:
+        // two rules already stricter than the defaults.
+        let elsewhere = r#"{"version":1,"rules":{
+            "exit-in-library":{"weight":60},
+            "shell-invocation":{"weight":50}
+        }}"#;
+        let in_force = Config::from_text(Some(elsewhere)).expect("parse");
+        let seed: Value = serde_json::from_str(elsewhere).expect("json");
+
+        let seeded = propose_from(
+            &file,
+            seed,
+            in_force.clone(),
+            "oversized-files",
+            "weight",
+            "40",
+            None,
+        )
+        .unwrap();
+        assert!(seeded.tightens, "{:#?}", seeded.changes);
+        assert_eq!(seeded.changes.len(), 1);
+        // And the other two survive into the file.
+        assert_eq!(seeded.document["rules"]["exit-in-library"]["weight"], json!(60));
+
+        // Without the seed, the same edit is a bloodbath: the two rules fall
+        // back to their defaults, and that is a loosening nobody asked for.
+        let bare = propose_from(
+            &file,
+            json!({ "version": 1, "rules": {} }),
+            in_force,
+            "oversized-files",
+            "weight",
+            "40",
+            None,
+        )
+        .unwrap();
+        assert!(bare.tightens, "the classification is about before vs after, not the file");
+        assert!(
+            bare.document["rules"].get("exit-in-library").is_none(),
+            "the unseeded document really does drop them: {:#}",
+            bare.document
+        );
+
         let _ = std::fs::remove_dir_all(&dir);
     }
 
