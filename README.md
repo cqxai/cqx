@@ -13,7 +13,7 @@ crosses its boundaries — and a **CodeQuality Score** derived from it.
   <img src="cqx-action.png" alt="CQX Screenshot" width="80%">
 </p>
 
-`cqx` has an [official github action](https://github.com/samifouad/cqx-action). it is repository-agnostic. It was built while auditing a large Rust workspace
+`cqx` has an [official github action](https://github.com/cqxai/action). it is repository-agnostic. It was built while auditing a large Rust workspace
 and is calibrated against ripgrep, tokio and deno, but nothing in it is specific
 to any project.
 
@@ -32,6 +32,25 @@ It is two halves, and they are deliberately separable:
 
 The index is useful with no UI at all. That is on purpose: the UI is how you
 explore a codebase, the index is how you defend one.
+
+## Install
+
+```sh
+npm install -g @cqxai/cli
+cqx --version
+```
+
+Or run once with `npx @cqxai/cli --help`. The package is `@cqxai/cli`;
+the installed command is still `cqx`.
+
+The npm release includes macOS arm64/x64, Linux x64, and Windows x64.
+npm selects the matching `@cqxai/cqx-<platform>-<arch>` optional dependency.
+
+The standalone installer is also available:
+
+```sh
+curl -fsSL https://cqx.bio/install | sh
+```
 
 ## The CodeQuality Score
 
@@ -176,7 +195,7 @@ crates/
 fixtures/basic/     a workspace with deliberately planted facts
 ```
 
-The web explorer lives in [cqx-web](https://github.com/samifouad/cqx-web), so
+The web explorer lives in [deka explorer](https://github.com/dekaruntime/explorer), so
 this repository stays Rust. `deka explore` in the deka toolchain is a downstream
 consumer of cqx, not a part of it.
 

@@ -2,7 +2,7 @@
 /**
  * Finds the binary for this machine and gets out of the way.
  *
- * cqx is a Rust program. This package exists so that `npx cqx` works and so
+ * cqx is a Rust program. This package exists so that `npx @cqxai/cli` works and so
  * that a CI job can use it without a Rust toolchain — not to wrap it. The
  * wrapper's whole job is to exec the real thing and return its exit code.
  *
@@ -19,10 +19,10 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const PLATFORMS = {
-  'darwin-arm64': '@samifouad/cqx-darwin-arm64',
-  'darwin-x64': '@samifouad/cqx-darwin-x64',
-  'linux-x64': '@samifouad/cqx-linux-x64',
-  'win32-x64': '@samifouad/cqx-windows-x64',
+  'darwin-arm64': '@cqxai/cqx-darwin-arm64',
+  'darwin-x64': '@cqxai/cqx-darwin-x64',
+  'linux-x64': '@cqxai/cqx-linux-x64',
+  'win32-x64': '@cqxai/cqx-windows-x64',
 };
 
 const key = `${process.platform}-${process.arch}`;
@@ -75,7 +75,7 @@ if (!binary) {
   // minute and an afternoon.
   console.error(
     `cqx: ${pkg} is not installed, so there is no binary to run.\n` +
-      `It is an optional dependency of @samifouad/cqx and something skipped it —\n` +
+      `It is an optional dependency of @cqxai/cli and something skipped it —\n` +
       `a network failure during install, or --omit=optional.\n` +
       `Try: npm install ${pkg}`,
   );

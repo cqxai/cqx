@@ -11,12 +11,13 @@
  *
  *   node npm/test.mjs [path to a cqx binary]
  */
-import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtemp, mkdir, writeFile, cp, rm, chmod } from 'node:fs/promises';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { mkdtemp, mkdir, writeFile, cp, rm, chmod, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
+import { createServer } from 'node:http';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 let failed = 0;
@@ -35,6 +36,10 @@ if (!real) {
 
 const version = execFileSync(real, ['--version']).toString().trim().replace(/^cqx /, '');
 const work = await mkdtemp(join(tmpdir(), 'cqx-npm-'));
+for (const old of ['0.0.0', '0.1.15']) {
+  const refused = spawnSync(process.execPath, [join(root, 'npm/build.mjs'), old, work, join(work, 'invalid')], { encoding: 'utf8' });
+  check(`rejects release version ${old}`, refused.status === 2 && /above 0.1.15/.test(refused.stderr));
+}
 
 // This machine's platform gets the real binary; the others get a stub, since
 // npm will refuse to install them here anyway and the point is to prove the
@@ -61,18 +66,74 @@ const built = join(work, 'packages');
 execFileSync(process.execPath, [join(root, 'npm/build.mjs'), version, bins, built], { stdio: 'pipe' });
 check(`built five packages at ${version}`, existsSync(join(built, 'cli/package.json')));
 
-// Installed the way a consumer installs, and with --ignore-scripts, which is
-// how a careful CI does it and the reason this package has no postinstall.
+// Pack every platform, including its OS/CPU metadata. Only this host's binary
+// is real; the other archives are test fixtures and never go in npm/dist.
+const registryPackages = new Map();
+const tarballs = new Map();
+const downloaded = [];
+let wrapper;
+for (const dir of [join(built, 'cli'), ...['darwin-arm64', 'darwin-x64', 'linux-x64', 'windows-x64']
+  .map((name) => join(built, 'platform', name))]) {
+  const manifest = JSON.parse(await readFile(join(dir, 'package.json'), 'utf8'));
+  const [dry] = JSON.parse(execFileSync('npm', ['pack', '--dry-run', '--json'], { cwd: dir }));
+  console.log(`npm pack --dry-run: ${dry.id} (non-host binaries are test stubs)`);
+  for (const file of dry.files) console.log(`  ${file.path} (${file.size} bytes)`);
+  const [packed] = JSON.parse(execFileSync('npm', ['pack', '--json', '--pack-destination', work], { cwd: dir }));
+  const tarball = join(work, packed.filename);
+  if (manifest.name === '@cqxai/cli') wrapper = tarball;
+  else {
+    registryPackages.set(manifest.name, { manifest, packed });
+    tarballs.set(`/tarballs/${packed.filename}`, await readFile(tarball));
+  }
+}
+check('the wrapper packs under @cqxai/cli', !!wrapper);
+
+// A local registry serves the real packed manifests to npm. Let npm select
+// its optional dependency itself; explicitly installing the host package
+// would conceal a broken optionalDependencies map or missing OS/CPU fields.
+const registry = createServer((request, response) => {
+  const path = decodeURIComponent(request.url);
+  const bytes = tarballs.get(path);
+  if (bytes) {
+    downloaded.push(path);
+    response.end(bytes);
+    return;
+  }
+  const pkg = registryPackages.get(path.slice(1));
+  if (!pkg) { response.writeHead(404); response.end('{}'); return; }
+  const { manifest, packed } = pkg;
+  response.setHeader('content-type', 'application/json');
+  response.end(JSON.stringify({
+    name: manifest.name,
+    'dist-tags': { latest: version },
+    versions: { [version]: { ...manifest, dist: {
+      tarball: `http://127.0.0.1:${registry.address().port}/tarballs/${packed.filename}`,
+      integrity: packed.integrity, shasum: packed.shasum,
+    } } },
+  }));
+});
+await new Promise((resolve) => registry.listen(0, '127.0.0.1', resolve));
 const consumer = join(work, 'consumer');
 await mkdir(consumer, { recursive: true });
 await writeFile(join(consumer, 'package.json'), '{"name":"c","private":true,"version":"1.0.0"}\n');
-execFileSync(
-  'npm',
-  ['install', '--silent', '--ignore-scripts',
-   join(built, 'platform', here),
-   join(built, 'cli')],
-  { cwd: consumer, stdio: 'pipe' },
-);
+try {
+  await new Promise((resolve, reject) => {
+    const install = spawn('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund',
+      '--registry', `http://127.0.0.1:${registry.address().port}`,
+      '--cache', join(work, 'cache'), wrapper], { cwd: consumer, stdio: 'inherit' });
+    install.on('error', reject);
+    install.on('exit', (code) => code === 0 ? resolve() : reject(new Error(`npm install exited ${code}`)));
+  });
+} finally {
+  await new Promise((resolve) => registry.close(resolve));
+}
+check('npm downloads only the matching binary archive',
+  downloaded.length === 1 && downloaded[0].includes(`cqx-${here}-`), JSON.stringify(downloaded));
+for (const { manifest } of registryPackages.values()) {
+  const installed = existsSync(join(consumer, 'node_modules', manifest.name));
+  check(`${manifest.name} ${manifest.name.endsWith(here) ? 'is installed' : 'is skipped'}`,
+    installed === manifest.name.endsWith(here));
+}
 
 const cqx = join(consumer, 'node_modules', '.bin', 'cqx');
 const run = (...args) => spawnSync(cqx, args, { cwd: consumer, encoding: 'utf8' });

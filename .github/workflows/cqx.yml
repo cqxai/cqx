@@ -28,7 +28,7 @@ jobs:
           # fetch, which is what turns the score into a direction.
           fetch-depth: 0
 
-      - uses: samifouad/cqx-action@main
+      - uses: cqxai/action@main
         id: cqx
         with:
           fail: 'false'

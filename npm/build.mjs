@@ -2,10 +2,9 @@
  * Turns the binaries a release built into packages npm can serve.
  *
  * Five packages: one per platform holding a single executable, and
- * `@samifouad/cqx` which holds no binary at all and depends on all four as
- * `optionalDependencies`. Scoped, because the unscoped names are not
- * available — `cqx` belongs to someone else and `cqx-cli` is refused as too
- * similar to `cp-cli`. A scope is exempt from that check. npm installs the one whose `os` and `cpu` match and
+ * `@cqxai/cli` which holds no binary at all and depends on all four as
+ * `optionalDependencies`. The bare npm name `cqx` belongs to someone else.
+ * npm installs the one whose `os` and `cpu` match and
  * silently skips the others, so a Linux machine downloads a Linux binary and
  * nothing else.
  *
@@ -37,6 +36,15 @@ if (!version || !from) {
   process.exit(2);
 }
 
+// Stable releases must advance beyond the last version under the old scope.
+// Check before removing output or copying any binaries.
+const parts = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(version);
+if (!parts || !(Number(parts[1]) > 0 || Number(parts[2]) > 1 ||
+    (Number(parts[2]) === 1 && Number(parts[3]) > 15))) {
+  console.error('npm releases require a stable version above 0.1.15');
+  process.exit(2);
+}
+
 /** What each platform package declares about the machine it is for. */
 const PLATFORMS = [
   { name: 'darwin-arm64', os: 'darwin', cpu: 'arm64', file: 'cqx-darwin-arm64', bin: 'cqx' },
@@ -51,7 +59,7 @@ await rm(out, { recursive: true, force: true });
 const optional = {};
 
 for (const p of PLATFORMS) {
-  const pkg = `@samifouad/cqx-${p.name}`;
+  const pkg = `@cqxai/cqx-${p.name}`;
   const dir = join(out, 'platform', p.name);
   await mkdir(join(dir, 'bin'), { recursive: true });
   await cp(join(from, p.file), join(dir, 'bin', p.bin));
@@ -65,9 +73,9 @@ for (const p of PLATFORMS) {
       {
         name: pkg,
         version,
-        description: `The cqx binary for ${p.os} ${p.cpu}. Installed by cqx-cli; not meant to be depended on directly.`,
+        description: `The cqx binary for ${p.os} ${p.cpu}. Installed by @cqxai/cli; not meant to be depended on directly.`,
         license: 'Apache-2.0',
-        repository: { type: 'git', url: 'git+https://github.com/samifouad/cqx.git' },
+        repository: { type: 'git', url: 'git+https://github.com/cqxai/cqx.git' },
         homepage: 'https://cqx.bio',
         // What makes npm skip this package on every other machine.
         os: [p.os],
@@ -91,5 +99,5 @@ const manifest = JSON.parse(await readFile(join(root, 'npm', 'cli', 'package.jso
 manifest.version = version;
 manifest.optionalDependencies = optional;
 await writeFile(join(cli, 'package.json'), JSON.stringify(manifest, null, 2) + '\n');
-await cp(join(root, 'README.md'), join(cli, 'README.md')).catch(() => {});
+await cp(join(root, 'README.md'), join(cli, 'README.md'));
 console.log(`  ${manifest.name}@${version} → ${Object.keys(optional).length} platforms`);
