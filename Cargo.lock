@@ -73,7 +73,7 @@ dependencies = [
 
 [[package]]
 name = "cqx"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "cqx-history",
  "cqx-mcp",
@@ -86,7 +86,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-history"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "cqx-rust",
  "cqx-schema",
@@ -101,7 +101,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-mcp"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "cqx-scan",
  "cqx-score",
@@ -112,7 +112,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-rust"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "cqx-schema",
  "cqx-store",
@@ -129,7 +129,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-scan"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "cqx-rust",
  "cqx-score",
@@ -142,7 +142,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-schema"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "serde",
  "serde_json",
@@ -150,7 +150,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-score"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "cqx-schema",
  "cqx-store",
@@ -161,7 +161,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-store"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "cqx-schema",
  "deka-cli-core",
@@ -172,7 +172,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-vfs"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "serde",
  "walkdir",
@@ -180,7 +180,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-view"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "cqx-rust",
  "cqx-schema",
@@ -191,7 +191,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-wasm"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "cqx-rust",
  "cqx-score",
