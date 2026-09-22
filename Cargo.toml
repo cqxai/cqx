@@ -7,7 +7,7 @@ exclude = ["fixtures"]
 version = "0.1.22"
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/samifouad/cqx"
+repository = "https://github.com/cqxai/cqx"
 
 [workspace.dependencies]
 cqx-schema = { path = "crates/cqx-schema" }

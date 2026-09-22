@@ -42,6 +42,11 @@ jobs:
       # The query backend is optional and pulls a git dependency, so it is built
       # separately rather than hidden inside the default path.
       - run: cargo build --locked -p cqx --features zega
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install and run the packed npm CLI
+        run: node npm/test.mjs "${CARGO_TARGET_DIR:-target}/debug/cqx"
 
       - uses: ./.github/actions/sccache-stats
         if: always()

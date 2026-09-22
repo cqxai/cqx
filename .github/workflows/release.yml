@@ -3,7 +3,7 @@ name: release
 # Cutting a tag builds the tool for every platform it is distributed on,
 # proves each binary runs, and publishes them three ways: attached to the
 # GitHub release, mirrored into R2 for the installer, and — once the npm
-# packages exist — as the platform packages `cqx-cli` depends on.
+# packages exist — as the platform packages `@cqxai/cli` depends on.
 #
 # SCCACHE IS REQUIRED FOR ALL RUST COMPILATION.
 
@@ -42,9 +42,11 @@ jobs:
             # platforms. Building an old tag would prove something about the
             # past — and would check out a tree without this workflow's own
             # actions in it, which is exactly how the first attempt failed.
-            echo "ref=${{ github.sha }}" >> "$GITHUB_OUTPUT"
-            echo "tag=v${MANIFEST}" >> "$GITHUB_OUTPUT"
-            echo "version=${MANIFEST}" >> "$GITHUB_OUTPUT"
+            {
+              echo "ref=${{ github.sha }}"
+              echo "tag=v${MANIFEST}"
+              echo "version=${MANIFEST}"
+            } >> "$GITHUB_OUTPUT"
             echo "dry run against $(git rev-parse --short HEAD), which says ${MANIFEST}"
             exit 0
           fi
@@ -58,9 +60,11 @@ jobs:
             echo "::error::tag $TAG but Cargo.toml says v$MANIFEST"
             exit 1
           fi
-          echo "ref=$TAG" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=$MANIFEST" >> "$GITHUB_OUTPUT"
+          {
+            echo "ref=$TAG"
+            echo "tag=$TAG"
+            echo "version=$MANIFEST"
+          } >> "$GITHUB_OUTPUT"
           echo "building $TAG"
 
   # ---------------------------------------------------------------------------
@@ -194,6 +198,49 @@ jobs:
           retention-days: 1
 
   # ---------------------------------------------------------------------------
+  npm:
+    name: npm packages
+    needs: [resolve, build]
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'push' && 'release' || 'public-ci' }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm install -g npm@^11.5.1
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cqx-*
+          path: incoming
+          merge-multiple: true
+      - name: Assemble packages from release binaries
+        run: node npm/build.mjs '${{ needs.resolve.outputs.version }}' incoming
+      - name: Verify the installed command and platform selection
+        run: |
+          chmod +x incoming/cqx-linux-x64
+          node npm/test.mjs "$PWD/incoming/cqx-linux-x64"
+      - name: Inspect every tarball
+        run: |
+          for package in npm/dist/platform/* npm/dist/cli; do
+            (cd "$package" && npm pack --dry-run)
+          done
+      # Ava configures trusted publishing for all five @cqxai packages:
+      # cqxai/cqx, release.yml, environment release. No copied npm token.
+      - name: Publish platforms before the CLI
+        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          for package in npm/dist/platform/*; do
+            (cd "$package" && npm publish --access public --provenance)
+          done
+          (cd npm/dist/cli && npm publish --access public --provenance)
+
   publish:
     name: publish
     needs: [resolve, build, wasm]
@@ -226,7 +273,7 @@ jobs:
           cd out
           # Checksums over everything, in one file, so a download can be
           # verified without trusting the page it came from.
-          sha256sum * > SHA256SUMS
+          sha256sum -- * > SHA256SUMS
           ls -l
           cat SHA256SUMS
 
