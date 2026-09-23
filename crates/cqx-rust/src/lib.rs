@@ -1,6 +1,6 @@
 //! The Rust extractor, as a cqx command.
 //!
-//! Per rfd#61 the handler body lives here, in the owning crate; the `cqx`
+//! Per APS 61 the handler body lives here, in the owning crate; the `cqx`
 //! binary only registers it. Adding a command requires touching an owner crate
 //! because that is the only place a handler can exist.
 
