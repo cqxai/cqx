@@ -151,7 +151,7 @@ The core knows nothing about any language, and there are two ways in.
 
 **Bundled extractors are crates.** Each one owns a command and registers it with
 the CLI registry from `deka-cli-core`; the `cqx` binary is composition only, so a
-handler can exist nowhere but its owning crate (the rfd#61 pattern, which exists
+handler can exist nowhere but its owning crate (the APS 61 pattern, which exists
 precisely because implementations kept leaking into the core crate).
 
 ```rust
