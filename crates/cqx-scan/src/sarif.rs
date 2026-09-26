@@ -66,9 +66,9 @@ pub fn build(report: &Value, root: &Path, scanned: &[String]) -> Value {
             "fullDescription": { "text": if remedy.is_empty() { describes } else { remedy } },
             "help": {
                 "text": remedy,
-                "markdown": format!("{remedy}\n\n[{id}](https://docs.cqx.dev/{id})"),
+                "markdown": format!("{remedy}\n\n[{id}]({})", crate::RULES_DOC),
             },
-            "helpUri": format!("https://docs.cqx.dev/{id}"),
+            "helpUri": crate::RULES_DOC,
             "defaultConfiguration": { "level": level },
             "properties": { "tags": [category], "weight": weight },
         }));

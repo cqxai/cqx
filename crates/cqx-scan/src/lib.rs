@@ -21,6 +21,11 @@
 mod sarif;
 mod summary;
 
+/// Where a rule id links to, from SARIF and from the step summary. There are
+/// no per-rule pages yet; this is the section of the README that explains the
+/// rules and how to configure them, which is the real page that exists.
+const RULES_DOC: &str = "https://github.com/cqxai/cqx#configuring-the-rules";
+
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
