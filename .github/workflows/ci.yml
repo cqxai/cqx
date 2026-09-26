@@ -34,17 +34,15 @@ jobs:
         id: filter
         if: github.event_name != 'workflow_dispatch'
         with:
+          # Everything except documentation is code: a fixture, an asset or a
+          # script change must run the tests too. Only docs-only PRs skip.
+          predicate-quantifier: every
           filters: |
             code:
-              - '**/*.rs'
-              - '**/Cargo.toml'
-              - 'Cargo.lock'
-              - 'rust-toolchain*'
-              - '.cargo/**'
-              - '.github/actions/**'
-              - '.github/workflows/ci.yml'
-              - 'scripts/**'
-              - 'reference-repos.toml'
+              - '**'
+              - '!**/*.md'
+              - '!docs/**'
+              - '!LICENSE*'
       - id: scope
         env:
           EVENT_NAME: ${{ github.event_name }}
