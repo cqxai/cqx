@@ -79,7 +79,7 @@ pub fn build(here: &Scanned, against: Option<(&str, &Scanned)>) -> String {
                 rule.get("rule").and_then(Value::as_str).unwrap_or("?"),
             );
             out.push_str(&format!(
-                "| [`{id}`](https://docs.cqx.bio/{id}) | {} | −{:.1} |\n",
+                "| [`{id}`](https://docs.cqx.dev/{id}) | {} | −{:.1} |\n",
                 rule.get("total_findings").and_then(Value::as_u64).unwrap_or(0),
                 rule.get("deducted").and_then(Value::as_f64).unwrap_or(0.0),
             ));

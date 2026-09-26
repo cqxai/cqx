@@ -4,7 +4,7 @@
   <img src="screenshot-deno.png" alt="CQX Screenshot" width="80%">
 </p>
 
-See it in your browser: https://cqx.bio/
+See it in your browser: https://cqx.dev/
 
 A queryable graph of a codebase: what it contains, what it touches, and what
 crosses its boundaries — and a **CodeQuality Score** derived from it.
@@ -49,7 +49,7 @@ npm selects the matching `@cqxai/cqx-<platform>-<arch>` optional dependency.
 The standalone installer is also available:
 
 ```sh
-curl -fsSL https://cqx.bio/install | sh
+curl -fsSL https://cqx.dev/install | sh
 ```
 
 ## The CodeQuality Score
