@@ -10,6 +10,10 @@ on:
   # So a cache question can be asked without inventing a commit.
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -17,11 +21,47 @@ env:
 # on the target triple, so cross-target output cannot collide.
 
 jobs:
+  changes:
+    # File-list inspection only; compiling jobs below stay on 4-vcpu Linux.
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.scope.outputs.code }}
+    steps:
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          # Everything except documentation is code: a fixture, an asset or a
+          # script change must run the tests too. Only docs-only PRs skip.
+          predicate-quantifier: every
+          filters: |
+            code:
+              - '**'
+              - '!**/*.md'
+              - '!docs/**'
+              - '!LICENSE*'
+      - id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          FILTERED_CODE: ${{ steps.filter.outputs.code }}
+        run: |
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            echo 'code=true' >> "$GITHUB_OUTPUT"
+          else
+            echo "code=$FILTERED_CODE" >> "$GITHUB_OUTPUT"
+          fi
+
   check:
     name: build · clippy · test
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     environment: public-ci
     env:
+      RUSTC_WRAPPER: sccache
       SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       SCCACHE_REGION: auto
       SCCACHE_BUCKET: cqx-sccache-linux-x64
@@ -53,9 +93,12 @@ jobs:
 
   wasm:
     name: analysis compiles for wasm
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     environment: public-ci
     env:
+      RUSTC_WRAPPER: sccache
       SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       SCCACHE_REGION: auto
       SCCACHE_BUCKET: cqx-sccache-linux-x64
@@ -83,9 +126,12 @@ jobs:
 
   conformance:
     name: manifest parser agrees with cargo
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     environment: public-ci
     env:
+      RUSTC_WRAPPER: sccache
       SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       SCCACHE_REGION: auto
       SCCACHE_BUCKET: cqx-sccache-linux-x64

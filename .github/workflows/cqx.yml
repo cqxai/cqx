@@ -14,13 +14,18 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
   security-events: write
 
 jobs:
   score:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    # Checkout and static analysis; reserve 4-vcpu runners for compilation.
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
         with:
