@@ -19,7 +19,7 @@ env:
 jobs:
   check:
     name: build · clippy · test
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     environment: public-ci
     env:
       SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
@@ -53,7 +53,7 @@ jobs:
 
   wasm:
     name: analysis compiles for wasm
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     environment: public-ci
     env:
       SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
@@ -83,7 +83,7 @@ jobs:
 
   conformance:
     name: manifest parser agrees with cargo
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     environment: public-ci
     env:
       SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
