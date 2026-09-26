@@ -93,6 +93,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     environment: ${{ github.event_name == 'push' && 'release' || 'public-ci' }}
     env:
+      RUSTC_WRAPPER: sccache
       SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       SCCACHE_REGION: auto
       SCCACHE_BUCKET: ${{ matrix.bucket }}
@@ -160,6 +161,7 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     environment: ${{ github.event_name == 'push' && 'release' || 'public-ci' }}
     env:
+      RUSTC_WRAPPER: sccache
       SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       SCCACHE_REGION: auto
       SCCACHE_BUCKET: cqx-sccache-linux-x64
