@@ -314,18 +314,18 @@ jobs:
           echo "published $TAG"
 
   # ---------------------------------------------------------------------------
-  # cqx.bio names the current release and links to it. It reads that when it is
+  # cqx.dev names the current release and links to it. It reads that when it is
   # built, because the front page is prerendered and has to stay that way — so a
   # new release has to ask it to build again.
   #
   # Guarded on the secret rather than requiring it: a release must not fail
   # because a marketing site is not wired up yet.
   refresh-site:
-    name: refresh cqx.bio
+    name: refresh cqx.dev
     needs: publish
     runs-on: ubuntu-latest
     steps:
-      - name: Ask cqx.bio to rebuild
+      - name: Ask cqx.dev to rebuild
         env:
           HOOK: ${{ secrets.CQX_BIO_DEPLOY_HOOK }}
         run: |
@@ -334,4 +334,4 @@ jobs:
             exit 0
           fi
           curl -fsS -X POST "$HOOK" -o /dev/null
-          echo "cqx.bio rebuild requested."
+          echo "cqx.dev rebuild requested."

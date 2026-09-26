@@ -66,9 +66,9 @@ pub fn build(report: &Value, root: &Path, scanned: &[String]) -> Value {
             "fullDescription": { "text": if remedy.is_empty() { describes } else { remedy } },
             "help": {
                 "text": remedy,
-                "markdown": format!("{remedy}\n\n[{id}](https://docs.cqx.bio/{id})"),
+                "markdown": format!("{remedy}\n\n[{id}](https://docs.cqx.dev/{id})"),
             },
-            "helpUri": format!("https://docs.cqx.bio/{id}"),
+            "helpUri": format!("https://docs.cqx.dev/{id}"),
             "defaultConfiguration": { "level": level },
             "properties": { "tags": [category], "weight": weight },
         }));
@@ -143,7 +143,7 @@ pub fn build(report: &Value, root: &Path, scanned: &[String]) -> Value {
                 "name": "cqx",
                 "semanticVersion": env!("CARGO_PKG_VERSION"),
                 "version": env!("CARGO_PKG_VERSION"),
-                "informationUri": "https://cqx.bio",
+                "informationUri": "https://cqx.dev",
                 "rules": descriptors,
             }},
             "artifacts": artifacts,
