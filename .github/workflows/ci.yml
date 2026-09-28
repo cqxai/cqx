@@ -23,7 +23,7 @@ env:
 jobs:
   changes:
     # File-list inspection only; compiling jobs below stay on 4-vcpu Linux.
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: read
@@ -58,7 +58,7 @@ jobs:
     name: build · clippy · test
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     environment: public-ci
     env:
       RUSTC_WRAPPER: sccache
@@ -95,7 +95,7 @@ jobs:
     name: analysis compiles for wasm
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     environment: public-ci
     env:
       RUSTC_WRAPPER: sccache
@@ -128,7 +128,7 @@ jobs:
     name: manifest parser agrees with cargo
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     environment: public-ci
     env:
       RUSTC_WRAPPER: sccache
