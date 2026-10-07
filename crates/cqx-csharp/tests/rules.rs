@@ -1,0 +1,189 @@
+use cqx_score::{config::Config, metrics::Metrics};
+use cqx_store::facts::Stream;
+use cqx_vfs::Vfs;
+fn report(files: &[(&str, &str)], config: &str) -> serde_json::Value {
+    let mut vfs = Vfs::new("fixture");
+    for (p, s) in files {
+        vfs.insert(*p, *s);
+    }
+    let mut facts = Vec::new();
+    cqx_csharp::run(&vfs, &mut facts, &|| {}).unwrap();
+    let stream = Stream::from_ndjson(&String::from_utf8(facts).unwrap());
+    let c = Config::from_text(Some(config)).unwrap();
+    cqx_score::report_json(&c, &Metrics::compute(&stream, &c))
+}
+fn count(code: &str, rule: &str) -> u64 {
+    let p = report(&[("Library.cs", code)], "{}");
+    assert!(p["skipped_files"].is_null(), "{p}");
+    findings(&p, rule)
+}
+fn findings(p: &serde_json::Value, rule: &str) -> u64 {
+    p["rules"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["language"] == "csharp" && r["rule"] == rule)
+        .map(|r| r["total_findings"].as_u64().unwrap())
+        .unwrap_or(0)
+}
+#[test]
+fn exits_fire_but_main_top_level_and_shadow_types_stay_quiet() {
+    assert_eq!(
+        count(
+            "class L { void Stop(){Environment.Exit(1);System.Environment.Exit(1);} }",
+            "exit-in-library"
+        ),
+        2
+    );
+    for code in ["class P { static void Main(string[] args){Environment.Exit(1);} }","class P { static int Main(){Environment.Exit(1);return 0;} }","class P { static async Task<int> Main(string[] args){Environment.Exit(1);return 0;} }","System.Environment.Exit(1);","class Environment { public static void Exit(int n){} } class L { void F(){Environment.Exit(1);} }","using Environment = My.Environment; class L { void F(){Environment.Exit(1);} }"] {assert_eq!(count(code,"exit-in-library"),0,"{code}");}
+    assert_eq!(
+        count(
+            "class L { void Main(){static void Helper(){} Environment.Exit(1);} }",
+            "exit-in-library"
+        ),
+        1
+    );
+    let p = report(
+        &[(
+            "Program.cs",
+            "class Library { void F(){Environment.Exit(1);} }",
+        )],
+        "{}",
+    );
+    assert_eq!(findings(&p, "exit-in-library"), 1);
+    assert!(p["scores"]["containment"].as_u64().unwrap() < 100);
+}
+#[test]
+fn nonliteral_process_targets_fire_and_literal_executables_stay_quiet() {
+    assert_eq!(count("class L { void F(string input){Process.Start(input);System.Diagnostics.Process.Start(input);} }","nonliteral-process"),2);
+    for code in ["class L { void F(string args){Process.Start(\"git\",args);Process.Start(@\"git\",args);} }","class L { void F(string args){Process.Start(new ProcessStartInfo(\"git\",args));} }","class L { void F(string args){Process.Start(new ProcessStartInfo {FileName=\"git\",Arguments=args});} }","class Process { public static void Start(string v){} } class L { void F(string x){Process.Start(x);} }","using Process = My.Process; class L { void F(string x){Process.Start(x);} }"]{assert_eq!(count(code,"nonliteral-process"),0,"{code}");}
+    assert_eq!(
+        count(
+            "class L { void F(string x){Process.Start(new ProcessStartInfo(x));} }",
+            "nonliteral-process"
+        ),
+        1
+    );
+}
+#[test]
+fn empty_catches_fire_but_handling_or_explanations_stay_quiet() {
+    assert_eq!(
+        count(
+            "class L { void F(){try{Work();}catch(Exception e){}} }",
+            "swallowed-errors"
+        ),
+        1
+    );
+    for code in ["class L { void F(){try{Work();}catch(Exception e){throw;}} }","class L { void F(){try{Probe();}catch(Exception e){/* Missing optional feature is expected. */}} }"]{assert_eq!(count(code,"swallowed-errors"),0);}
+}
+#[test]
+fn pragma_suppressions_fire_but_reasons_and_restore_stay_quiet() {
+    assert_eq!(
+        count(
+            "#pragma warning disable\nclass L {}",
+            "undocumented-suppressions"
+        ),
+        1
+    );
+    for code in ["// Legacy generated interoperability requires this declaration.\n#pragma warning disable CS0168\nclass L {}","#pragma warning disable CS0168 // Legacy interoperability boundary.\nclass L {}","#pragma warning restore CS0168\nclass L {}","class L { string text=\"#pragma warning disable\"; }"]{assert_eq!(count(code,"undocumented-suppressions"),0,"{code}");}
+}
+#[test]
+fn roles_exclude_generated_and_test_code_and_bad_files_do_not_abort() {
+    for path in [
+        "Benchmarks/L.cs",
+        "obj/L.cs",
+        "bin/L.cs",
+        "L.g.cs",
+        "L.Designer.cs",
+        "Tests/L.cs",
+        "src/Library.Tests/L.cs",
+        "LTests.cs",
+    ] {
+        let p = report(
+            &[
+                (path, "class L { void F(){Environment.Exit(1);} }"),
+                ("src/Library.Tests/Library.Tests.csproj", ""),
+                ("Quiet.cs", "class Q {}"),
+            ],
+            "{}",
+        );
+        assert_eq!(findings(&p, "exit-in-library"), 0, "{path}");
+        assert_eq!(p["lines"], 1);
+    }
+    let p = report(
+        &[
+            (
+                "Generated.cs",
+                "// <auto-generated />\nclass L { void F(){Environment.Exit(1);} }",
+            ),
+            ("Quiet.cs", "class Q {}"),
+        ],
+        "{}",
+    );
+    assert_eq!(p["lines"], 1);
+    assert_eq!(findings(&p, "exit-in-library"), 0);
+    for attr in ["Fact", "Theory", "Test", "TestMethod"] {
+        assert_eq!(
+            count(
+                &format!("class L {{ [{attr}] void F(){{Environment.Exit(1);}} }}"),
+                "exit-in-library"
+            ),
+            0
+        );
+    }
+    let p = report(
+        &[
+            ("Library.cs", "class L { void F(){Environment.Exit(1);} }"),
+            ("Broken.cs", "class { bad("),
+        ],
+        "{}",
+    );
+    assert_eq!(findings(&p, "exit-in-library"), 1);
+    assert_eq!(p["skipped_files"][0]["file"], "Broken.cs");
+}
+#[test]
+fn duplicate_and_size_rules_fire_with_config_and_quiet_counterexamples() {
+    let body = "Consume(1);".repeat(30);
+    let code = format!("class L {{ void A(){{{body}}} void B(){{{body}}} }}");
+    assert_eq!(count(&code, "duplicated-bodies"), 1);
+    assert_eq!(
+        count(
+            &code.replacen("Consume(1)", "Consume(2)", 1),
+            "duplicated-bodies"
+        ),
+        0
+    );
+    assert_eq!(
+        count(
+            "class L { void A(){Wrap();} void B(){Wrap();} }",
+            "duplicated-bodies"
+        ),
+        0
+    );
+    let cfg = r#"{"rules":{"csharp/oversized-files":{"params":{"max_lines":2}},"csharp/oversized-line-share":{"params":{"max_lines":2}}}}"#;
+    let p = report(&[("L.cs", "class L {\n int v;\n}")], cfg);
+    assert_eq!(findings(&p, "oversized-files"), 1);
+    assert!(p["scores"]["modularity"].as_u64().unwrap() < 100);
+    assert_eq!(
+        findings(&report(&[("L.cs", "class L {\n}")], cfg), "oversized-files"),
+        0
+    );
+}
+
+#[test]
+fn a_directive_at_eof_needs_no_source_newline() {
+    assert_eq!(
+        count(
+            "#pragma warning disable",
+            "undocumented-suppressions"
+        ),
+        1
+    );
+    assert_eq!(
+        count(
+            "class Library {}\n#pragma warning restore CS0168",
+            "undocumented-suppressions"
+        ),
+        0
+    );
+}

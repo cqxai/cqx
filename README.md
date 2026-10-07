@@ -647,8 +647,11 @@ Routing is by extension using the shared `scripts/wasm-catalog.mjs` contract.
 Core contains the engine and all pure-Rust frontends; C/C++ and C# are separate
 heavy modules. Metadata is coordinated before routing; only each module's source
 text is sent to its reader. Core also handles extensionless Composer binaries.
-The infrastructure PR supplies core; the following frontend PR adds the heavy
-modules and their manifest entries.
+Build all three modules and the monolithic parity reference with
+`python3 scripts/build-wasm-modules.py`. The resulting `.target/wasm-dist/manifest.json`
+is generated from the actual binaries, including their version/ABI identities and
+SHA-256 hashes. `node scripts/test-modules.mjs .target/wasm-dist` exercises the
+complete split pipeline against the monolith.
 
 ## Pinned grammar build dependency
 
@@ -671,3 +674,41 @@ node scripts/test-loader.mjs .target/wasm-dist
 Use `--cache PATH` to choose a build cache and `--output PATH` for a copied wasm
 artifact. Cached archives are verified on every use; corrupt caches fail closed.
 Unsupported hosts produce an explicit missing-pin error.
+
+## C/C++ and C# scope
+
+C/C++ uses tree-sitter C 0.24.1 and C++ 0.23.4; C# uses the WillBooster C# grammar
+2.0.2 with tree-sitter runtime 0.27.0 / language 0.1.8. These grammar pins retain
+the freestanding shim rather than modifying or vendoring grammar sources.
+Frontends use `cqx-layout` for project-root exclusions, test roles, generated
+headers, declaration-scoped entries and specific suppression codes. Main/entry
+bodies are exempt from library termination; sibling and nested helpers are not.
+C test preprocessor blocks and C# test attributes retain their existing scopes.
+
+These are syntax rules, without preprocessing, cross-translation-unit types,
+cross-file C# name binding or taint inference. Macro/conditional fragments can
+cause a whole-file parse skip, which remains visible in the report. Specific
+NOLINT/diagnostic/CS warning codes stay quiet; broad unexplained suppression
+still fires. Calibration remains in `cqx.json`, using the existing ramps.
+
+Pinned corpus evidence and full-report hashes are in `docs/heavy-language-evidence.json`.
+Before uses the original held frontend commits inside the current engine and
+all pure-Rust frontends; after uses shared layout. Both read the identical pinned
+snapshot. Thus Redis now includes Python findings absent from the older
+three-language experiment; the before/after comparison does not attribute them
+to the C port. Scores are containment / legibility / modularity / quality / security:
+
+| Repository | Before | After | Coverage parsed/skipped |
+| --- | --- | --- | --- |
+| Redis | 79/100/100/95/100 | 76/100/100/95/100 | C 143/50, C++ 82/5 |
+| double-conversion | 100/100/100/94/100 | 100/100/100/94/100 | C++ 35/5 |
+| Humanizer | 100/100/100/90/100 | 100/100/100/90/100 | C# 728/7 |
+
+Redis C library termination findings grow 5→13 after scoping main exemptions to
+the declaration (2.3 deducted); narrow C suppressions drop 2→0. Humanizer keeps
+22 duplicate findings (10 deducted), 11 oversized files and one empty catch;
+narrow warning suppressions drop 2→0. Product lines grow 69,408→70,131 under the
+shared classifier, with parse coverage unchanged. No weights or ramps changed.
+Split and monolithic **after** reports have identical complete JSON bytes on all
+three corpora, all language fixtures and the Rust/TS/Go/C/C++/C# fixture; complete
+datasets also agree. Existing main goldens and the held C# golden are unchanged.

@@ -588,6 +588,29 @@ pub fn defaults() -> BTreeMap<String, Rule> {
     ] {
         rules.insert(format!("php/{id}"),Rule{category:category.into(),language:"php".into(),describes:format!("{desc} per 10k product lines"),remedy:"Review input and error boundaries; use explicit data formats, parameterized SQL and error handling.".into(),weight,free,full,enabled:true,params:BTreeMap::new()});
     }
+    for lang in ["c", "cpp"] {
+        for id in ["duplicated-bodies", "oversized-files", "oversized-line-share", "exit-in-library", "undocumented-suppressions", "discarded-check", "hand-built-json", "shell-argument-unchecked"] {
+            let mut rule = rules[id].clone();
+            rule.language = lang.into();
+            rule.describes = format!("{lang} syntax findings for {id}, measured using the existing ramp");
+            rule.remedy = format!("Review {id}; configure {lang}/{id} only in cqx.json.");
+            rules.insert(format!("{lang}/{id}"), rule);
+        }
+        rules.insert(format!("{lang}/unsafe-buffer-calls"), Rule { category: "security".into(), language: lang.into(), describes: "unbounded C buffer APIs, per 10k product lines".into(), remedy: "Use a bounded buffer API or an owning string type.".into(), weight: 20.0, free: 0.0, full: 6.0, enabled: true, params: BTreeMap::new() });
+    }
+    for id in ["duplicated-bodies", "oversized-files", "oversized-line-share", "exit-in-library", "undocumented-suppressions"] {
+        let mut rule = rules[id].clone();
+        rule.language = "csharp".into();
+        rule.describes = format!("csharp syntax findings for {id}, using the existing ramp");
+        rule.remedy = format!("Review {id}; configure csharp/{id} only in cqx.json.");
+        rules.insert(format!("csharp/{id}"), rule);
+    }
+    for (id, category, weight, free, full, describes, remedy) in [
+      ("swallowed-errors", "quality", 10.0, 1.0, 6.0, "unexplained empty catches, per 10k product lines", "Handle the error or explain why ignoring it is safe."),
+      ("nonliteral-process", "security", 15.0, 0.0, 6.0, "non-literal executable or command at standard process APIs, per 10k product lines", "Use a literal executable and separate arguments; review input validation for dynamic commands.")
+    ] {
+      rules.insert(format!("csharp/{id}"), Rule { category: category.into(), language: "csharp".into(), describes: describes.into(), remedy: remedy.into(), weight, free, full, enabled: true, params: BTreeMap::new() });
+    }
     rules
 }
 

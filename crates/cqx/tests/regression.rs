@@ -37,6 +37,7 @@ fn all_language_goldens_are_byte_identical() {
         "zig",
         "python",
         "php",
+        "csharp",
     ] {
         let root = fixtures.join(language);
         let vfs = cqx_vfs::from_dir(&root).unwrap();

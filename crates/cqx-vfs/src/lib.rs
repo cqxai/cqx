@@ -132,7 +132,7 @@ pub fn is_interesting(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
     matches!(
         path.rsplit('.').next(),
-        Some("rs" | "go" | "java" | "kt" | "kts" | "swift" | "zig" | "py" | "php")
+        Some("rs" | "go" | "java" | "kt" | "kts" | "swift" | "zig" | "py" | "php" | "c" | "h" | "cc" | "cpp" | "cxx" | "hpp" | "hh" | "hxx" | "C" | "H" | "cs" | "csx")
     ) || is_typescript_source(path)
         || cqx_layout::is_manifest(name)
         || matches!(name, "cqx.json" | "Cargo.lock" | "pyvenv.cfg")
