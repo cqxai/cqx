@@ -114,6 +114,50 @@ not scanned. TypeScript rules have no environment-variable overrides.
 Existing unprefixed Rust config keys remain compatible; `rust/<rule>` is also
 accepted in a config file.
 
+## Go
+
+The CLI and WASM API analyze `.go` alongside Rust and TypeScript, with the
+same original five categories and a single combined score. `cqx-go` uses
+[gosyn 0.2.15](https://github.com/chikaku/gosyn), a maintained pure Rust parser
+with generic types/functions, constraints and type arguments. Its production
+dependencies have no C build. Build with Cargo and the Rust WASM target alone.
+
+Rule IDs are `go/<rule>`: `exit-in-library`, `shell-invocation`,
+`shell-argument-unchecked`, `env-controlled-spawn`, `discarded-check`,
+`undocumented-suppressions`, `hand-built-json`, `duplicated-bodies`,
+`oversized-files`, and `oversized-line-share`. They reuse the corresponding
+Rust category and per-10k-line ramp, with Go's own product-line denominator.
+There is no independently calibrated Go corpus yet. Configure only through
+repository-root `cqx.json`, using the existing version/rules/min_score/exclude
+fields, for example `"go/oversized-files": {"params": {"max_lines": 1500}}`.
+Go rules do not accept environment overrides.
+
+`go.mod` supplies module/package identity, including nested modules and reader
+shards. `_test.go`, explicit tools/tool/testdata trees, and files with an
+exclusive tools/ignore build tag remain in the graph
+but do not affect scores; `cmd/` and `internal/` are product code. Exits are
+allowed only in `package main`. Import aliases are resolved, lexical shadows
+are respected, and unknown signatures are not inferred from names. Discarded
+errors are recognized from same-file functions and a narrow set of standard
+library APIs; unresolved methods and cross-file functions remain unknown.
+Deferred cleanup and ordinary fmt output are allowed; their ignored results
+are often intentional and writer contracts cannot be established here. Empty typed error branches are allowed with an
+explanation; suppressions use `//nolint:rule // reason`.
+
+Process checks cover `exec.Command` and `CommandContext`: shell command flags
+(`-c`, `-lc`, `/C`, `-Command`), non-literal shell scripts, and executable values
+traced to `os.Getenv`/`ExpandEnv` through local bindings. Ordinary non-literal
+arguments to direct executables are legitimate. These are syntax/provenance
+rules, not a Go type checker or whole-program taint analysis. JSON detection
+requires an interpolated `fmt.Sprintf` template whose surrounding structure
+parses as a JSON object. Duplicate bodies
+compare exact token fingerprints (40 tokens minimum), preserving literals.
+
+Parser errors fail analysis rather than reporting a clean score. A known
+gosyn limitation is compact grouped imports lacking a final semicolon or
+newline before `)`; gofmt-style imports work. All build-tag variants are read
+as source; analysis does not choose a GOOS/GOARCH build or invoke Go tooling.
+
 ## The model
 
 ### One graph, not several views

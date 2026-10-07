@@ -51,9 +51,28 @@ pub struct Item {
 /// borrowed out of it, so these stay plain functions.
 /// Types that say nothing about where logic belongs.
 const PRIMITIVES: &[&str] = &[
-    "String", "&str", "bool", "usize", "u8", "u32", "u64", "i32", "i64", "f64", "char", "()",
-    "Self", "&self", "&mut self", "PathBuf", "&Path", "Vec<String>", "serde_json::Value",
-    "&[u8]", "Vec<u8>", "&mut Self",
+    "String",
+    "&str",
+    "bool",
+    "usize",
+    "u8",
+    "u32",
+    "u64",
+    "i32",
+    "i64",
+    "f64",
+    "char",
+    "()",
+    "Self",
+    "&self",
+    "&mut self",
+    "PathBuf",
+    "&Path",
+    "Vec<String>",
+    "serde_json::Value",
+    "&[u8]",
+    "Vec<u8>",
+    "&mut Self",
 ];
 
 fn package_of(id: &str) -> Option<&str> {
@@ -69,8 +88,14 @@ fn package_of(id: &str) -> Option<&str> {
 /// category. A repository with its own vocabulary will be able to say so in
 /// cqx.json once a rule parameter can hold a word rather than a number.
 const DEFAULT_CHECKS: &[&str] = &[
-    "enforce", "authorize", "authorise", "permit", "require_cap", "check_permission",
-    "check_access", "check_cap",
+    "enforce",
+    "authorize",
+    "authorise",
+    "permit",
+    "require_cap",
+    "check_permission",
+    "check_access",
+    "check_cap",
 ];
 
 /// Literal arguments that hand a child process fewer checks than its parent.
@@ -121,6 +146,10 @@ pub fn about(what: impl Into<String>, file: impl Into<String>, line: u32) -> Fin
     }
 }
 
+fn frontend_language(n: &cqx_schema::Node) -> &str {
+    n.attrs.get("language").and_then(|v| v.as_str()).unwrap_or("rust")
+}
+
 pub struct Metrics {
     /// Product lines, in units of ten thousand — the denominator for densities.
     pub scale: f64,
@@ -134,97 +163,82 @@ impl Metrics {
     }
 
     pub fn compute(stream: &Stream, config: &Config) -> Metrics {
-        // Preserve the Rust-only memory profile: large Rust graphs do not need
-        // cloning just because a second frontend is available.
+        // Keep the Rust-only memory profile; split additional frontends only
+        // when they occur, then feed each the shared neutral measurements.
         if !stream.nodes.iter().any(|n| {
-            n.kind == NodeKind::File
-                && n.attrs.get("language").and_then(|v| v.as_str()) == Some("typescript")
+            n.kind == NodeKind::File && matches!(frontend_language(n), "typescript" | "go")
         }) {
             return Self::compute_one(stream, config);
         }
-        let ts_node = |n: &cqx_schema::Node| {
-            n.attrs.get("language").and_then(|v| v.as_str()) == Some("typescript")
-        };
-        let ts_edge = |e: &Edge| e.ev.iter().any(|ev| ev.extractor == "typescript");
-        let rust = Stream {
+        let subset = |lang: &str| Stream {
             nodes: stream
                 .nodes
                 .iter()
-                .filter(|n| !ts_node(n))
+                .filter(|n| frontend_language(n) == lang)
                 .cloned()
                 .collect(),
             edges: stream
                 .edges
                 .iter()
-                .filter(|e| !ts_edge(e))
-                .cloned()
-                .collect(),
-            ..Stream::default()
-        };
-        let ts = Stream {
-            nodes: stream
-                .nodes
-                .iter()
-                .filter(|n| ts_node(n))
-                .cloned()
-                .collect(),
-            edges: stream
-                .edges
-                .iter()
-                .filter(|e| ts_edge(e))
-                .cloned()
-                .collect(),
-            ..Stream::default()
-        };
-        let mut metrics = Self::compute_one(&rust, config);
-        let mut ts_config = config.clone();
-        for id in [
-            "duplicated-bodies",
-            "oversized-files",
-            "oversized-line-share",
-        ] {
-            if let Some(rule) = config.rules.get(&format!("typescript/{id}")) {
-                ts_config.rules.insert(id.into(), rule.clone());
-            }
-        }
-        let mut ts_metrics = Self::compute_one(&ts, &ts_config);
-        for id in [
-            "duplicated-bodies",
-            "oversized-files",
-            "oversized-line-share",
-        ] {
-            if let Some(value) = ts_metrics.values.remove(id) {
-                metrics.values.insert(format!("typescript/{id}"), value);
-            }
-        }
-        for id in [
-            "undocumented-suppressions",
-            "swallowed-errors",
-            "dynamic-code",
-            "dynamic-html",
-            "exit-in-library",
-            "any-density",
-        ] {
-            let findings: Vec<Finding> = ts
-                .edges
-                .iter()
-                .filter(|e| attr(e, "typescript:rule") == id && is_product(e))
                 .filter(|e| {
-                    !e.ev
-                        .iter()
-                        .any(|ev| config.exclude.iter().any(|p| ev.file.starts_with(p)))
+                    if lang == "rust" {
+                        !e.ev
+                            .iter()
+                            .any(|ev| matches!(ev.extractor.as_str(), "typescript" | "go"))
+                    } else {
+                        e.ev.iter().any(|ev| ev.extractor == lang)
+                    }
                 })
-                .map(|e| finding(attr(e, "what"), e))
-                .collect();
-            metrics.values.insert(
-                format!("typescript/{id}"),
-                Measure {
-                    value: findings.len() as f64 / ts_metrics.scale,
-                    findings,
-                },
-            );
+                .cloned()
+                .collect(),
+            ..Stream::default()
+        };
+        let mut metrics = Self::compute_one(&subset("rust"), config);
+        for lang in ["typescript", "go"] {
+            let part = subset(lang);
+            let neutral = [
+                "duplicated-bodies",
+                "oversized-files",
+                "oversized-line-share",
+            ];
+            let mut part_config = config.clone();
+            for id in neutral {
+                if let Some(rule) = config.rules.get(&format!("{lang}/{id}")) {
+                    part_config.rules.insert(id.into(), rule.clone());
+                }
+            }
+            let mut part_metrics = Self::compute_one(&part, &part_config);
+            for id in neutral {
+                if let Some(value) = part_metrics.values.remove(id) {
+                    metrics.values.insert(format!("{lang}/{id}"), value);
+                }
+            }
+            for (key, _) in config.rules.iter().filter(|(_, r)| r.language == lang) {
+                let id = key.strip_prefix(&format!("{lang}/")).unwrap_or(key);
+                if neutral.contains(&id) {
+                    continue;
+                }
+                let findings: Vec<Finding> = part
+                    .edges
+                    .iter()
+                    .filter(|e| attr(e, &format!("{lang}:rule")) == id && is_product(e))
+                    .filter(|e| {
+                        !e.ev
+                            .iter()
+                            .any(|ev| config.exclude.iter().any(|p| ev.file.starts_with(p)))
+                    })
+                    .map(|e| finding(attr(e, "what"), e))
+                    .collect();
+                metrics.values.insert(
+                    key.clone(),
+                    Measure {
+                        value: findings.len() as f64 / part_metrics.scale,
+                        findings,
+                    },
+                );
+            }
+            metrics.lines += part_metrics.lines;
         }
-        metrics.lines += ts_metrics.lines;
         metrics.scale = (metrics.lines as f64 / 10_000.0).max(0.05);
         metrics.locate(stream);
         metrics
