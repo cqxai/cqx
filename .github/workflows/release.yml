@@ -30,6 +30,7 @@ jobs:
       tag: ${{ steps.v.outputs.tag }}
       version: ${{ steps.v.outputs.version }}
       ref: ${{ steps.v.outputs.ref }}
+      wasm_compat: ${{ steps.wasm.outputs.compat }}
     steps:
       - uses: actions/checkout@v4
 
@@ -66,6 +67,17 @@ jobs:
             echo "version=$MANIFEST"
           } >> "$GITHUB_OUTPUT"
           echo "building $TAG"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - id: wasm
+        name: Decide the one-release single-file transition
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COMPAT=$(node scripts/wasm-compat.mjs '${{ steps.v.outputs.tag }}' '${{ github.repository }}')
+          echo "compat=$COMPAT" >> "$GITHUB_OUTPUT"
 
   # ---------------------------------------------------------------------------
   build:
@@ -156,7 +168,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   wasm:
-    name: cqx_wasm.wasm
+    name: selective WASM modules
     needs: resolve
     runs-on: ubuntu-latest
     environment: ${{ github.event_name == 'push' && 'release' || 'public-ci' }}
@@ -177,18 +189,26 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: ./.github/actions/sccache
 
-      - name: Build
-        run: cargo build --locked --release --target wasm32-unknown-unknown -p cqx-wasm
-
-      - name: Collect
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/cache@v4
+        with:
+          path: .target/zig
+          key: zig-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/zig-toolchain.json') }}
+      - name: Build and prove the selective modules
         run: |
-          mkdir -p dist
-          for d in target .target; do
-            f="$d/wasm32-unknown-unknown/release/cqx_wasm.wasm"
-            [ -f "$f" ] && cp "$f" dist/ && break
-          done
-          test -f dist/cqx_wasm.wasm || { echo "::error::no wasm was produced"; exit 1; }
-          ls -l dist/cqx_wasm.wasm
+          python3 scripts/build-wasm-modules.py
+          node scripts/test-modules.mjs .target/wasm-dist
+          node scripts/test-wasm-package.mjs .target/wasm-dist
+      - name: Collect verified modules and transitional compatibility
+        run: |
+          COMPAT_ARGS=()
+          if [ '${{ needs.resolve.outputs.wasm_compat }}' = true ]; then
+            COMPAT_ARGS=(--legacy)
+          fi
+          node scripts/package-wasm.mjs .target/wasm-dist dist "${COMPAT_ARGS[@]}"
+          ls -l dist
 
       - uses: ./.github/actions/sccache-stats
         if: always()
@@ -299,11 +319,26 @@ jobs:
 
           # Binaries and checksums, under the version that produced them.
           aws s3 sync out/ "s3://cqx-releases/${TAG}/" \
-            --endpoint-url "$R2_ENDPOINT" --exclude 'cqx_wasm.wasm'
+            --endpoint-url "$R2_ENDPOINT" --exclude '*.wasm' --exclude '*.mjs' \
+            --exclude 'manifest.json' --exclude 'WASM-DEPRECATION.md'
 
-          # The wasm goes to its own bucket, which is the one browsers read.
-          aws s3 cp out/cqx_wasm.wasm "s3://cqx-wasm/${TAG}/cqx_wasm.wasm" \
-            --endpoint-url "$R2_ENDPOINT" --content-type application/wasm
+          # All browser assets go to the existing versioned WASM bucket.
+          for module in core c csharp; do
+            aws s3 cp "out/$module.wasm" "s3://cqx-wasm/${TAG}/$module.wasm" \
+              --endpoint-url "$R2_ENDPOINT" --content-type application/wasm
+          done
+          if [ -f out/cqx_wasm.wasm ]; then
+            aws s3 cp out/cqx_wasm.wasm "s3://cqx-wasm/${TAG}/cqx_wasm.wasm" \
+              --endpoint-url "$R2_ENDPOINT" --content-type application/wasm
+            aws s3 cp out/WASM-DEPRECATION.md "s3://cqx-wasm/${TAG}/WASM-DEPRECATION.md" \
+              --endpoint-url "$R2_ENDPOINT" --content-type text/markdown
+          fi
+          aws s3 cp out/manifest.json "s3://cqx-wasm/${TAG}/manifest.json" \
+            --endpoint-url "$R2_ENDPOINT" --content-type application/json
+          for helper in cqx-loader.mjs wasm-catalog.mjs; do
+            aws s3 cp "out/$helper" "s3://cqx-wasm/${TAG}/$helper" \
+              --endpoint-url "$R2_ENDPOINT" --content-type application/javascript
+          done
           aws s3 cp out/SHA256SUMS "s3://cqx-wasm/${TAG}/SHA256SUMS" \
             --endpoint-url "$R2_ENDPOINT"
 
