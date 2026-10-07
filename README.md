@@ -436,3 +436,17 @@ external project disagreed:
 Locally the test skips when the checkouts are absent. Setting
 `CQX_REFERENCE_DIR` asserts they are present, so a failed fetch fails the job
 rather than quietly checking nothing.
+
+## Swift frontend
+
+Swift 6.3 files use the maintained pure-Rust Rezel parser in CLI and WASM.
+Whole-file syntax errors are reported as skips. Library exit/fatalError, locally
+constructed Foundation.Process launch paths, empty catches and try!/expression
+force unwraps contribute to the original five categories. Body duplication and
+file size/share reuse the existing rules. Configure only `swift/<rule>` in
+`cqx.json`; these are syntax/binding findings, not whole-program type or taint
+analysis. Literal executables with dynamic arguments stay quiet. main.swift,
+@main and top-level executable statements are entry units; tests and generated,
+.build, Pods, DerivedData and Carthage sources do not score as product code.
+The parser is vendored unchanged with private Unicode tables (see vendor/README.md),
+so existing Rust identifiers retain their Unicode version. No extra WASM toolchain.

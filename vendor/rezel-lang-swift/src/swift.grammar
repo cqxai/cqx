@@ -1,0 +1,2215 @@
+@precedence {
+  typeMember
+  functionType
+  conditionalElse
+  catchWhere @cut
+  repeatStatement
+  catchIdentifier
+  composition
+  optionalType
+  keyPathRootSuffix
+  accessorEffects
+  member
+  postfixCustom
+  generic
+  subscript
+  optionalChain
+  forceUnwrap
+  postfixOperator
+  attributeArguments
+  call
+  trailingClosure
+  prefix
+  sequence @right
+  packExpansion @right
+  ternary @right
+}
+
+@top SourceFile { Shebang? codeBlockItemList? }
+
+codeBlockItemList {
+  CodeBlockItem (codeItemSeparator CodeBlockItem)* codeItemSeparator?
+}
+
+CodeBlockItem {
+  declaration |
+  statement |
+  ExpressionStatement
+}
+
+declaration {
+  declarationFlavor<declarationKind>
+}
+
+declarationFlavor<kind> {
+  specialDeclarationKind |
+  attributeListElement* DeclarationModifier* kind |
+  (
+    attributeListElement+ DeclarationModifier* |
+    DeclarationModifier+
+  ) MacroExpansionDeclaration
+}
+
+attributeListElement {
+  Attribute |
+  attributeIfConfigNonemptyLookahead attributeIfConfig
+}
+
+attributeIfConfigClauseElement {
+  Attribute |
+  attributeIfConfigStructuralLookahead attributeIfConfig
+}
+
+attributeIfConfig[@name=IfConfigDeclaration,@isGroup=Declaration] {
+  attributeIfConfigIfClause
+  attributeIfConfigElseifClause*
+  attributeIfConfigElseClause?
+  PoundEndif lineBreak
+}
+
+attributeIfConfigIfClause[@name=IfConfigIfClause] {
+  PoundIf IfConfigCondition lineBreak attributeIfConfigClauseElement*
+}
+
+attributeIfConfigElseifClause[@name=IfConfigElseifClause] {
+  PoundElseif IfConfigCondition lineBreak attributeIfConfigClauseElement*
+}
+
+attributeIfConfigElseClause[@name=IfConfigElseClause] {
+  PoundElse lineBreak attributeIfConfigClauseElement*
+}
+
+specialDeclarationKind[@isGroup=Declaration] {
+  OperatorDeclaration |
+  PrecedenceGroupDeclaration |
+  UsingDeclaration |
+  InvalidUsingDeclaration |
+  PoundSourceLocation
+}
+
+declarationKind[@isGroup=Declaration] {
+  nonCaseDeclarationKind |
+  EnumCaseDeclaration
+}
+
+nonCaseDeclarationKind {
+  IfConfigDeclaration |
+  nonIfConfigDeclarationKind
+}
+
+nonIfConfigDeclarationKind {
+  nonInitializerDeclarationKind |
+  InitializerDeclaration
+}
+
+nonInitializerDeclarationKind {
+  ImportDeclaration |
+  VariableDeclaration |
+  FunctionDeclaration |
+  StructDeclaration |
+  ClassDeclaration |
+  ActorDeclaration |
+  EnumDeclaration |
+  ProtocolDeclaration |
+  ExtensionDeclaration |
+  TypeAliasDeclaration |
+  AssociatedTypeDeclaration |
+  MacroDeclaration |
+  DeinitializerDeclaration |
+  SubscriptDeclaration
+}
+
+IfConfigDeclaration {
+  codeBlockIfConfigDeclaration<CodeBlockItem>
+}
+
+// SwiftSyntax's parsePoundIfDirective forwards the current code-item parser to
+// every clause. Preserve that context recursively: initializer bodies still
+// forbid immediate init declarations, while implicit getters keep their
+// restricted declaration set instead of falling back to ordinary code items.
+codeBlockIfConfigDeclaration<item> {
+  codeBlockIfConfigIfClause<item>
+  codeBlockIfConfigElseifClause<item>*
+  codeBlockIfConfigElseClause<item>?
+  PoundEndif
+}
+
+codeBlockIfConfigIfClause[@name=IfConfigIfClause]<item> {
+  PoundIf IfConfigCondition lineBreak codeBlockIfConfigClauseItemList<item>?
+}
+
+codeBlockIfConfigElseifClause[@name=IfConfigElseifClause]<item> {
+  PoundElseif IfConfigCondition lineBreak codeBlockIfConfigClauseItemList<item>?
+}
+
+codeBlockIfConfigElseClause[@name=IfConfigElseClause]<item> {
+  PoundElse lineBreak codeBlockIfConfigClauseItemList<item>?
+}
+
+codeBlockIfConfigClauseItemList<item> {
+  item (codeItemSeparator item)* codeItemSeparator?
+}
+
+PoundIf { "#if" }
+
+PoundElseif { "#elseif" }
+
+PoundElse { "#else" }
+
+PoundEndif { "#endif" }
+
+// TSPL gives compilation conditions their own boolean grammar, while
+// SwiftSyntax parses each predicate with expression-like flexibility. Keep the
+// boolean spine structural and the predicate arguments open so new platform
+// predicates don't require grammar changes.
+IfConfigCondition { ifConfigDisjunctionCondition }
+
+ifConfigDisjunctionCondition {
+  ifConfigConjunctionCondition ("||" ifConfigConjunctionCondition)*
+}
+
+ifConfigConjunctionCondition {
+  ifConfigUnaryCondition ("&&" ifConfigUnaryCondition)*
+}
+
+ifConfigUnaryCondition {
+  "!" ifConfigUnaryCondition |
+  "(" ifConfigDisjunctionCondition ")" |
+  ifConfigPredicate
+}
+
+ifConfigPredicate {
+  IfConfigConditionToken ("(" commaSep<ifConfigPredicateArgument> ")")?
+}
+
+ifConfigPredicateArgument { IfConfigConditionToken+ }
+
+IfConfigConditionToken {
+  Identifier | DollarIdentifier | BooleanLiteral | IntegerLiteral | FloatLiteral | StringLiteral |
+  RegexLiteral |
+  ":" | "." | "?" | "==" | "!=" | "<" | "<=" | ">" | ">=" |
+  "+" | "-" | "*" | "/" | "%"
+}
+
+Attribute {
+  moduleSelectedAttributeAtSign ModuleSelector
+  moduleSelectedAttributeName (!attributeArguments customAttributeArgumentClause)? |
+  AttributeName |
+  customAttributeNameWithArguments customAttributeArgumentClause |
+  effectsAttributeNameWithArguments EffectsAttributeArgumentList |
+  specializeAttributeNameWithArguments SpecializeAttributeArgumentList |
+  specializedAttributeNameWithArguments SpecializedAttributeArgument |
+  differentiableAttributeNameWithArguments DifferentiableAttributeArguments |
+  derivativeAttributeNameWithArguments DerivativeAttributeArguments |
+  abiAttributeNameWithArguments ABIAttributeArguments |
+  AttributeNameWithArguments AttributeArgumentClause
+}
+
+moduleSelectedAttributeName[@name=AttributeName] { moduleSelectedName }
+
+customAttributeArgumentClause[@name=AttributeArgumentClause] {
+  "(" commaSep<LabeledExpression> ")"
+}
+
+AttributeArgumentClause { "(" AttributeArgument* ")" }
+
+AttributeArgument {
+  ModuleSelector (moduleSelectedName | binaryOperatorReference) |
+  AttributeArgumentGroup { "(" AttributeArgument* ")" } |
+  AttributeBracketClause { "[" AttributeArgument* "]" } |
+  AttributeBraceClause { "{" AttributeArgument* "}" } |
+  Identifier ~moduleSelector | DollarIdentifier | keywordIdentifierToken |
+  AttributeArgumentKeyword |
+  IntegerLiteral | FloatLiteral | StringLiteral |
+  "@" | "#" | "." | "," | ":" | "::" | ";" | "=" | "==" | "!=" |
+  "<" | "<=" | ">" | ">=" | "+" | "-" | "*" | "/" | "%" |
+  "&&" | "||" | "!" | "?" | "->" | "_"
+}
+
+AttributeArgumentKeyword {
+  kw<"extension"> ~attributeKeywordRole |
+  kw<"init"> ~attributeKeywordRole |
+  kw<"deinit"> ~attributeKeywordRole |
+  kw<"subscript"> ~attributeKeywordRole
+}
+
+// SwiftSyntax leaves @_effects payloads for SIL and preserves tokens until the
+// first right parenthesis, without interpreting them as Swift expressions.
+EffectsAttributeArgumentList { "(" effectsAttributeToken* ")" }
+
+effectsAttributeToken {
+  Identifier | DollarIdentifier | keywordIdentifierToken |
+  IntegerLiteral | FloatLiteral | StringLiteral | RegexLiteral |
+  EffectsAttributeOperator | EffectsAttributeBackslash |
+  "(" | "[" | "]" | "{" | "}" |
+  "@" | "#" | "." | "," | ":" | "::" | ";" |
+  "=" | "==" | "!=" | "<" | "<=" | ">" | ">=" |
+  "+" | "-" | "*" | "/" | "%" | "&&" | "||" | "!" | "?" | "??" |
+  "->" | "&" | "|" | "^" | "~" | "..." | "_"
+}
+
+EffectsAttributeOperator { customOperator }
+
+EffectsAttributeBackslash { keyPathBackslash }
+
+SpecializeAttributeArgumentList {
+  "(" specializeAttributeArgument* GenericWhereClause? ")"
+}
+
+specializeAttributeArgument {
+  SpecializeTargetFunctionArgument |
+  SpecializeAvailabilityArgument |
+  LabeledSpecializeArgument
+}
+
+SpecializeTargetFunctionArgument {
+  ckw<"target"> ":"
+  specializeTargetDeclReference ","?
+}
+
+specializeTargetDeclReference {
+  specializeZeroArgumentTarget |
+  memberDeclReferenceExpression |
+  operatorReferenceExpression
+}
+
+specializeZeroArgumentTarget[@name=DeclReferenceExpression,@isGroup=Expression] {
+  (memberDeclReferenceCore | ModuleSelector? binaryOperatorReference) !call "(" ")"
+}
+
+SpecializeAvailabilityArgument {
+  ckw<"availability"> ":" availabilityArgumentList ";"
+}
+
+availabilityArgumentList { AvailabilityArgument ("," AvailabilityArgument)* }
+
+LabeledSpecializeArgument {
+  (
+    ckw<"exported"> ":" BooleanLiteral |
+    ckw<"kind"> ":" contextualName |
+    (ckw<"spi"> | ckw<"spiModule">) ":" contextualName
+  ) ","?
+}
+
+SpecializedAttributeArgument { "(" GenericWhereClause ")" }
+
+// SwiftSyntax gives the differentiation attributes dedicated argument nodes.
+// They are not ordinary Swift expressions or opaque balanced token bags.
+DifferentiableAttributeArguments {
+  "(" differentiableAttributeArgumentSequence? ")"
+}
+
+differentiabilityKindSpecifier {
+  @extend[@name=ForwardDifferentiabilityKeyword]<identifier, "_forward"> |
+  ckw<"reverse"> |
+  @extend[@name=LinearDifferentiabilityKeyword]<identifier, "_linear">
+}
+
+differentiableAttributeArgumentSequence {
+  differentiabilityKindSpecifier
+  (","? DifferentiabilityWithRespectToArgument)?
+  (","? GenericWhereClause)? |
+  DifferentiabilityWithRespectToArgument (","? GenericWhereClause)? |
+  GenericWhereClause
+}
+
+DifferentiabilityWithRespectToArgument {
+  ckw<"wrt"> ":" (DifferentiabilityArgument | DifferentiabilityArguments)
+}
+
+DifferentiabilityArguments {
+  "(" DifferentiabilityArgumentList ")"
+}
+
+DifferentiabilityArgumentList { commaSep<DifferentiabilityArgument> }
+
+DifferentiabilityArgument {
+  Identifier | IntegerLiteral | kw<"self">
+}
+
+DerivativeAttributeArguments {
+  "(" ckw<"of"> ":" (
+    derivativeAccessorOriginalDeclName "." derivativeAccessorSpecifier |
+    derivativeOriginalDeclName
+  )
+  ("," DifferentiabilityWithRespectToArgument)? ")"
+}
+
+derivativeOriginalDeclName {
+  specializeTargetDeclReference |
+  MemberAccessExpression[@isGroup=Expression] {
+    derivativeOriginalDeclBase "." specializeTargetDeclReference
+  }
+}
+
+derivativeOriginalDeclBase[@name=TypeExpression,@isGroup=Expression] {
+  derivativeOriginalDeclType
+}
+
+// Leave the last dotted component for the declaration reference, matching
+// SwiftSyntax's `canParseBaseTypeForQualifiedDeclName`/`hasAnotherMember` split.
+derivativeOriginalDeclType[@name=IdentifierType,@isGroup=Type] {
+  qualifiedDeclTypeLookahead kw<"Any"> |
+  identifierTypeComponent
+  (qualifiedDeclTypeLookahead "." memberIdentifierTypeComponent)*
+}
+
+derivativeAccessorOriginalDeclName {
+  derivativeAccessorDeclReference |
+  MemberAccessExpression[@isGroup=Expression] {
+    derivativeOriginalDeclBase "." derivativeAccessorDeclReference
+  }
+}
+
+derivativeAccessorDeclReference {
+  specializeZeroArgumentTarget |
+  operatorReferenceExpression |
+  derivativeCompoundDeclReference
+}
+
+derivativeCompoundDeclReference[@name=DeclReferenceExpression,@isGroup=Expression] {
+  memberCompoundReferenceIdentifier ~compoundReference
+  declNameArgumentsLookahead DeclNameArguments |
+  kw<"init"> ~compoundReference declNameArgumentsLookahead DeclNameArguments |
+  kw<"Self"> ~compoundReference declNameArgumentsLookahead DeclNameArguments
+}
+
+derivativeAccessorSpecifier { ckw<"get"> | ckw<"set"> | ckw<"_modify"> }
+
+// SwiftSyntax parses the contents of @abi as a declaration, then restricts
+// the resulting node to the declaration kinds admitted by Provider.
+ABIAttributeArguments { "(" abiProviderDeclaration ")" }
+
+abiProviderDeclaration {
+  attributeListElement* DeclarationModifier* abiProviderDeclarationKind
+}
+
+abiProviderDeclarationKind[@isGroup=Declaration] {
+  AssociatedTypeDeclaration |
+  DeinitializerDeclaration |
+  EnumCaseDeclaration |
+  FunctionDeclaration |
+  InitializerDeclaration |
+  SubscriptDeclaration |
+  TypeAliasDeclaration |
+  VariableDeclaration
+}
+
+DeclarationModifier {
+  detailedModifierKeyword ModifierDetail? |
+  plainModifierKeyword |
+  ckw<"_local">
+}
+
+detailedModifierKeyword {
+  ckw<"public"> ~modifierReference |
+  ckw<"package"> ~modifierReference |
+  ckw<"internal"> ~modifierReference |
+  ckw<"fileprivate"> ~modifierReference |
+  ckw<"private"> ~modifierReference |
+  ckw<"open"> ~modifierReference |
+  ckw<"unowned"> ~modifierReference |
+  ckw<"nonisolated"> ~modifierReference
+}
+
+plainModifierKeyword {
+  ckw<"final"> | ckw<"static"> | kw<"class"> | ckw<"override"> |
+  ckw<"required"> | ckw<"convenience"> | ckw<"lazy"> | ckw<"weak"> |
+  ckw<"mutating"> | ckw<"nonmutating"> | ckw<"isolated"> |
+  ckw<"distributed"> | ckw<"indirect"> | ckw<"optional"> |
+  ckw<"dynamic"> | ckw<"prefix"> | ckw<"postfix"> | ckw<"infix"> |
+  ckw<"async"> | ckw<"borrowing"> | ckw<"consuming"> | ckw<"sending"> |
+  ckw<"__consuming"> | ckw<"__owned"> | ckw<"__shared">
+}
+
+ModifierDetail { "(" Identifier ")" }
+
+ImportDeclaration {
+  kw<"import"> (ImportKind (ScopedImportPath | ImportPath) | ImportPath)
+}
+
+ImportKind {
+  kw<"typealias"> | kw<"struct"> | kw<"class"> | kw<"enum"> |
+  kw<"protocol"> | kw<"let"> | kw<"var"> | kw<"func">
+}
+
+ImportPath { ImportPathComponent ("." ImportPathComponent)* }
+
+ImportPathComponent { Identifier }
+
+ScopedImportPath[@name=ImportPath] {
+  scopedImportModulePathComponent ImportPathComponent
+}
+
+scopedImportModulePathComponent[@name=ImportPathComponent] { Identifier "::" }
+
+VariableDeclaration[@dynamicPrecedence=1] {
+  bindingSpecifier PatternBinding ("," PatternBinding)*
+}
+
+bindingSpecifier {
+  kw<"let"> ~bindingReference |
+  kw<"var"> ~bindingReference |
+  kw<"inout"> ~bindingReference |
+  ckw<"_mutating"> | ckw<"_borrowing"> | ckw<"_consuming">
+}
+
+PatternBinding {
+  pattern resultTypeAnnotation? (
+    InitializerClause (initializedPropertyBlockLookahead PropertyBlock)? |
+    PropertyBlock
+  )?
+}
+
+pattern { patternFlavor<IdentifierPattern> }
+
+patternFlavor<identifierPattern> {
+  identifierPattern |
+  WildcardPattern |
+  ValueBindingPattern<patternFlavor<identifierPattern>> |
+  TuplePattern<patternFlavor<identifierPattern>>
+}
+
+IdentifierPattern { Identifier }
+
+WildcardPattern { "_" }
+
+ValueBindingPattern[@dynamicPrecedence=1]<item> { patternBindingSpecifier item }
+
+patternBindingSpecifier {
+  kw<"let"> ~bindingReference |
+  kw<"var"> ~bindingReference |
+  kw<"inout"> ~bindingReference |
+  ckw<"_mutating"> | ckw<"_consuming">
+}
+
+TuplePattern<item> { "(" commaSep<TuplePatternElement<item>> ")" }
+
+TuplePatternElement<item> { (Identifier ":")? item }
+
+TypeAnnotation { ":" type }
+
+InitializerClause { "=" expression }
+
+FunctionDeclaration {
+  kw<"func"> FunctionName GenericParameterClause? FunctionParameterClause
+  functionEffectSpecifiers? resultReturnClause? GenericWhereClause? CodeBlock?
+}
+
+FunctionName { Identifier | FunctionOperatorName }
+
+FunctionOperatorName {
+  "==" | "!=" | "<" | "<=" | ">" | ">=" |
+  "+" | "-" | "*" | "/" | "%" | "&&" | "||" | "??" |
+  "!" | prefixTilde | prefixAmpersand | binaryAmpersand |
+  binaryRangeOperator |
+  functionCustomOperator
+}
+
+FunctionParameterClause { "(" commaSep<FunctionParameter> ")" }
+
+FunctionParameter {
+  attributeListElement* parameterModifier*
+  ParameterNames ":" type "..."? DefaultArgumentClause?
+}
+
+// Prefer the ordinary parameter-name interpretation when both parses can
+// complete (`_const map:`), while still allowing the modifier interpretation
+// when the following head requires it (`_const _ map:`). This is a grammar
+// ambiguity, not a lexical one.
+parameterModifier[@name=DeclarationModifier,@dynamicPrecedence=-1] {
+  ckw<"_const"> ~parameterModifierRole |
+  ckw<"isolated"> ~parameterModifierRole
+}
+
+ParameterNames {
+  parameterName parameterName? ~nameColonRole
+}
+
+parameterName[@inline] { Identifier | keywordIdentifierToken | "_" }
+
+DefaultArgumentClause { "=" expression }
+
+ReturnClause { "->" type }
+
+functionEffectSpecifiers {
+  declarationEffectLineLookahead? (
+    declarationAsyncEffect declarationThrowsEffect? |
+    declarationThrowsEffect
+  )
+}
+
+declarationAsyncEffect[@name=FunctionEffect] {
+  ckw<"async"> | ckw<"reasync">
+}
+
+declarationThrowsEffect[@name=FunctionEffect] {
+  ckw<"throws"> ThrowsType? | ckw<"rethrows">
+}
+
+typeEffectSpecifiers {
+  typeAsyncEffect typeThrowsEffect? |
+  typeThrowsEffect
+}
+
+typeAsyncEffect[@name=FunctionEffect] { ckw<"async"> }
+
+typeThrowsEffect[@name=FunctionEffect] { ckw<"throws"> ThrowsType? }
+
+deinitializerEffect[@name=FunctionEffect] { ckw<"async"> }
+
+ThrowsType { "(" type ")" }
+
+StructDeclaration {
+  kw<"struct"> TypeName GenericParameterClause? InheritanceClause?
+  GenericWhereClause? MemberBlock
+}
+
+ClassDeclaration {
+  kw<"class"> TypeName GenericParameterClause? InheritanceClause?
+  GenericWhereClause? MemberBlock
+}
+
+ActorDeclaration {
+  ckw<"actor"> TypeName GenericParameterClause? InheritanceClause?
+  GenericWhereClause? MemberBlock
+}
+
+EnumDeclaration {
+  kw<"enum"> TypeName GenericParameterClause? InheritanceClause?
+  GenericWhereClause? MemberBlock
+}
+
+ProtocolDeclaration {
+  kw<"protocol"> TypeName PrimaryAssociatedTypeClause? InheritanceClause?
+  GenericWhereClause? MemberBlock
+}
+
+PrimaryAssociatedTypeClause { "<" commaSep<TypeName> ">" }
+
+ExtensionDeclaration {
+  kw<"extension"> ~extensionReference type InheritanceClause? GenericWhereClause? MemberBlock
+}
+
+TypeAliasDeclaration {
+  kw<"typealias"> TypeName GenericParameterClause? "=" type GenericWhereClause?
+}
+
+AssociatedTypeDeclaration {
+  kw<"associatedtype"> TypeName InheritanceClause? DefaultType? GenericWhereClause?
+}
+
+DefaultType { "=" type }
+
+MacroDeclaration {
+  ckw<"macro"> TypeName GenericParameterClause? FunctionParameterClause
+  functionEffectSpecifiers? resultReturnClause? InitializerClause? GenericWhereClause?
+}
+
+MacroExpansionDeclaration[@isGroup=Declaration] {
+  "#" macroExpansionReference
+  (!generic genericArgumentLookahead GenericArgumentClause)? macroExpansionCallSuffix?
+}
+
+PoundSourceLocation {
+  poundSourceLocation "(" PoundSourceLocationArguments? ")"
+}
+
+PoundSourceLocationArguments {
+  ckw<"file"> ":" StringLiteral "," ckw<"line"> ":" IntegerLiteral
+}
+
+macroExpansionCallSuffix {
+  !call ArgumentClause (!trailingClosure TrailingClosureClause)? |
+  !trailingClosure TrailingClosureClause
+}
+
+EnumCaseDeclaration { kw<"case"> ~caseRole commaSep1<EnumCaseElement> }
+
+EnumCaseElement {
+  Identifier (
+    EnumCaseParameterClause |
+    enumCaseParameterLineLookahead EnumCaseParameterClause
+  )? RawValueClause?
+}
+
+EnumCaseParameterClause { "(" commaSep<EnumCaseParameter> ")" }
+
+EnumCaseParameter {
+  parameterModifier*
+  (enumCaseParameterLabel ":")? type DefaultArgumentClause?
+}
+
+enumCaseParameterLabel {
+  (Identifier | keywordIdentifierToken | "_")
+  (Identifier | keywordIdentifierToken | "_")?
+}
+
+RawValueClause { "=" expression }
+
+InitializerDeclaration[@dynamicPrecedence=2] {
+  kw<"init"> ~initRole ("?" | "!")? GenericParameterClause? FunctionParameterClause
+  functionEffectSpecifiers? resultReturnClause? GenericWhereClause? initializerCodeBlock?
+}
+
+DeinitializerDeclaration { kw<"deinit"> deinitializerEffect? CodeBlock? }
+
+SubscriptDeclaration {
+  kw<"subscript"> ~subscriptReference
+  GenericParameterClause? FunctionParameterClause resultReturnClause
+  GenericWhereClause? PropertyBlock?
+}
+
+OperatorDeclaration {
+  (ckw<"prefix"> | ckw<"infix"> | ckw<"postfix">)
+  kw<"operator"> OperatorName OperatorPrecedenceAndTypes?
+}
+
+OperatorName {
+  "==" | "!=" | "<" | "<=" | ">" | ">=" |
+  "+" | "-" | "*" | "/" | "%" | "&&" | "||" | "??" |
+  "=" | "->" | "!" | "?" | "&" | "~" |
+  prefixTilde | prefixAmpersand | binaryAmpersand |
+  prefixRangeOperator | binaryRangeOperator | postfixRangeOperator |
+  prefixCustomOperator | binaryCustomOperator | postfixCustomOperator |
+  customOperator
+}
+
+OperatorPrecedenceAndTypes {
+  ":" PrecedenceGroupName ("," OperatorDesignatedType)* ","?
+}
+
+OperatorDesignatedType { PrecedenceGroupName | OperatorName }
+
+PrecedenceGroupDeclaration {
+  kw<"precedencegroup"> PrecedenceGroupName "{"
+  (PrecedenceGroupAssociativity | PrecedenceGroupAssignment | PrecedenceGroupRelation)*
+  "}"
+}
+
+PrecedenceGroupName { Identifier | kw<"self"> | kw<"Self"> }
+
+PrecedenceGroupAssociativity {
+  ckw<"associativity"> ":" (ckw<"left"> | ckw<"right"> | ckw<"none">)
+}
+
+PrecedenceGroupAssignment {
+  ckw<"assignment"> ":" BooleanLiteral
+}
+
+PrecedenceGroupRelation {
+  (ckw<"higherThan"> | ckw<"lowerThan">) ":"
+  PrecedenceGroupName ("," PrecedenceGroupName)*
+}
+
+// With defaultIsolationPerFile enabled, `using` introduces a declaration only
+// when its attribute or identifier specifier follows on the same line.
+UsingDeclaration[@dynamicPrecedence=-1] {
+  usingDeclarationLookahead ckw<"using"> (Attribute | Identifier)
+}
+
+// Keep a tolerant CST for a hard-keyword specifier. Making the specialized
+// keyword term shiftable also prevents it from silently falling back to the
+// ordinary Identifier branch; strict CST validation rejects this node.
+InvalidUsingDeclaration {
+  usingDeclarationLookahead ckw<"using"> keywordIdentifierToken
+}
+
+InheritanceClause { ":" commaSep1<InheritedType> }
+
+InheritedType {
+  ClassRestrictionType[@isGroup=Type,@dynamicPrecedence=1] { kw<"class"> } |
+  type
+}
+
+// Swift 4 compatibility permits a generic where clause inside the angle
+// brackets. SwiftSyntax preserves it as a direct child of the parameter clause.
+GenericParameterClause {
+  "<" commaSep1<GenericParameter> GenericWhereClause? ">"
+}
+
+GenericParameter {
+  attributeListElement* (ckw<"each"> | kw<"let">)? TypeName (":" type)?
+}
+
+GenericWhereClause { ckw<"where"> genericRequirementList }
+
+genericRequirementList[@inline] {
+  GenericRequirement (genericRequirementSeparator GenericRequirement)* ","?
+}
+
+genericRequirementSeparator[@inline] { "," genericRequirementContinuation? }
+
+GenericRequirement {
+  LayoutRequirement |
+  type (":" type | "==" genericSameTypeOperand) |
+  genericValueExpression "==" genericSameTypeOperand
+}
+
+LayoutRequirement[@dynamicPrecedence=1] {
+  type ":" (
+    ckw<"_Trivial"> layoutRequirementArguments? |
+    (ckw<"_TrivialAtMost"> | ckw<"_TrivialStride">) layoutRequirementArguments |
+    ckw<"_UnknownLayout"> | ckw<"_RefCountedObject"> |
+    ckw<"_NativeRefCountedObject"> | ckw<"_Class"> |
+    ckw<"_NativeClass"> | ckw<"_BridgeObject">
+  )
+}
+
+layoutRequirementArguments {
+  "(" IntegerLiteral ("," IntegerLiteral)? ")"
+}
+
+genericSameTypeOperand { type | genericValueExpression }
+
+MemberBlock { "{" memberList? "}" }
+
+memberList {
+  memberDeclaration (codeItemSeparator memberDeclaration)* codeItemSeparator?
+}
+
+memberDeclaration {
+  memberIfConfigDeclaration |
+  declarationFlavor<memberDeclarationKind> |
+  MacroExpansionDeclaration
+}
+
+memberDeclarationKind[@isGroup=Declaration] {
+  nonIfConfigDeclarationKind |
+  EnumCaseDeclaration
+}
+
+memberIfConfigDeclaration[@name=IfConfigDeclaration,@isGroup=Declaration] {
+  codeBlockIfConfigDeclaration<memberDeclaration>
+}
+
+CodeBlock { "{" codeBlockItemList? "}" }
+
+// SwiftSyntax parses only an initializer's immediate body with
+// `allowInitDecl: false`, and forwards that choice through same-level `#if`
+// clauses. Nested ordinary code blocks start their own declaration context.
+initializerCodeBlock[@name=CodeBlock] {
+  "{" initializerCodeBlockItemList? "}"
+}
+
+initializerCodeBlockItemList {
+  initializerCodeBlockItem
+  (codeItemSeparator initializerCodeBlockItem)* codeItemSeparator?
+}
+
+initializerCodeBlockItem[@name=CodeBlockItem] {
+  initializerBodyDeclaration |
+  statement |
+  ExpressionStatement
+}
+
+initializerBodyDeclaration {
+  declarationFlavor<initializerBodyDeclarationKind>
+}
+
+initializerBodyDeclarationKind[@isGroup=Declaration] {
+  initializerIfConfigDeclaration |
+  nonInitializerDeclarationKind |
+  EnumCaseDeclaration
+}
+
+initializerIfConfigDeclaration[@name=IfConfigDeclaration,@isGroup=Declaration] {
+  codeBlockIfConfigDeclaration<initializerCodeBlockItem>
+}
+
+PropertyBlock {
+  accessorBlockLookahead AccessorBlock |
+  GetterCodeBlock
+}
+
+AccessorBlock {
+  "{" AccessorDeclaration* "}"
+}
+
+GetterCodeBlock {
+  "{" getterCodeBlockItemList "}"
+}
+
+getterCodeBlockItemList {
+  GetterCodeBlockItem (codeItemSeparator GetterCodeBlockItem)* codeItemSeparator?
+}
+
+GetterCodeBlockItem {
+  getterIfConfigDeclaration |
+  GetterDeclaration |
+  statement |
+  ExpressionStatement
+}
+
+getterIfConfigDeclaration[@name=IfConfigDeclaration,@isGroup=Declaration] {
+  codeBlockIfConfigDeclaration<GetterCodeBlockItem>
+}
+
+GetterDeclaration {
+  attributeListElement* DeclarationModifier* (
+    VariableDeclaration |
+    FunctionDeclaration |
+    StructDeclaration |
+    ClassDeclaration |
+    ActorDeclaration |
+    EnumDeclaration |
+    ProtocolDeclaration |
+    TypeAliasDeclaration
+  )
+}
+
+AccessorDeclaration {
+  attributeListElement* accessorModifier* AccessorSpecifier AccessorParameter?
+  (!accessorEffects typeEffectSpecifiers)? CodeBlock?
+}
+
+// SwiftSyntax parses a deliberately smaller modifier set before accessors
+// than it does before declarations. Keep the visible DeclarationModifier CST
+// role while preventing declaration-only modifiers from starting an accessor.
+accessorModifier[@name=DeclarationModifier] {
+  ckw<"__consuming"> | ckw<"consuming"> | ckw<"borrowing"> |
+  ckw<"mutating"> | ckw<"nonmutating"> | ckw<"yielding">
+}
+
+AccessorSpecifier {
+  ckw<"get"> |
+  ckw<"set"> |
+  ckw<"didSet"> |
+  ckw<"willSet"> |
+  ckw<"unsafeAddress"> |
+  ckw<"addressWithOwner"> |
+  ckw<"addressWithNativeOwner"> |
+  ckw<"unsafeMutableAddress"> |
+  ckw<"mutableAddressWithOwner"> |
+  ckw<"mutableAddressWithNativeOwner"> |
+  ckw<"_read"> |
+  ckw<"read"> |
+  ckw<"_modify"> |
+  ckw<"modify"> |
+  kw<"init"> |
+  ckw<"borrow"> |
+  ckw<"mutate">
+}
+
+AccessorParameter { "(" Identifier ")" }
+
+statement[@isGroup=Statement] {
+  LabeledStatement |
+  GuardStatement |
+  WhileStatement |
+  RepeatStatement |
+  ForStatement |
+  DoStatement |
+  DeferStatement |
+  ReturnStatement |
+  ThrowStatement |
+  BreakStatement |
+  ContinueStatement |
+  FallThroughStatement |
+  YieldStatement |
+  DiscardStatement |
+  ThenStatement
+}
+
+LabeledStatement {
+  Identifier ":" (statement | labeledExpressionStatement)
+}
+
+labeledExpressionStatement[@name=ExpressionStatement] {
+  IfExpression | SwitchExpression | DoExpression
+}
+
+ConditionList {
+  ConditionElement ("," ConditionElement)* ("," conditionListEndLookahead)?
+}
+
+ConditionElement {
+  AvailabilityCondition |
+  OptionalBindingCondition |
+  MatchingPatternCondition |
+  conditionExpression
+}
+
+AvailabilityCondition {
+  ("#available" | "#unavailable")
+  "(" commaSep1<AvailabilityArgument> ")"
+}
+
+AvailabilityArgument {
+  AvailabilityPlatformVersion | AvailabilityLabeledArgument | "*"
+}
+
+AvailabilityLabeledArgument {
+  (ckw<"message"> | ckw<"renamed">) ":" StringLiteral |
+  (ckw<"introduced"> | ckw<"obsoleted">) ":" AvailabilityVersion |
+  ckw<"deprecated"> (":" AvailabilityVersion)? |
+  @extend[@name=UnavailableKeyword]<identifier, "unavailable"> | ckw<"noasync">
+}
+
+AvailabilityPlatformVersion { Identifier AvailabilityVersion? }
+
+AvailabilityVersion { (IntegerLiteral | FloatLiteral) ("." IntegerLiteral)* }
+
+OptionalBindingCondition {
+  optionalBindingSpecifier optionalBindingPattern TypeAnnotation? ConditionInitializerClause?
+}
+
+optionalBindingSpecifier {
+  kw<"let"> ~bindingReference | kw<"var"> ~bindingReference
+}
+
+optionalBindingPattern {
+  patternFlavor<optionalBindingIdentifierPattern>
+}
+
+optionalBindingIdentifierPattern[@name=IdentifierPattern] {
+  Identifier |
+  [@dynamicPrecedence=1] { kw<"self"> }
+}
+
+ConditionInitializerClause { "=" conditionExpression }
+
+MatchingPatternCondition {
+  kw<"case"> ~caseRole SwitchCasePattern "=" conditionExpression
+}
+
+GuardStatement { kw<"guard"> ~guardReference ConditionList kw<"else"> CodeBlock }
+
+WhileStatement { kw<"while"> ~whileReference ConditionList CodeBlock }
+
+RepeatStatement[@dynamicPrecedence=2] {
+  kw<"repeat"> !repeatStatement CodeBlock ~repeatBody lineBreak? kw<"while"> expression
+}
+
+ForStatement {
+  kw<"for"> ~forReference kw<"try">? ckw<"await">? ckw<"unsafe">?
+  (kw<"case"> ~caseRole SwitchCasePattern TypeAnnotation? | pattern resultTypeAnnotation?)
+  kw<"in"> conditionExpression WhereClause? CodeBlock
+}
+
+WhereClause { ckw<"where"> conditionExpression }
+
+// Typed-throws `do` remains a statement. Plain `do` is modeled below as a
+// DoExpression, matching SwiftSyntax when the DoExpressions feature is on.
+DoStatement { kw<"do"> ThrowsClause CodeBlock CatchClause* }
+
+ThrowsClause { ckw<"throws"> ThrowsType? }
+
+CatchClause { kw<"catch"> CatchItemList? CodeBlock }
+
+CatchItemList { commaSep1<CatchItem> }
+
+CatchItem {
+  !catchWhere WhereClause |
+  pattern WhereClause? |
+  catchPatternLookahead catchPattern WhereClause?
+}
+
+catchPattern {
+  ValueBindingPattern<bindingMatchingPattern> |
+  ContextualValueBindingPattern |
+  IsTypePattern |
+  catchIdentifierPattern |
+  matchingPatternExpression
+}
+
+catchIdentifierPattern[@name=IdentifierPattern] {
+  Identifier !catchIdentifier
+}
+
+DeferStatement { kw<"defer"> CodeBlock }
+
+ReturnStatement[@dynamicPrecedence=1] { kw<"return"> ~returnReference expression? }
+
+ThrowStatement[@dynamicPrecedence=1] { kw<"throw"> ~throwReference expression }
+
+BreakStatement[@dynamicPrecedence=1] { kw<"break"> Identifier? }
+
+ContinueStatement[@dynamicPrecedence=1] { kw<"continue"> Identifier? }
+
+FallThroughStatement[@dynamicPrecedence=1] { kw<"fallthrough"> }
+
+YieldStatement { ckw<"yield"> expression }
+
+DiscardStatement { ckw<"discard"> expression }
+
+ThenStatement[@dynamicPrecedence=-1] { ckw<"then"> expression }
+
+ExpressionStatement { expression }
+
+expression[@isGroup=Expression] { expressionFlavor<postfixExpression, BinaryOperator> }
+
+conditionExpression { expressionFlavor<conditionPostfixExpression, BinaryOperator> }
+
+// SwiftSyntax materializes `async`/`throws` plus `->` as an ArrowExpr element
+// in an expression sequence; `rethrows` does not start that operator.
+expressionFlavor<postfix, binaryOperator> {
+  TernaryExpression {
+    expressionFlavor<postfix, binaryOperator> !ternary infixQuestionMark
+    expressionFlavor<postfix, binaryOperator> ":" expressionFlavor<postfix, binaryOperator>
+  } |
+  SequenceExpression {
+    prefixExpressionFlavor<postfix, binaryOperator>
+    (!sequence (
+      castSequenceTail |
+      (
+        binaryOperator |
+        ArrowExpression[@isGroup=Expression] { typeEffectSpecifiers? "->" }
+      ) prefixExpressionFlavor<postfix, binaryOperator>
+    ))+
+  } |
+  prefixExpressionFlavor<postfix, binaryOperator>
+}
+
+castSequenceTail {
+  CastOperator castTypeExpression
+}
+
+castTypeExpression[@name=TypeExpression,@isGroup=Expression] { type }
+
+prefixExpressionFlavor<postfix, binaryOperator> {
+  TryExpression {
+    kw<"try"> ~tryReference TrySuffix? prefixExpressionFlavor<postfix, binaryOperator>
+  } |
+  AwaitExpression { ckw<"await"> prefixExpressionFlavor<postfix, binaryOperator> } |
+  UnsafeExpression { ckw<"unsafe"> prefixExpressionFlavor<postfix, binaryOperator> } |
+  ConsumeExpression[@dynamicPrecedence=-1] {
+    (ckw<"consume"> | ckw<"_move">) prefixExpressionFlavor<postfix, binaryOperator>
+  } |
+  CopyExpression { ckw<"copy"> prefixExpressionFlavor<postfix, binaryOperator> } |
+  BorrowExpression[@dynamicPrecedence=-1] {
+    (ckw<"borrow"> | ckw<"_borrow">) prefixExpressionFlavor<postfix, binaryOperator>
+  } |
+  PackExpansionExpression[@isGroup=Expression,@dynamicPrecedence=-1] {
+    kw<"repeat"> !packExpansion expressionFlavor<postfix, binaryOperator>
+  } |
+  PackElementExpression[@isGroup=Expression,@dynamicPrecedence=-1] {
+    ckw<"each"> prefixExpressionFlavor<postfix, binaryOperator>
+  } |
+  InOutExpression { prefixAmpersand !prefix prefixExpressionFlavor<postfix, binaryOperator> } |
+  PrefixOperatorExpression {
+    PrefixOperator !prefix prefixExpressionFlavor<postfix, binaryOperator>
+  } |
+  DoExpression |
+  KeyPathExpression |
+  postfix
+}
+
+// With SwiftSyntax's DoExpressions feature enabled, `do` is a single-value
+// expression. It is deliberately kept at the unary layer: the upstream parser
+// does not attach postfix suffixes to do/if/switch expressions, avoiding the
+// ambiguity between a following `.member` and a result-builder member.
+DoExpression[@isGroup=Expression] { kw<"do"> CodeBlock CatchClause* }
+
+// SwiftSyntax's `parseKeyPathExpression` is dispatched from
+// `parseUnaryExpression`, rather than its general postfix parser. Keeping the
+// whole path here prevents a completed key path from acquiring arbitrary
+// ordinary postfix suffixes.
+KeyPathExpression[@isGroup=Expression] {
+  keyPathBackslash (
+    keyPathRoot keyPathInitialComponents? |
+    keyPathPropertyComponent keyPathInitialComponents? |
+    keyPathRootlessTransitionComponent keyPathRemainingComponents?
+  )
+}
+
+// Property and method components preserve SwiftSyntax's
+// `mayBeAfterTypeName` state. A first optional or subscript component moves
+// the path into the remaining phase, where a period may only introduce
+// another property or method.
+keyPathInitialComponents {
+  keyPathPropertyComponent keyPathInitialComponents? |
+  keyPathTransitionComponent keyPathRemainingComponents?
+}
+
+keyPathPropertyComponent[@name=KeyPathComponent] {
+  "." keyPathPropertyOrMethod
+}
+
+keyPathPropertyOrMethod[@inline] {
+  KeyPathMethodComponent |
+  KeyPathPropertyComponent
+}
+
+keyPathTransitionComponent[@name=KeyPathComponent] {
+  "." KeyPathSubscriptComponent |
+  KeyPathSubscriptComponent |
+  keyPathDottedOptionalComponentLookahead "." KeyPathOptionalComponent
+}
+
+keyPathRootlessTransitionComponent[@name=KeyPathComponent] {
+  "." KeyPathSubscriptComponent |
+  keyPathDottedOptionalComponentLookahead "." KeyPathOptionalComponent
+}
+
+keyPathRemainingComponent[@name=KeyPathComponent] {
+  "." keyPathPropertyOrMethod |
+  KeyPathSubscriptComponent |
+  KeyPathOptionalComponent
+}
+
+keyPathRemainingComponents {
+  keyPathRemainingComponent keyPathRemainingComponents?
+}
+
+// Property components may carry a generic argument clause. Reusing the
+// ordinary generic lookahead keeps a `<` expression operator from becoming a
+// key-path generic specialization.
+KeyPathPropertyComponent {
+  memberDeclReferenceExpression
+  (keyPathGenericArgumentLookahead GenericArgumentClause)?
+}
+
+// SwiftSyntax retains generic arguments before a fully-applied key-path method
+// as recovery-only unexpected syntax. Strict method components therefore have
+// only the declaration reference and ordinary argument clause.
+KeyPathMethodComponent {
+  memberDeclReferenceExpression "(" commaSep<LabeledExpression> ")"
+}
+
+KeyPathSubscriptComponent { "[" commaSep<LabeledExpression> "]" }
+
+// The phase-specific optional-component markers keep a combined `.?!`
+// operator in the key path without consuming a later dotted operator once the
+// path has left its type-name phase. The existing optional-type question token
+// then consumes one question mark at a time, giving the CST one component per
+// suffix.
+KeyPathOptionalComponent { optionalTypeQuestionMark | "!" }
+
+// `parseSimpleType(allowMemberTypes: false)` parses the root. In particular,
+// the identifier form intentionally stops before an ordinary `.member`, while
+// `.Type` and `.Protocol` remain part of the root as metatype suffixes.
+keyPathRoot {
+  OptionalType[@isGroup=Type] {
+    keyPathRoot !keyPathRootSuffix optionalTypeQuestionMark
+  } |
+  ImplicitlyUnwrappedOptionalType[@isGroup=Type] { keyPathRoot !keyPathRootSuffix "!" } |
+  SuppressedType[@isGroup=Type] { "~" keyPathRoot } |
+  MetatypeType[@isGroup=Type] {
+    keyPathRoot !keyPathRootSuffix "." metatypeSpecifier
+  } |
+  keyPathRootSimpleType
+}
+
+keyPathRootSimpleType[@inline] {
+  ArrayType |
+  DictionaryType |
+  TupleType |
+  keyPathIdentifierType
+}
+
+keyPathIdentifierType[@name=IdentifierType,@isGroup=Type] {
+  (ModuleSelector moduleSelectedName | TypeIdentifierName)
+  (keyPathGenericArgumentLookahead GenericArgumentClause)?
+}
+
+// SwiftSyntax's postfix loop permits an arbitrary operator before any later
+// member, generic, subscript, optional, force, or call suffix. Keeping the
+// ordinary path separate makes the second layer require at least one custom
+// postfix operator, avoiding a parallel parse of every ordinary expression.
+ordinaryPostfixExpression {
+  postfixExpressionFlavor<
+    ordinaryPostfixExpression,
+    BasicCallSuffix,
+    primaryExpression,
+    LabeledExpression
+  > |
+  SubscriptCallExpression {
+    ordinaryPostfixExpression !subscript "[" commaSep<LabeledExpression> "]"
+    !trailingClosure TrailingClosureClause
+  }
+}
+
+postfixExpression {
+  ordinaryPostfixExpression |
+  customPostfixExpressionFlavor<
+    postfixExpression,
+    BasicCallSuffix,
+    LabeledExpression
+  > |
+  SubscriptCallExpression {
+    customPostfixExpressionFlavor<
+      postfixExpression,
+      BasicCallSuffix,
+      LabeledExpression
+    > !subscript "[" commaSep<LabeledExpression> "]"
+    !trailingClosure TrailingClosureClause
+  } |
+  postfixIfConfigSuffix<postfixExpression>
+}
+
+ordinaryConditionPostfixExpression {
+  postfixExpressionFlavor<
+    ordinaryConditionPostfixExpression,
+    conditionCallSuffix,
+    primaryExpression,
+    LabeledExpression
+  >
+}
+
+conditionPostfixExpression {
+  ordinaryConditionPostfixExpression |
+  customPostfixExpressionFlavor<
+    conditionPostfixExpression,
+    conditionCallSuffix,
+    LabeledExpression
+  > |
+  postfixIfConfigSuffix<conditionPostfixExpression>
+}
+
+conditionCallSuffix {
+  ConditionArgumentClause<expression> |
+  conditionTrailingClosureLookahead TrailingClosureClause
+}
+
+ordinaryMatchingPatternPostfixExpression {
+  postfixExpressionFlavor<
+    ordinaryMatchingPatternPostfixExpression,
+    ConditionArgumentClause<matchingPatternArgument>,
+    matchingPatternPrimaryExpression,
+    ConditionLabeledExpression<matchingPatternArgument>
+  >
+}
+
+matchingPatternPostfixExpression {
+  ordinaryMatchingPatternPostfixExpression |
+  customPostfixExpressionFlavor<
+    matchingPatternPostfixExpression,
+    ConditionArgumentClause<matchingPatternArgument>,
+    ConditionLabeledExpression<matchingPatternArgument>
+  > |
+  postfixIfConfigSuffix<matchingPatternPostfixExpression>
+}
+
+bindingPatternPostfixExpression {
+  bindingIdentifierPattern |
+  bindingExpressionPostfixExpression
+}
+
+contextualBindingPostfixExpression {
+  postfixExpressionSuffixFlavor<
+    contextualBindingPostfixHead,
+    ConditionArgumentClause<bindingPatternArgument>,
+    ConditionLabeledExpression<bindingPatternArgument>
+  >
+}
+
+contextualBindingPostfixHead {
+  bindingReferenceIdentifier |
+  contextualBindingPostfixExpression
+}
+
+ordinaryBindingExpressionPostfixExpression {
+  postfixExpressionFlavor<
+    ordinaryBindingExpressionPostfixExpression,
+    ConditionArgumentClause<bindingPatternArgument>,
+    bindingExpressionPrimaryExpression,
+    ConditionLabeledExpression<bindingPatternArgument>
+  >
+}
+
+bindingExpressionPostfixExpression {
+  ordinaryBindingExpressionPostfixExpression |
+  customPostfixExpressionFlavor<
+    bindingExpressionPostfixExpression,
+    ConditionArgumentClause<bindingPatternArgument>,
+    ConditionLabeledExpression<bindingPatternArgument>
+  > |
+  postfixIfConfigSuffix<bindingExpressionPostfixExpression>
+}
+
+bindingExpressionPrimaryExpression {
+  bindingPatternPrimaryExpression |
+  MemberAccessExpression {
+    bindingReferenceIdentifier postfixMemberLookahead !member "." memberAccessName
+  } |
+  genericSpecializationExpression<bindingReferenceIdentifier> |
+  SubscriptCallExpression {
+    bindingReferenceIdentifier !subscript "["
+    commaSep<ConditionLabeledExpression<bindingPatternArgument>> "]"
+  } |
+  FunctionCallExpression {
+    bindingReferenceIdentifier !call ConditionArgumentClause<bindingPatternArgument>
+  } |
+  OptionalChainingExpression {
+    bindingIdentifierPattern !optionalChain postfixQuestionMark
+  } |
+  ForceUnwrapExpression { bindingIdentifierPattern !forceUnwrap "!" } |
+  PostfixOperatorExpression {
+    bindingIdentifierPattern !postfixOperator postfixRangeOperator
+  }
+}
+
+bindingReferenceIdentifier {
+  DeclReferenceExpression {
+    Identifier |
+    kw<"self">
+  }
+}
+
+bindingIdentifierPattern {
+  IdentifierPattern { Identifier | kw<"self"> }
+}
+
+postfixExpressionFlavor<head, callSuffix, primary, argument> {
+  primary |
+  postfixExpressionSuffixFlavor<head, callSuffix, argument>
+}
+
+postfixExpressionSuffixFlavor[@inline]<head, callSuffix, argument> {
+  MemberAccessExpression { head postfixMemberLookahead !member "." memberAccessName } |
+  genericSpecializationExpression<head> |
+  SubscriptCallExpression {
+    head !subscript "[" commaSep<argument> "]"
+  } |
+  OptionalChainingExpression { head !optionalChain postfixQuestionMark } |
+  ForceUnwrapExpression { head !forceUnwrap "!" } |
+  PostfixOperatorExpression { head !postfixOperator postfixRangeOperator } |
+  FunctionCallExpression { head !call callSuffix }
+}
+
+customPostfixExpressionFlavor<full, callSuffix, argument> {
+  PostfixOperatorExpression {
+    full !postfixCustom postfixCustomOperator
+  } |
+  postfixExpressionSuffixFlavor<
+    customPostfixExpressionFlavor<full, callSuffix, argument>,
+    callSuffix,
+    argument
+  >
+}
+
+genericSpecializationExpression[@name=GenericSpecializationExpression,@dynamicPrecedence=1]<head> {
+  head genericArgumentLookahead GenericArgumentClause
+}
+
+postfixIfConfigSuffix[@inline]<head> {
+  PostfixIfConfigExpression[@isGroup=Expression] {
+    head postfixIfConfigLookahead postfixIfConfigDeclaration
+  }
+}
+
+// SwiftSyntax treats a conditional-compilation block whose first body starts
+// with a dotted suffix as part of the preceding postfix expression. Keep the
+// directive tree structural; the lookaheads only select this expression-only
+// interpretation and its required dotted clause entries.
+postfixIfConfigDeclaration[@name=IfConfigDeclaration,@isGroup=Declaration] {
+  postfixIfConfigIfClause
+  postfixIfConfigElseifClause*
+  postfixIfConfigElseClause?
+  PoundEndif
+}
+
+postfixIfConfigIfClause[@name=IfConfigIfClause] {
+  PoundIf IfConfigCondition lineBreak postfixIfConfigClauseItemList
+}
+
+postfixIfConfigElseifClause[@name=IfConfigElseifClause] {
+  PoundElseif IfConfigCondition lineBreak postfixIfConfigClauseItemList?
+}
+
+postfixIfConfigElseClause[@name=IfConfigElseClause] {
+  PoundElse lineBreak postfixIfConfigClauseItemList?
+}
+
+postfixIfConfigClauseItemList {
+  postfixIfConfigClauseElement
+  (codeItemSeparator postfixIfConfigClauseElement)* codeItemSeparator?
+}
+
+postfixIfConfigClauseElement {
+  postfixIfConfigClauseLookahead postfixExpression |
+  rootlessPostfixIfConfigExpression
+}
+
+rootlessPostfixIfConfigExpression[@name=PostfixIfConfigExpression,@isGroup=Expression] {
+  postfixIfConfigDeclaration
+}
+
+BasicCallSuffix {
+  ArgumentClause (!trailingClosure TrailingClosureClause)? |
+  TrailingClosureClause
+}
+
+TrailingClosureClause {
+  ClosureExpression ~additionalTrailingClosure |
+  ClosureExpression ~additionalTrailingClosure lineBreak? additionalTrailingClosureList
+}
+
+additionalTrailingClosureList {
+  AdditionalTrailingClosure ~additionalTrailingClosure |
+  AdditionalTrailingClosure ~additionalTrailingClosure
+  lineBreak? additionalTrailingClosureList
+}
+
+AdditionalTrailingClosure { ArgumentLabel ":" ClosureExpression }
+
+primaryExpression {
+  DiscardAssignmentExpression |
+  DeclReferenceExpression |
+  primaryExpressionBase |
+  tupleExpression<LabeledExpression>
+}
+
+// A leading `_` may be either a discard expression in the closure body or a
+// shorthand closure parameter. The later `in` selects the parameter parse.
+DiscardAssignmentExpression[@isGroup=Expression] { "_" }
+
+matchingPatternPrimaryExpression {
+  WildcardPattern |
+  DeclReferenceExpression |
+  primaryExpressionBase |
+  tupleExpression<ConditionLabeledExpression<matchingPatternArgument>>
+}
+
+bindingPatternPrimaryExpression {
+  WildcardPattern |
+  [@dynamicPrecedence=2] {
+    DeclReferenceExpression {
+      DollarIdentifier |
+      kw<"Self">
+    }
+  } |
+  primaryExpressionBase |
+  tupleExpression<ConditionLabeledExpression<bindingPatternArgument>>
+}
+
+primaryExpressionBase {
+  contextualAnyCallExpression |
+  IfExpression |
+  SwitchExpression |
+  MacroExpansionExpression |
+  ImplicitMemberExpression { "." implicitMemberDeclReferenceExpression } |
+  SuperExpression { kw<"super"> ~compoundReference } |
+  TypeExpression {
+    inlineArrayTypeExpressionLookahead InlineArrayType
+  } |
+  TypeExpression {
+    attributedTypeExpressionLookahead type
+  } |
+  TypeExpression { contextualAnyTypeLookahead anyTypeExpression } |
+  TypeExpression { kw<"Any"> ~compoundReference } |
+  IntegerLiteralExpression |
+  FloatLiteralExpression { FloatLiteral } |
+  StringLiteralExpression { StringLiteral } |
+  RegexLiteralExpression { RegexLiteral } |
+  BooleanLiteralExpression { BooleanLiteral ~compoundReference } |
+  NilLiteralExpression { kw<"nil"> ~compoundReference } |
+  CollectionExpression {
+    "["
+    (":" | CollectionElement ("," CollectionElement)* ","?)?
+    "]"
+  } |
+  ClosureExpression
+}
+
+contextualAnyCallExpression[
+  @name=FunctionCallExpression,
+  @isGroup=Expression,
+  @dynamicPrecedence=1
+] {
+  DeclReferenceExpression { contextualAnyCallName ~contextualAny } BasicCallSuffix
+}
+
+contextualAnyCallName[@name=Identifier] { ckw<"any"> }
+
+DeclReferenceExpression {
+  compoundDeclReference |
+  ModuleSelector moduleSelectedDeclReferenceName |
+  Identifier ~compoundReference |
+  DollarIdentifier |
+  [@dynamicPrecedence=1] { kw<"init"> ~compoundReference ~initRole } |
+  kw<"self"> ~compoundReference |
+  kw<"Self"> ~compoundReference
+}
+
+compoundDeclReference {
+  ModuleSelector? compoundReferenceIdentifier ~compoundReference
+  declNameArgumentsLookahead DeclNameArguments |
+  ModuleSelector? kw<"init"> ~compoundReference
+  declNameArgumentsLookahead DeclNameArguments |
+  kw<"self"> ~compoundReference declNameArgumentsLookahead DeclNameArguments |
+  kw<"Self"> ~compoundReference declNameArgumentsLookahead DeclNameArguments
+}
+
+moduleSelectedDeclReferenceName {
+  moduleSelectedName
+}
+
+tupleExpression<argument> {
+  TupleExpression {
+    "(" commaSep<argument> ")"
+  }
+}
+
+MacroExpansionExpression { "#" macroExpansionReference }
+
+macroExpansionReference {
+  ModuleSelector moduleSelectedName |
+  contextualName
+}
+
+contextualName { Identifier | keywordIdentifierToken }
+
+CollectionElement { expression (":" expression)? }
+
+ClosureExpression {
+  "{" (closureSignatureLookahead ClosureSignature)? codeBlockItemList? "}" ~repeatBody
+}
+
+ClosureSignature {
+  attributeListElement* ClosureCaptureClause? (
+    ParenthesizedClosureParameterClause typeEffectSpecifiers? ReturnClause? |
+    UnparenthesizedClosureParameterClause typeEffectSpecifiers? ReturnClause?
+  )? kw<"in">
+}
+
+ClosureCaptureClause {
+  "[" commaSep<ClosureCaptureItem> "]"
+}
+
+ClosureCaptureItem {
+  ClosureCaptureSpecifier* (Identifier | kw<"self">)
+  InitializerClause?
+}
+
+ClosureCaptureSpecifier {
+  ckw<"weak"> | ckw<"unowned"> ModifierDetail?
+}
+
+ParenthesizedClosureParameterClause {
+  "(" commaSep<ClosureParameter> ")"
+}
+
+UnparenthesizedClosureParameterClause { commaSep1<ClosureShorthandParameter> }
+
+ClosureShorthandParameter { Identifier | "_" }
+
+ClosureParameter {
+  attributeListElement* parameterModifier*
+  ParameterNames TypeAnnotation?
+}
+
+IfExpression {
+  kw<"if"> ~ifReference ConditionList CodeBlock
+  (!conditionalElse kw<"else"> (IfExpression | CodeBlock))?
+}
+
+SwitchExpression {
+  kw<"switch"> ~switchReference conditionExpression "{" switchCaseListElement* "}"
+}
+
+switchCaseListElement {
+  SwitchCase |
+  switchCaseIfConfigLookahead switchIfConfigDeclaration |
+  switchCaseDiagnosticLookahead MacroExpansionDeclaration
+}
+
+switchIfConfigDeclaration[@name=IfConfigDeclaration,@isGroup=Declaration] {
+  switchIfConfigIfClause
+  switchIfConfigElseifClause*
+  switchIfConfigElseClause?
+  PoundEndif
+}
+
+switchIfConfigIfClause[@name=IfConfigIfClause] {
+  PoundIf IfConfigCondition lineBreak switchCaseListElement*
+}
+
+switchIfConfigElseifClause[@name=IfConfigElseifClause] {
+  PoundElseif IfConfigCondition lineBreak switchCaseListElement*
+}
+
+switchIfConfigElseClause[@name=IfConfigElseClause] {
+  PoundElse lineBreak switchCaseListElement*
+}
+
+SwitchCase {
+  (switchCaseAttributeLookahead Attribute)? SwitchCaseLabel switchCaseItemList?
+}
+
+switchCaseItemList {
+  SwitchCaseCodeBlockItem (codeItemSeparator SwitchCaseCodeBlockItem)* codeItemSeparator?
+}
+
+SwitchCaseCodeBlockItem {
+  (
+    switchCaseDeclaration |
+    statement |
+    switchCaseBodyDiagnosticLookahead ExpressionStatement |
+    ExpressionStatement
+  )
+}
+
+switchCaseDeclaration {
+  attributeListElement* DeclarationModifier* (
+    switchCaseBodyIfConfigLookahead IfConfigDeclaration |
+    nonIfConfigDeclarationKind
+  )
+}
+
+SwitchCaseLabel {
+  kw<"case"> ~caseRole commaSep1<SwitchCaseItem> ":" |
+  ckw<"default"> ":"
+}
+
+SwitchCaseItem { SwitchCasePattern WhereClause? }
+
+SwitchCasePattern { matchingPattern }
+
+// SwiftSyntax parseMatchingPattern re-enters the binding-introducer context
+// after every specifier. This also follows TSPL's `(var | let) pattern` rule.
+matchingPattern {
+  ValueBindingPattern<bindingMatchingPattern> |
+  ContextualValueBindingPattern |
+  IsTypePattern |
+  matchingPatternExpression
+}
+
+bindingMatchingPattern {
+  ValueBindingPattern<bindingMatchingPattern> |
+  ContextualValueBindingPattern |
+  IsTypePattern |
+  bindingPatternExpression
+}
+
+ContextualValueBindingPattern[@name=ValueBindingPattern,@dynamicPrecedence=1] {
+  (ckw<"_borrowing"> | ckw<"borrowing">) (
+    bindingIdentifierPattern |
+    WildcardPattern |
+    contextualBindingPostfixExpression
+  )
+}
+
+matchingPatternExpression {
+  expressionFlavor<matchingPatternPostfixExpression, patternBinaryOperator>
+}
+
+bindingPatternExpression {
+  expressionFlavor<bindingPatternPostfixExpression, patternBinaryOperator>
+}
+
+IsTypePattern { kw<"is"> ~isTypeRole type }
+
+memberAccessName[@inline] { memberDeclReferenceExpression }
+
+memberDeclReferenceExpression[@name=DeclReferenceExpression,@isGroup=Expression] {
+  tupleMemberInteger | memberDeclReferenceCore
+}
+
+implicitMemberDeclReferenceExpression[@name=DeclReferenceExpression,@isGroup=Expression] {
+  memberDeclReferenceCore
+}
+
+memberDeclReferenceCore {
+  moduleSelectedMemberDeclReference |
+  [@dynamicPrecedence=1] { kw<"self"> ~compoundReference } |
+  [@dynamicPrecedence=1] { kw<"Self"> ~compoundReference } |
+  kw<"init"> ~compoundReference |
+  memberDeclReferenceBase |
+  memberCompoundReferenceIdentifier ~compoundReference
+  declNameArgumentsLookahead DeclNameArguments |
+  [@dynamicPrecedence=1] {
+    kw<"init"> ~compoundReference declNameArgumentsLookahead DeclNameArguments |
+    kw<"Self"> ~compoundReference declNameArgumentsLookahead DeclNameArguments
+  }
+}
+
+moduleSelectedMemberDeclReference {
+  ModuleSelector moduleSelectedDeclReferenceName
+}
+
+memberDeclReferenceBase[@inline] {
+  Identifier ~compoundReference |
+  DollarIdentifier |
+  keywordIdentifierToken ~compoundReference
+}
+
+DeclNameArguments { "(" DeclNameArgument+ ")" }
+
+DeclNameArgument { declNameArgumentLabel ~nameColonRole ":" }
+
+declNameArgumentLabel[@inline] { Identifier | keywordIdentifierToken | "_" }
+
+ArgumentClause { "(" commaSep<LabeledExpression> ")" }
+
+ConditionArgumentClause<item> { "(" commaSep<ConditionLabeledExpression<item>> ")" }
+
+ConditionLabeledExpression<item> {
+  item | operatorReferenceExpression |
+  ArgumentLabel ":" (item | operatorReferenceExpression)
+}
+
+matchingPatternArgument { matchingPattern }
+
+bindingPatternArgument { bindingMatchingPattern }
+
+LabeledExpression {
+  expression | operatorReferenceExpression |
+  ArgumentLabel ":" (expression | operatorReferenceExpression)
+}
+
+operatorReferenceExpression[@inline] {
+  DeclReferenceExpression { ModuleSelector? binaryOperatorReference }
+}
+
+binaryOperatorReference[@inline] {
+  "==" | "!=" | "<" | "<=" | ">" | ">=" |
+  "+" | "-" | "*" | "/" | "%" | "&&" | "||" | "??" |
+  binaryAmpersand | binaryRangeOperator | customOperator
+}
+
+ArgumentLabel { Identifier | keywordIdentifierToken | "_" }
+
+BooleanLiteral { @specialize<identifier, "true" | "false"> }
+
+BinaryOperator {
+  "=" | binaryOperatorWithoutAssignment
+}
+
+binaryOperatorWithoutAssignment[@inline] {
+  "==" | "!=" | "<" | "<=" | ">" | ">=" |
+  "+" | "-" | "*" | "/" | "%" | "&&" | "||" | "??" |
+  binaryAmpersand |
+  binaryRangeOperator |
+  binaryCustomOperator
+}
+
+patternBinaryOperator[@name=BinaryOperator] {
+  binaryOperatorWithoutAssignment
+}
+
+CastOperator {
+  kw<"as"> ~castSuffix ("?" | "!")? |
+  kw<"is"> ~isTypeRole
+}
+
+TrySuffix { (postfixQuestionMark | "!") ~trySuffix }
+
+PrefixOperator {
+  "!" ~trySuffix | "+" | "-" | prefixTilde | prefixRangeOperator |
+  prefixCustomOperator
+}
+
+type[@isGroup=Type] {
+  (
+    PackExpansionType[@isGroup=Type] {
+      kw<"repeat"> ~repeatTypeRole typeScalar
+    } |
+    typeScalar
+  ) ~compoundReference ~keywordRole ~modifierReference
+}
+
+typeScalar {
+  AttributedType[@isGroup=Type] { attributedTypePrefix+ unattributedTypeScalar } |
+  unattributedTypeScalar
+}
+
+attributedTypePrefix {
+  Attribute | SimpleTypeSpecifier | NonisolatedTypeSpecifier | LifetimeTypeSpecifier
+}
+
+unattributedTypeScalar {
+  FunctionType[@isGroup=Type] { TupleType !functionType typeEffectSpecifiers? "->" type } |
+  typeComposition
+}
+
+typeComposition[@inline] {
+  compositionType |
+  typeElement
+}
+
+compositionType[@name=CompositionType,@isGroup=Type] {
+  typeElement !composition ("&" typeElement)+
+}
+
+typeElement {
+  PackElementType[@isGroup=Type] { ckw<"each"> typeSuffix } |
+  typeSuffix
+}
+
+typeSuffix {
+  OptionalType[@isGroup=Type] {
+    typeSuffix !optionalType optionalTypeQuestionMark
+  } |
+  ImplicitlyUnwrappedOptionalType[@isGroup=Type] {
+    typeSuffix !optionalType typeExclamationMark
+  } |
+  MemberType[@isGroup=Type] {
+    typeSuffix !typeMember "." memberIdentifierTypeComponent
+  } |
+  MetatypeType[@isGroup=Type] {
+    typeSuffix !typeMember "." metatypeSpecifier
+  } |
+  SomeOrAnyType[@isGroup=Type] {
+    (ckw<"some"> | ckw<"any">) someOrAnyConstraint
+  } |
+  simpleType<typeSuffix>
+}
+
+// SwiftSyntax parses contextual `any` at the expression-prefix layer, then
+// gives the complete following constraint to its ordinary type parser. Keep
+// the same SomeOrAnyType/CompositionType ownership instead of reducing at an
+// expression-level binary `&`.
+anyTypeExpression[@name=SomeOrAnyType,@isGroup=Type] {
+  ckw<"any"> ~contextualAny (
+    CompositionType[@isGroup=Type] {
+      simpleTypeWithoutSuffix !composition
+      (anyTypeCompositionAmpersand simpleTypeWithoutSuffix)+
+    } |
+    simpleTypeWithoutSuffix
+  )
+}
+
+someOrAnyConstraint {
+  someOrAnyComposition |
+  simpleTypeWithoutSuffix
+}
+
+someOrAnyComposition[@name=CompositionType,@isGroup=Type] {
+  simpleTypeWithoutSuffix !composition ("&" simpleTypeWithoutSuffix)+
+}
+
+simpleTypeWithoutSuffix { simpleType<simpleTypeWithoutSuffix> }
+
+simpleType<inner> {
+  SuppressedType[@isGroup=Type] { "~" inner } |
+  simpleTypeBase
+}
+
+simpleTypeBase[@inline] {
+  InlineArrayType |
+  ArrayType |
+  DictionaryType |
+  TupleType |
+  IdentifierType
+}
+
+InlineArrayType[@isGroup=Type] {
+  "[" genericArgument ckw<"of"> genericArgument "]"
+}
+
+ArrayType[@isGroup=Type] { "[" type "]" }
+
+DictionaryType[@isGroup=Type] { "[" type ":" type "]" }
+
+SimpleTypeSpecifier {
+  kw<"inout"> | ckw<"borrowing"> | ckw<"consuming"> | ckw<"sending"> |
+  [@dynamicPrecedence=-2] {
+    ckw<"isolated"> ~parameterModifierRole |
+    ckw<"_const"> ~parameterModifierRole
+  } |
+  ckw<"__shared"> | ckw<"__owned">
+}
+
+NonisolatedTypeSpecifier {
+  ckw<"nonisolated">
+  (nonisolatedSpecifierArgumentLookahead NonisolatedSpecifierArgument)?
+}
+
+NonisolatedSpecifierArgument { "(" ckw<"nonsending"> ")" }
+
+// SwiftSyntax TypeSpecifierListSyntax gives the optional `scoped` keyword to
+// the complete argument list, not to each LifetimeSpecifierArgument.
+LifetimeTypeSpecifier[@dynamicPrecedence=-1] {
+  ckw<"dependsOn"> "(" ckw<"scoped">?
+  lifetimeSpecifierArgumentWithComma* lifetimeSpecifierArgumentLast ")"
+}
+
+lifetimeSpecifierArgumentWithComma[@name=LifetimeSpecifierArgument] {
+  lifetimeSpecifierParameter ","
+}
+
+lifetimeSpecifierArgumentLast[@name=LifetimeSpecifierArgument] {
+  lifetimeSpecifierParameter
+}
+
+lifetimeSpecifierParameter { Identifier | kw<"self"> | IntegerLiteral }
+
+TupleType[@isGroup=Type] { "(" ~keywordRole commaSep<TupleTypeElement> ")" }
+
+TupleTypeElement {
+  TupleTypeElementLabel? type "..."?
+}
+
+TupleTypeElementLabel {
+  parameterName parameterName? ":"
+}
+
+IdentifierType[@isGroup=Type] {
+  identifierTypeComponent
+}
+
+identifierTypeComponent[@inline] {
+  (ModuleSelector moduleSelectedName | TypeIdentifierName)
+  (!generic GenericArgumentClause)?
+}
+
+memberIdentifierTypeComponent[@inline] {
+  (ModuleSelector moduleSelectedName | memberTypeIdentifierName)
+  (!generic GenericArgumentClause)?
+}
+
+TypeIdentifierName { Identifier | kw<"Self"> | kw<"Any"> | "_" }
+
+// SwiftSyntax's MemberTypeSyntax admits an identifier or lowercase `self` and
+// remaps capital `Self` as a member identifier. IdentifierTypeSyntax does not
+// admit lowercase `self` as its root name.
+memberTypeIdentifierName[@name=TypeIdentifierName] {
+  Identifier | kw<"Self"> | kw<"self">
+}
+
+GenericArgumentClause { "<" commaSep<genericArgument> ">" }
+
+genericArgument[@inline] { type | genericValueExpression }
+
+// SwiftSyntax deliberately bounds value-generic arguments and same-type
+// operands to integer literals, with an optional unary minus. General
+// expressions do not enter generic disambiguation through this rule.
+genericValueExpression {
+  IntegerLiteralExpression |
+  negativeIntegerLiteralExpression |
+  parenthesizedGenericValueLookahead tupleExpression<LabeledExpression>
+}
+
+IntegerLiteralExpression[@isGroup=Expression] { IntegerLiteral }
+
+negativeIntegerLiteralExpression[@name=PrefixOperatorExpression,@isGroup=Expression] {
+  "-" IntegerLiteralExpression
+}
+
+Identifier { identifier }
+
+DollarIdentifier { dollarIdentifier }
+
+TypeName { Identifier }
+
+ModuleSelector[@dynamicPrecedence=1] { Identifier ~moduleSelector "::" }
+
+moduleSelectedName {
+  (Identifier | DollarIdentifier | keywordIdentifierToken) ~compoundReference
+}
+
+compoundReferenceIdentifier[@inline] { Identifier }
+
+// Reserved spellings are identifiers only in the productions that explicitly
+// remap lexer keywords (labels, member names, module-selected names, and macro
+// names). Keeping ordinary unqualified references on `Identifier` prevents
+// every declaration keyword from opening a redundant expression parse.
+memberCompoundReferenceIdentifier[@inline] { Identifier | keywordIdentifierToken }
+
+kw<term> { @specialize[@name={term}]<identifier, term> }
+
+ckw<term> { @extend[@name={term}]<identifier, term> }
+
+metatypeSpecifier[@inline] {
+  TypeKeyword | ProtocolKeyword
+}
+
+resultTypeAnnotation[@name=TypeAnnotation] { ":" (NamedOpaqueReturnType | type) }
+
+resultReturnClause[@name=ReturnClause] { "->" (NamedOpaqueReturnType | type) }
+
+NamedOpaqueReturnType[@isGroup=Type] { GenericParameterClause type }
+
+commaSep<item> { (item ("," item)* ","?)? }
+
+commaSep1<item> { item ("," item)* ","? }
+
+codeItemSeparator[@inline] { ";" | lineBreak }
+
+@skip { whitespace | LineComment | BlockComment }
+
+// Keep the outer opener in the main token group so comments remain ordinary
+// skip syntax. After it shifts, only comment-internal tokens are active.
+@local tokens {
+  blockCommentStart { "/*" }
+
+  blockCommentContent { ![*/] blockCommentContent? | "*" blockCommentStar | "/" blockCommentSlash }
+  blockCommentStar { ![/*] blockCommentContent | "*" blockCommentStar }
+  blockCommentSlash { ![/*] blockCommentContent | "/" blockCommentSlash }
+
+  blockCommentEnd { ![*/] blockCommentEnd | "*" blockCommentEndStar | "/" blockCommentEndSlash }
+  blockCommentEndStar { "/" | ![/*] blockCommentEnd | "*" blockCommentEndStar }
+  blockCommentEndSlash { ![/*] blockCommentEnd | "/" blockCommentEndSlash }
+
+  @precedence { blockCommentEnd, blockCommentContent }
+}
+
+@skip {} {
+  BlockComment[isolate] { "/*" (NestedBlockComment | blockCommentContent)* blockCommentEnd }
+
+  NestedBlockComment[isolate,@name=BlockComment] {
+    blockCommentStart (NestedBlockComment | blockCommentContent)* blockCommentEnd
+  }
+}
+
+@external tokens METATYPE_TOKENS from "./tokens" {
+  TypeKeyword
+  ProtocolKeyword
+}
+
+@external tokens KEYWORD_IDENTIFIERS from "./tokens" {
+  keywordIdentifierToken[@name=Identifier]
+}
+
+@external tokens GENERIC_REQUIREMENT_CONTINUATION from "./tokens" {
+  genericRequirementContinuation
+}
+
+@external tokens CODE_ITEM_LAYOUT from "./tokens" {
+  lineBreak
+  declarationEffectLineLookahead
+  enumCaseParameterLineLookahead
+  postfixIfConfigLookahead
+}
+
+@external tokens ACCESSOR_LOOKAHEADS from "./tokens" {
+  initializedPropertyBlockLookahead
+  accessorBlockLookahead
+}
+
+@external tokens TYPE_PATH_LOOKAHEADS from "./tokens" {
+  qualifiedDeclTypeLookahead
+  keyPathDottedOptionalComponentLookahead
+  keyPathGenericArgumentLookahead
+}
+
+@external tokens ATTRIBUTE_TOKENS from "./tokens" {
+  AttributeName
+  AttributeNameWithArguments
+  customAttributeNameWithArguments[@name=AttributeNameWithArguments]
+  effectsAttributeNameWithArguments[@name=AttributeNameWithArguments]
+  specializeAttributeNameWithArguments[@name=AttributeNameWithArguments]
+  specializedAttributeNameWithArguments[@name=AttributeNameWithArguments]
+  differentiableAttributeNameWithArguments[@name=AttributeNameWithArguments]
+  derivativeAttributeNameWithArguments[@name=AttributeNameWithArguments]
+  abiAttributeNameWithArguments[@name=AttributeNameWithArguments]
+  attributeIfConfigNonemptyLookahead
+  attributeIfConfigStructuralLookahead
+  switchCaseAttributeLookahead
+  switchCaseIfConfigLookahead
+  switchCaseBodyIfConfigLookahead
+  switchCaseDiagnosticLookahead
+  switchCaseBodyDiagnosticLookahead
+  moduleSelectedAttributeAtSign[@name="@"]
+  poundSourceLocation[@name="#sourceLocation"]
+}
+
+@external tokens LITERALS from "./tokens" {
+  RegexLiteral
+  StringLiteral[isolate]
+}
+
+@external tokens GENERIC_VALUE_LOOKAHEADS from "./tokens" {
+  parenthesizedGenericValueLookahead
+  inlineArrayTypeExpressionLookahead
+}
+
+@external tokens SYNTAX_LOOKAHEADS from "./tokens" {
+  postfixMemberLookahead
+  attributedTypeExpressionLookahead
+  nonisolatedSpecifierArgumentLookahead
+  conditionListEndLookahead
+  conditionTrailingClosureLookahead
+  postfixIfConfigClauseLookahead
+  genericArgumentLookahead
+  declNameArgumentsLookahead
+  contextualAnyTypeLookahead
+  usingDeclarationLookahead
+}
+
+@external tokens OPERATORS from "./tokens" {
+  prefixTilde
+  prefixAmpersand
+  binaryAmpersand
+  anyTypeCompositionAmpersand[@name="&"]
+  prefixRangeOperator
+  binaryRangeOperator
+  postfixRangeOperator
+  prefixCustomOperator
+  binaryCustomOperator
+  postfixCustomOperator
+  customOperator
+  functionCustomOperator
+  optionalTypeQuestionMark[@name="?"]
+  typeExclamationMark[@name="!"]
+  postfixQuestionMark
+  infixQuestionMark
+}
+
+@external tokens CATCH_PATTERN_CONTEXT from "./tokens" {
+  catchPatternLookahead
+}
+
+@external tokens CLOSURE_SIGNATURE_CONTEXT from "./tokens" {
+  closureSignatureLookahead
+}
+
+@external propSource swift_highlighting from "./highlighting"
+
+@tokens {
+  identifier[@export] {
+    $[A-Za-z] identifierContinueCandidate* |
+    "_" identifierContinueCandidate+ |
+    identifierNonAsciiCandidate identifierContinueCandidate* |
+    "$" |
+    "$" identifierContinueCandidate* identifierNonDigitCandidate identifierContinueCandidate* |
+    rawIdentifier
+  }
+
+  dollarIdentifier { "$" $[0-9]+ }
+
+  identifierNonDigitCandidate {
+    $[A-Z_a-z$] | identifierNonAsciiCandidate
+  }
+
+  identifierContinueCandidate {
+    $[0-9A-Z_a-z$] | identifierNonAsciiCandidate
+  }
+
+  identifierNonAsciiCandidate {
+    $[\u{0080}-\u{10FFFF}]
+  }
+
+  rawIdentifier { "\u{0060}" ![\u{0060}\n\r\\]+ "\u{0060}" }
+
+  whitespace { $[\u{0009}-\u{000d} ]+ }
+  LineComment { "//" ![\n\r]* }
+  Shebang { "#!" ![\n\r]* }
+  keyPathBackslash[@name="\\"] { "\\" }
+
+  digit { $[0-9] }
+  digits { digit $[0-9_]* }
+  hexDigit { $[0-9a-fA-F] }
+  hexDigits { hexDigit $[0-9a-fA-F_]* }
+
+  integerLiteralBody {
+    "0x" hexDigits |
+    "0o" $[0-7] $[0-7_]* |
+    "0b" $[01] $[01_]* |
+    digits
+  }
+
+  IntegerLiteral { integerLiteralBody }
+  tupleMemberInteger[@name=IntegerLiteral] { integerLiteralBody }
+
+  FloatLiteral {
+    digits "." digits ($[eE] $[+\-]? digits)? |
+    digits $[eE] $[+\-]? digits |
+    "0x" hexDigits "." hexDigits $[pP] $[+\-]? digits
+  }
+
+  @conflict { tupleMemberInteger, FloatLiteral }
+  @conflict { tupleMemberInteger, IntegerLiteral }
+  @precedence { dollarIdentifier, identifier, "_" }
+  @precedence { FloatLiteral, IntegerLiteral }
+  @precedence { LineComment "/" }
+  @precedence { Shebang "#" }
+  "#unavailable" "#available" "#elseif" "#endif" "#else" "#if"
+  "->" "..." "::" "==" "!=" "<=" ">=" "&&" "||" "??"
+  "(" ")" "{" "}" "[" "]" "@" "#" ":" "," "." ";" "="
+  "!" "?" "<" ">" "+" "-" "*" "/" "%" "&" "~" "_"
+}
+
+@detectDelim
