@@ -238,6 +238,33 @@ pub fn defaults() -> BTreeMap<String, Rule> {
         rule.describes = describes.into();
         rule.remedy = remedy.into();
     }
+    // Go uses the same five categories and density ramps as their Rust analogues.
+    for id in [
+        "duplicated-bodies",
+        "oversized-files",
+        "oversized-line-share",
+        "undocumented-suppressions",
+        "exit-in-library",
+        "shell-invocation",
+        "shell-argument-unchecked",
+        "env-controlled-spawn",
+        "discarded-check",
+        "hand-built-json",
+    ] {
+        let mut rule = rules[id].clone();
+        rule.language = "go".into();
+        rules.insert(format!("go/{id}"), rule);
+    }
+    for (id, describes, remedy) in [
+        ("discarded-check", "known error results discarded or empty error branches without a reason, per 10k lines", "Handle the error, return it, or explain why ignoring it is safe. Unknown external signatures are not guessed."),
+        ("undocumented-suppressions", "nolint comments without a // reason, per 10k lines", "Add a reason after //nolint:rule // explaining why the suppression is safe."),
+        ("exit-in-library", "os.Exit or log.Fatal outside package main, per 10k lines", "Return an error and let package main choose the exit code."),
+        ("hand-built-json", "JSON object templates passed to fmt.Sprintf, per 10k lines", "Use encoding/json to serialize the value."),
+        ("oversized-files", "files longer than max_lines, per 10k lines", "Split the file, or set go/oversized-files.params.max_lines in cqx.json."),
+    ] {
+        let rule = rules.get_mut(&format!("go/{id}")).unwrap();
+        rule.describes = describes.into(); rule.remedy = remedy.into();
+    }
     rules
 }
 
@@ -347,7 +374,7 @@ impl Config {
     /// a no-op — which is the correct behaviour rather than a special case.
     fn apply_env(&mut self) -> Result<(), String> {
         for (id, rule) in self.rules.iter_mut() {
-            if rule.language == "typescript" {
+            if rule.language != "rust" {
                 continue;
             }
             let key = id.to_uppercase().replace('-', "_");

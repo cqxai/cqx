@@ -8,6 +8,7 @@ description = "Shared language dispatch for cqx snapshots."
 
 [dependencies]
 cqx-rust = { path = "../cqx-rust" }
+cqx-go = { path = "../cqx-go" }
 cqx-ts = { path = "../cqx-ts" }
 cqx-vfs.workspace = true
 serde_json.workspace = true

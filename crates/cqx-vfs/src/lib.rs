@@ -129,6 +129,8 @@ pub fn is_typescript_source(path: &str) -> bool {
 pub fn is_interesting(path: &str) -> bool {
     path.ends_with(".rs")
         || is_typescript_source(path)
+        || path.ends_with(".go")
+        || path == "go.mod" || path.ends_with("/go.mod")
         || path == "package.json" || path.ends_with("/package.json")
         || path == "cqx.json"
         || path.ends_with("/Cargo.toml")
