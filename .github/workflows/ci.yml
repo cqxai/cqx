@@ -114,7 +114,7 @@ jobs:
       # cqx is meant to run in a browser, which means the analysis path must not
       # acquire a dependency that cannot go there. This job is what notices.
       - run: |
-          for crate in cqx-vfs cqx-schema cqx-rust cqx-ts cqx-go cqx-analysis cqx-score cqx-store cqx-view; do
+          for crate in cqx-vfs cqx-schema cqx-rust cqx-ts cqx-go cqx-layout cqx-source cqx-java cqx-kotlin cqx-swift cqx-zig cqx-python cqx-php cqx-analysis cqx-score cqx-store cqx-view; do
             cargo build --locked --target wasm32-unknown-unknown -p "$crate"
           done
           cargo build --locked --release --target wasm32-unknown-unknown -p cqx-wasm
@@ -127,6 +127,15 @@ jobs:
         run: node scripts/test-typescript-wasm.mjs "${CARGO_TARGET_DIR:-target}/wasm32-unknown-unknown/release/cqx_wasm.wasm"
       - name: Exercise Go and three-language WASM ABI
         run: node scripts/test-go-wasm.mjs "${CARGO_TARGET_DIR:-target}/wasm32-unknown-unknown/release/cqx_wasm.wasm"
+
+      - name: Exercise Java and mixed-repo WASM ABI
+        run: node scripts/test-java-wasm.mjs "${CARGO_TARGET_DIR:-target}/wasm32-unknown-unknown/release/cqx_wasm.wasm"
+
+      - name: Exercise all shared-layout language frontends
+        run: |
+          for language in kotlin swift zig python php layout; do
+            node "scripts/test-$language-wasm.mjs" "${CARGO_TARGET_DIR:-target}/wasm32-unknown-unknown/release/cqx_wasm.wasm"
+          done
 
       - uses: ./.github/actions/sccache-stats
         if: always()

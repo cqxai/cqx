@@ -6,8 +6,8 @@
 //! curve — which also means it can be explained, argued with, and configured.
 
 pub mod config;
-pub mod metrics;
 pub mod edit;
+pub mod metrics;
 pub mod ratchet;
 
 use std::collections::BTreeMap;
@@ -149,11 +149,22 @@ fn cmd_score(context: &Context) {
             return;
         }
     };
-    if let Some(v) = context.args.params.get("--min-score").and_then(|s| s.parse().ok()) {
+    if let Some(v) = context
+        .args
+        .params
+        .get("--min-score")
+        .and_then(|s| s.parse().ok())
+    {
         config.min_score = Some(v);
     }
 
-    if context.args.flags.get("--explain").copied().unwrap_or(false) {
+    if context
+        .args
+        .flags
+        .get("--explain")
+        .copied()
+        .unwrap_or(false)
+    {
         explain(&config);
         return;
     }
@@ -242,7 +253,11 @@ pub fn config_json(config: &Config) -> serde_json::Value {
 fn cmd_config_show(context: &Context) {
     let root = context.env.cwd.clone();
     let config = match Config::resolve(
-        context.args.params.get("--config").map(std::path::Path::new),
+        context
+            .args
+            .params
+            .get("--config")
+            .map(std::path::Path::new),
         &root,
     ) {
         Ok(c) => c,
@@ -309,7 +324,14 @@ fn cmd_config_set(context: &Context) {
     // person changing a rule deserves to be told which direction they went:
     // "looser" on screen is the difference between a decision and a drift,
     // and it costs a line.
-    if context.args.flags.get("--tighten-only").copied().unwrap_or(false) && !proposal.tightens {
+    if context
+        .args
+        .flags
+        .get("--tighten-only")
+        .copied()
+        .unwrap_or(false)
+        && !proposal.tightens
+    {
         eprintln!("cqx config set: refused — --tighten-only, and this does not tighten.");
         for objection in proposal.objections() {
             eprintln!(
@@ -494,7 +516,7 @@ fn build_report(
                 })
                 .unwrap_or_default();
             serde_json::json!({
-                "rule": d.rule.strip_prefix("typescript/").or_else(|| d.rule.strip_prefix("go/")).unwrap_or(&d.rule), "category": d.category,
+                "rule": d.rule.rsplit('/').next().unwrap_or(&d.rule), "category": d.category,
                 // The language prefixes the name wherever it is shown and
                 // names its page in the docs, so it travels with the rule
                 // rather than being assumed by whoever renders it.
@@ -512,7 +534,7 @@ fn build_report(
     // should show the standards it was actually scored against.
     let mut shown_config = config.clone();
     // A Rust-only report retains main's full JSON, including its rule config.
-    for language in ["typescript", "go"] {
+    for language in config.frontend_languages() {
         if m.get(&format!("{language}/duplicated-bodies")).is_none() {
             shown_config.rules.retain(|_, r| r.language != language);
         }

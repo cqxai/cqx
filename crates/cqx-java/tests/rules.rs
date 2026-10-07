@@ -1,0 +1,292 @@
+use cqx_score::{config::Config, metrics::Metrics};
+use cqx_store::facts::Stream;
+use cqx_vfs::Vfs;
+fn report(files: &[(&str, &str)], config: &str) -> serde_json::Value {
+    let mut vfs = Vfs::new("fixture");
+    for (p, s) in files {
+        vfs.insert(*p, *s);
+    }
+    let mut out = Vec::new();
+    cqx_java::run(&vfs, &mut out, &|| {}).unwrap();
+    let stream = Stream::from_ndjson(&String::from_utf8(out).unwrap());
+    let config = Config::from_text(Some(config)).unwrap();
+    cqx_score::report_json(&config, &Metrics::compute(&stream, &config))
+}
+fn findings(p: &serde_json::Value, rule: &str) -> u64 {
+    p["rules"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["language"] == "java" && r["rule"] == rule)
+        .map(|r| r["total_findings"].as_u64().unwrap())
+        .unwrap_or(0)
+}
+fn count(code: &str, rule: &str) -> u64 {
+    let p = report(&[("src/main/java/Library.java", code)], "{}");
+    assert!(p["skipped_files"].is_null(), "{p}");
+    findings(&p, rule)
+}
+#[test]
+fn exits_fire_but_entrypoints_and_custom_types_stay_quiet() {
+    assert_eq!(
+        count(
+            "class Library { void stop() { System.exit(1); java.lang.System.exit(1); } }",
+            "exit-in-library"
+        ),
+        2
+    );
+    let p = report(
+        &[(
+            "Library.java",
+            "class Library { void stop() { System.exit(1); } }",
+        )],
+        "{}",
+    );
+    assert!(p["scores"]["containment"].as_u64().unwrap() < 100);
+    for code in ["class App { public static void main(String[] args) { System.exit(1); } }","class System { static void exit(int n) {} } class Library { void stop() { System.exit(1); } }","import app.System; class Library { void stop() { System.exit(1); } }"] {assert_eq!(count(code,"exit-in-library"),0);}
+}
+#[test]
+fn nonliteral_process_commands_fire_but_literal_executables_and_user_types_stay_quiet() {
+    assert_eq!(count("class Library { void f(String input) throws Exception { Runtime.getRuntime().exec(input); new ProcessBuilder(input); } }","nonliteral-process"),2);
+    for code in ["class Library { void f(String input) throws Exception { Runtime.getRuntime().exec(\"git status\"); new ProcessBuilder(/* executable */ \"git\", input); } }","class ProcessBuilder { ProcessBuilder(String value) {} } class Library { void f(String value) { new ProcessBuilder(value); } }","class Library { void f(MyRuntime Runtime, String input) { Runtime.exec(input); } }"]{assert_eq!(count(code,"nonliteral-process"),0);}
+}
+#[test]
+fn empty_catches_fire_but_handling_and_intent_comments_stay_quiet() {
+    assert_eq!(
+        count(
+            "class Library { void f() { try { work(); } catch (Exception e) {} } }",
+            "swallowed-errors"
+        ),
+        1
+    );
+    for code in ["class Library { void f() { try { work(); } catch (Exception e) { throw e; } } }","class Library { void f() { try { optional(); } catch (Exception e) { /* Feature detection: absence is expected. */ } } }"]{assert_eq!(count(code,"swallowed-errors"),0);}
+}
+#[test]
+fn suppressions_fire_but_explained_annotations_stay_quiet() {
+    assert_eq!(
+        count(
+            "@SuppressWarnings(\"unchecked\") class Library { void f() {} }",
+            "undocumented-suppressions"
+        ),
+        1
+    );
+    for code in ["class Library { // Java cannot express the validated generic cast.\n@SuppressWarnings(\"unchecked\") void f() {} }","class Library { @SuppressWarnings(\"unchecked\") // Validated generic cast at this boundary.\nvoid f() {} }","class Library { void f() { String value = \"@SuppressWarnings\"; } }"]{assert_eq!(count(code,"undocumented-suppressions"),0);}
+}
+#[test]
+fn generated_build_and_test_conventions_remove_findings_and_product_lines() {
+    for path in [
+        "build/Generated.java",
+        "target/generated-sources/Generated.java",
+        "src/test/java/Library.java",
+        "src/test/java/LibraryTest.java",
+    ] {
+        let p = report(
+            &[
+                (path, "class Library { void f() { System.exit(1); } }"),
+                ("Library.java", "class Library {}"),
+            ],
+            "{}",
+        );
+        assert_eq!(findings(&p, "exit-in-library"), 0, "{path}");
+        assert_eq!(p["lines"], 1);
+    }
+    for marker in [
+        "@Generated(\"tool\")",
+        "@javax.annotation.processing.Generated(\"tool\")",
+        "// @generated",
+    ] {
+        let code = format!("{marker}\nclass Library {{ void f() {{ System.exit(1); }} }}");
+        let p = report(
+            &[
+                ("Generated.java", &code),
+                ("Library.java", "class Library {}"),
+            ],
+            "{}",
+        );
+        assert_eq!(findings(&p, "exit-in-library"), 0);
+        assert_eq!(p["lines"], 1);
+    }
+    let p = report(
+        &[
+            (
+                "Library.java",
+                "class Library { void f() { System.exit(1); } }",
+            ),
+            ("Broken.java", "class { broken ("),
+        ],
+        "{}",
+    );
+    assert_eq!(findings(&p, "exit-in-library"), 1);
+    assert_eq!(p["skipped_files"][0]["file"], "Broken.java");
+}
+#[test]
+fn duplicates_and_oversized_files_use_the_existing_config_surface() {
+    let body = "consume(1);".repeat(30);
+    let code = format!("class Library {{ void a() {{ {body} }} void b() {{ {body} }} }}");
+    assert_eq!(count(&code, "duplicated-bodies"), 1);
+    assert_eq!(
+        count(
+            &code.replacen("consume(1)", "consume(2)", 1),
+            "duplicated-bodies"
+        ),
+        0
+    );
+    assert_eq!(
+        count(
+            "class Library { void a() { wrapper(); } void b() { wrapper(); } }",
+            "duplicated-bodies"
+        ),
+        0
+    );
+    let config = r#"{"rules":{"java/oversized-files":{"params":{"max_lines":2}},"java/oversized-line-share":{"params":{"max_lines":2}}}}"#;
+    let p = report(
+        &[("Library.java", "class Library {\n int value;\n}\n")],
+        config,
+    );
+    assert_eq!(findings(&p, "oversized-files"), 1);
+    assert!(p["scores"]["modularity"].as_u64().unwrap() < 100);
+    assert_eq!(
+        findings(
+            &report(&[("Library.java", "class Library {\n}")], config),
+            "oversized-files"
+        ),
+        0
+    );
+}
+#[test]
+fn modern_java_entrypoints_and_decoded_names() {
+    for code in [
+        "class App { void main() { System.exit(1); } }",
+        "class App { public void main(String... args) { System.exit(1); } }",
+        "void main() { System.exit(1); }",
+    ] {
+        assert_eq!(count(code, "exit-in-library"), 0, "{code}");
+    }
+    assert_eq!(
+        count(
+            "class Library { private void main() { System.exit(1); } }",
+            "exit-in-library"
+        ),
+        1
+    );
+    assert_eq!(
+        count(
+            r"class Library { void stop() { Syst\u0065m.exit(1); } }",
+            "exit-in-library"
+        ),
+        1
+    );
+    assert_eq!(count("class Library { void f() throws Exception { Runtime.getRuntime().exec(new String[]{\"git\", user}); } }", "nonliteral-process"), 0);
+}
+
+#[test]
+fn review_build_names_are_packages_unless_directly_below_project_roots() {
+    for manifest in [
+        "pom.xml",
+        "build.gradle",
+        "build.gradle.kts",
+        "settings.gradle",
+        "settings.gradle.kts",
+    ] {
+        for dir in [
+            "build",
+            "target",
+            "generated-sources",
+            "generated",
+            "vendor",
+        ] {
+            let manifest_path = format!("modules/app/{manifest}");
+            let package = format!("modules/app/src/main/java/com/acme/{dir}/Library.java");
+            let output = format!("modules/app/{dir}/Output.java");
+            let p = report(
+                &[
+                    (&manifest_path, ""),
+                    (
+                        &package,
+                        "class Library { void stop() { System.exit(1); } }",
+                    ),
+                    (&output, "class Output { void stop() { System.exit(1); } }"),
+                ],
+                "{}",
+            );
+            assert_eq!(findings(&p, "exit-in-library"), 1, "{manifest}: {dir}");
+            assert_eq!(p["lines"], 1, "{manifest}: {dir}");
+        }
+    }
+}
+
+#[test]
+fn review_testimonial_and_product_test_suffixes_are_product_code() {
+    for path in [
+        "src/main/java/com/acme/TestimonialService.java",
+        "src/main/java/com/acme/CacheTest.java",
+        "src/main/java/com/acme/CacheTests.java",
+        "src/main/java/com/acme/CacheIT.java",
+        "src/main/java/com/acme/test/Library.java",
+    ] {
+        let p = report(
+            &[(path, "class Library { void stop() { System.exit(1); } }")],
+            "{}",
+        );
+        assert_eq!(findings(&p, "exit-in-library"), 1, "{path}");
+        assert_eq!(p["lines"], 1, "{path}");
+    }
+    for path in [
+        "src/test/java/Library.java",
+        "modules/app/src/test/java/LibraryTest.java",
+        "src/test/java/LibraryTests.java",
+        "src/test/java/LibraryIT.java",
+        "src/testFixtures/java/Library.java",
+        "src/androidTest/java/Library.java",
+    ] {
+        let p = report(
+            &[
+                ("modules/app/pom.xml", ""),
+                (path, "class Library { void stop() { System.exit(1); } }"),
+            ],
+            "{}",
+        );
+        assert_eq!(findings(&p, "exit-in-library"), 0, "{path}");
+        assert_eq!(p["lines"], 0, "{path}");
+    }
+}
+
+#[test]
+fn review_suppressions_only_count_broad_scope_or_all() {
+    for code in [
+        "class Library { @SuppressWarnings(\"unchecked\") void f() {} }",
+        "class Library { @SuppressWarnings(\"rawtypes\") Object value; }",
+        "class Library { void f() { @SuppressWarnings(\"unchecked\") Object value = get(); } }",
+        "class Library { @SuppressWarnings({\"unchecked\", \"rawtypes\"}) void f() {} }",
+        "class Library { @SuppressWarnings(value = {\"unchecked\", \"deprecation\"}) void f() {} }",
+        "class Library { @SuppressWarnings(\"deprecation\") void f() {} }",
+    ] {
+        assert_eq!(count(code, "undocumented-suppressions"), 0, "{code}");
+    }
+    for code in [
+        "@SuppressWarnings(\"unchecked\") class Library {}",
+        "@SuppressWarnings(\"rawtypes\") class Library {}",
+        "@SuppressWarnings(\"deprecation\") class Library {}",
+        "class Library { @SuppressWarnings(\"all\") void f() {} }",
+        "class Library { @SuppressWarnings({\"unchecked\", \"all\"}) Object value; }",
+        "class Library { void f() { @SuppressWarnings(value = \"all\") Object value = get(); } }",
+        "class Library { @SuppressWarnings(\"all\") class Nested {} }",
+    ] {
+        assert_eq!(count(code, "undocumented-suppressions"), 1, "{code}");
+    }
+    for code in [
+        "// Reviewed legacy generic boundary.\n@SuppressWarnings(\"unchecked\") class Library {}",
+        "@SuppressWarnings(\"all\") // Reviewed generated interoperability boundary.\nclass Library {}",
+        "class Library { /* Validated generic boundary. */ @SuppressWarnings(\"all\") void f() {} }",
+    ] { assert_eq!(count(code, "undocumented-suppressions"), 0, "{code}"); }
+}
+
+#[test]
+fn review_main_only_exempts_its_own_class() {
+    for code in [
+        "class App { public static void main(String[] args) { System.exit(1); } } class Library { void stop() { System.exit(2); } }",
+        "class App { public static void main(String[] args) { System.exit(1); } class Library { void stop() { System.exit(2); } } }",
+        "class Outer { class App { void main() { System.exit(1); } } void stop() { System.exit(2); } }",
+
+    ] { assert_eq!(count(code, "exit-in-library"), 1, "{code}"); }
+}

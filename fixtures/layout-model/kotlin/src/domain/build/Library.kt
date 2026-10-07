@@ -1,0 +1,1 @@
+fun stop(){kotlin.system.exitProcess(1)}

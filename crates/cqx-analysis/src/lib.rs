@@ -12,6 +12,9 @@ pub fn manifests(vfs: &Vfs) -> Result<Value, String> {
         serde_json::json!({ "packages": [] })
     };
     metadata["typescript_bins"] = serde_json::json!(cqx_ts::entry_files(vfs));
+    metadata["layout"] = serde_json::json!(cqx_layout::Layout::from_paths(vfs.paths()));
+    metadata["python_entries"] = serde_json::json!(cqx_python::entry_files(vfs));
+    metadata["php"] = serde_json::json!(cqx_php::metadata(vfs));
     metadata["go_modules"] = serde_json::json!(cqx_go::modules(vfs));
     Ok(metadata)
 }
@@ -20,6 +23,9 @@ pub struct Prepared {
     rust: cqx_rust::extract::Prepared,
     bins: std::collections::BTreeSet<String>,
     go: cqx_go::Prepared,
+    layout: cqx_layout::Layout,
+    python_entries: std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
+    php: cqx_php::Metadata,
 }
 
 pub fn prepare_reporting(
@@ -34,17 +40,40 @@ pub fn prepare_reporting(
         .flatten()
         .filter_map(|v| v.as_str().map(str::to_string))
         .collect();
+    let layout = serde_json::from_value(metadata["layout"].clone())
+        .unwrap_or_else(|_| cqx_layout::Layout::from_paths(vfs.paths()));
+    let python_entries =
+        serde_json::from_value(metadata["python_entries"].clone()).unwrap_or_default();
+    let php = serde_json::from_value(metadata["php"].clone()).unwrap_or_default();
     let go_modules = serde_json::from_value(metadata["go_modules"].clone()).unwrap_or_default();
     let go_files = vfs.paths().filter(|p| cqx_go::is_source(p)).count() as u32;
+    let extra_files = vfs
+        .paths()
+        .filter(|p| {
+            cqx_java::is_source(p)
+                || cqx_kotlin::is_source(p)
+                || cqx_swift::is_source(p)
+                || cqx_zig::is_source(p)
+                || cqx_python::is_source(p)
+                || cqx_php::is_source_in(vfs, p, &php)
+        })
+        .count() as u32;
     let ts_files = vfs.paths().filter(|p| cqx_ts::is_source(p)).count() as u32;
     let rust = cqx_rust::extract::prepare_reporting(
         vfs,
         metadata,
-        &|n| total(n + ts_files + go_files),
+        &|n| total(n + ts_files + go_files + extra_files),
         tick,
     )?;
-    let go = cqx_go::prepare(vfs, go_modules, tick)?;
-    Ok(Prepared { rust, bins, go })
+    let go = cqx_go::prepare_with_layout(vfs, go_modules, tick, layout.clone())?;
+    Ok(Prepared {
+        rust,
+        bins,
+        go,
+        layout,
+        python_entries,
+        php,
+    })
 }
 
 impl Prepared {
@@ -67,7 +96,7 @@ impl Prepared {
         tick: &dyn Fn(),
     ) -> Result<Stats, ExtractError> {
         let mut stats = self.rust.emit(vfs, facts, &mut out)?;
-        let ts = cqx_ts::run_with_entries(vfs, &mut out, &self.bins, tick)?;
+        let ts = cqx_ts::run_with_layout(vfs, &mut out, &self.bins, tick, &self.layout)?;
         stats.packages += usize::from(ts.files > 0);
         stats.files += ts.files;
         stats.nodes += ts.nodes;
@@ -77,6 +106,20 @@ impl Prepared {
         stats.files += go.files;
         stats.nodes += go.nodes;
         stats.edges += go.edges;
+        for extra in [
+            cqx_java::run_with_layout(vfs, &mut out, &self.layout, tick)?,
+            cqx_kotlin::run_with_layout(vfs, &mut out, tick, &self.layout)?,
+            cqx_swift::run_with_layout(vfs, &mut out, tick, &self.layout)?,
+            cqx_zig::run_with_layout(vfs, &mut out, tick, &self.layout)?,
+            cqx_python::run_with_layout(vfs, &mut out, tick, &self.python_entries, &self.layout)?,
+            cqx_php::run_with_layout(vfs, &mut out, tick, &self.php, &self.layout)?,
+        ] {
+            stats.packages += usize::from(extra.files > 0);
+            stats.files += extra.files;
+            stats.nodes += extra.nodes;
+            stats.edges += extra.edges;
+            stats.unparsed.extend(extra.unparsed);
+        }
         stats.unparsed.extend(ts.unparsed);
         stats.unparsed.extend(go.unparsed);
         Ok(stats)
@@ -116,7 +159,8 @@ pub const EXTRACT_COMMAND: CommandSpec = CommandSpec {
     name: "extract",
     owner: "cqx-analysis",
     category: "index",
-    summary: "Read Rust, Go, TypeScript and JavaScript and emit facts as newline-delimited JSON",
+    summary:
+        "Read Rust, Go, Java, Kotlin, Swift, Zig, Python, PHP, TypeScript and JavaScript and emit facts as newline-delimited JSON",
     // `scan` was an alias here. It is now its own command — the one the front
     // page has always shown — and the registry took the second registration
     // without a word, so `cqx scan` quietly went on emitting facts.

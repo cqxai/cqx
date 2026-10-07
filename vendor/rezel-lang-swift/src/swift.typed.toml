@@ -1,0 +1,179 @@
+language = "SwiftLanguage"
+kind = "SwiftKind"
+language_path = "crate::generated::LANGUAGE"
+
+[kind_names]
+"⚠" = "Error"
+"(" = "LeftParen"
+")" = "RightParen"
+"{" = "LeftBrace"
+"}" = "RightBrace"
+":" = "Colon"
+"," = "Comma"
+"." = "Period"
+"\\" = "Backslash"
+";" = "Semicolon"
+"=" = "Equal"
+"->" = "Arrow"
+"_" = "Wildcard"
+"#if" = "PoundIfToken"
+"#elseif" = "PoundElseifToken"
+"#else" = "PoundElseToken"
+"#endif" = "PoundEndifToken"
+"self" = "SelfKeyword"
+"Self" = "CapitalSelfKeyword"
+"super" = "SuperKeyword"
+"Any" = "AnyKeyword"
+"__shared" = "DoubleUnderscoreSharedKeyword"
+"__owned" = "DoubleUnderscoreOwnedKeyword"
+"__consuming" = "DoubleUnderscoreConsumingKeyword"
+"_mutating" = "UnderscoreMutatingKeyword"
+"_move" = "UnderscoreMoveKeyword"
+"_borrow" = "UnderscoreBorrowKeyword"
+"_borrowing" = "UnderscoreBorrowingKeyword"
+"_const" = "UnderscoreConstKeyword"
+"_local" = "UnderscoreLocalKeyword"
+"_consuming" = "UnderscoreConsumingKeyword"
+"_read" = "ReadAccessorKeyword"
+"_modify" = "ModifyAccessorKeyword"
+
+[[node]]
+name = "SwiftSourceFile"
+kind = "SourceFile"
+
+[[node.field]]
+name = "items"
+type = "SwiftCodeBlockItem"
+cardinality = "many"
+selector = { node = "CodeBlockItem" }
+
+[[node]]
+name = "SwiftCodeBlockItem"
+kind = "CodeBlockItem"
+
+[[node]]
+name = "SwiftImportDeclaration"
+kind = "ImportDeclaration"
+
+[[node]]
+name = "SwiftVariableDeclaration"
+kind = "VariableDeclaration"
+
+[[node.field]]
+name = "bindings"
+type = "SwiftPatternBinding"
+cardinality = "many"
+selector = { node = "PatternBinding" }
+
+[[node]]
+name = "SwiftPatternBinding"
+kind = "PatternBinding"
+
+[[node]]
+name = "SwiftFunctionDeclaration"
+kind = "FunctionDeclaration"
+
+[[node.field]]
+name = "name"
+type = "SwiftFunctionName"
+cardinality = "one"
+selector = { node = "FunctionName" }
+
+[[node.field]]
+name = "parameters"
+type = "SwiftFunctionParameterClause"
+cardinality = "one"
+selector = { node = "FunctionParameterClause" }
+
+[[node.field]]
+name = "return_clause"
+type = "SwiftReturnClause"
+cardinality = "optional"
+selector = { node = "ReturnClause" }
+
+[[node.field]]
+name = "body"
+type = "SwiftCodeBlock"
+cardinality = "optional"
+selector = { node = "CodeBlock" }
+
+[[node]]
+name = "SwiftFunctionName"
+kind = "FunctionName"
+
+[[node]]
+name = "SwiftFunctionParameterClause"
+kind = "FunctionParameterClause"
+
+[[node.field]]
+name = "parameters"
+type = "SwiftFunctionParameter"
+cardinality = "many"
+selector = { node = "FunctionParameter" }
+
+[[node]]
+name = "SwiftFunctionParameter"
+kind = "FunctionParameter"
+
+[[node]]
+name = "SwiftReturnClause"
+kind = "ReturnClause"
+
+[[node]]
+name = "SwiftStructDeclaration"
+kind = "StructDeclaration"
+
+[[node.field]]
+name = "name"
+type = "SwiftTypeName"
+cardinality = "one"
+selector = { node = "TypeName" }
+
+[[node.field]]
+name = "members"
+type = "SwiftMemberBlock"
+cardinality = "one"
+selector = { node = "MemberBlock" }
+
+[[node]]
+name = "SwiftMemberBlock"
+kind = "MemberBlock"
+
+[[node]]
+name = "SwiftCodeBlock"
+kind = "CodeBlock"
+
+[[node.field]]
+name = "items"
+type = "SwiftCodeBlockItem"
+cardinality = "many"
+selector = { node = "CodeBlockItem" }
+
+[[node]]
+name = "SwiftIdentifier"
+kind = "Identifier"
+
+[[node]]
+name = "SwiftDollarIdentifier"
+kind = "DollarIdentifier"
+
+[[node]]
+name = "SwiftTypeName"
+kind = "TypeName"
+
+[[node]]
+name = "SwiftStringLiteral"
+kind = "StringLiteral"
+
+[[node]]
+name = "SwiftIntegerLiteral"
+kind = "IntegerLiteral"
+
+[[union]]
+name = "SwiftDeclaration"
+variants = [
+	{ name = "Import", type = "SwiftImportDeclaration" },
+	{ name = "Variable", type = "SwiftVariableDeclaration" },
+	{ name = "Function", type = "SwiftFunctionDeclaration" },
+	{ name = "Struct", type = "SwiftStructDeclaration" },
+]

@@ -1,0 +1,17 @@
+[package]
+name = "cqx-java"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "java syntax analysis for cqx."
+[dependencies]
+cqx-layout = { path = "../cqx-layout" }
+cqx-schema.workspace = true
+cqx-vfs.workspace = true
+cqx-source = { path = "../cqx-source" }
+rezel-lang-java = { version = "=0.0.0", path = "../../vendor/rezel-lang-java" }
+[dev-dependencies]
+cqx-score = { path = "../cqx-score" }
+cqx-store = { path = "../cqx-store" }
+serde_json.workspace = true

@@ -1,0 +1,1 @@
+fun stop(input:String){kotlin.system.exitProcess(1);Runtime.getRuntime().exec(input)}

@@ -7,9 +7,17 @@ repository.workspace = true
 description = "Shared language dispatch for cqx snapshots."
 
 [dependencies]
+cqx-layout = { path = "../cqx-layout" }
 cqx-rust = { path = "../cqx-rust" }
 cqx-go = { path = "../cqx-go" }
 cqx-ts = { path = "../cqx-ts" }
 cqx-vfs.workspace = true
 serde_json.workspace = true
 deka-cli-core.workspace = true
+
+cqx-java = { path = "../cqx-java" }
+cqx-kotlin = { path = "../cqx-kotlin" }
+cqx-swift = { path = "../cqx-swift" }
+cqx-zig = { path = "../cqx-zig" }
+cqx-python = { path = "../cqx-python" }
+cqx-php = { path = "../cqx-php" }

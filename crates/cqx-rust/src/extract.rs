@@ -100,6 +100,8 @@ pub fn prepare_reporting(
     total: &dyn Fn(u32),
     parsed_one: &dyn Fn(),
 ) -> Result<Prepared, ExtractError> {
+    let layout = serde_json::from_value::<cqx_layout::Layout>(metadata["layout"].clone())
+        .unwrap_or_else(|_| cqx_layout::Layout::from_paths(vfs.paths()));
     let packages = metadata["packages"].as_array().cloned().unwrap_or_default();
 
     let mut known: HashMap<String, Id> = HashMap::new();
@@ -128,7 +130,8 @@ pub fn prepare_reporting(
             .filter(|o| **o != pkg_dir && is_inside(o, &pkg_dir))
             .cloned()
             .collect();
-        expected += prepass::files_of(vfs, &source_roots(pkg, &pkg_dir), &nested).len() as u32;
+        expected += prepass::files_of_layout(vfs, &source_roots(pkg, &pkg_dir), &nested, &layout)
+            .len() as u32;
     }
     total(expected);
 
@@ -147,10 +150,11 @@ pub fn prepare_reporting(
             .filter(|o| **o != pkg_dir && is_inside(o, &pkg_dir))
             .cloned()
             .collect();
-        let (parsed, failures) = prepass::parse_package_watched(
+        let (parsed, failures) = prepass::parse_package_with_layout(
             vfs,
             &source_roots(pkg, &pkg_dir),
             &nested,
+            &layout,
             parsed_one,
         );
         unparsed.extend(failures);
@@ -171,7 +175,11 @@ impl Prepared {
     /// Read in the order the files were parsed, so two of these merged in that
     /// same order hold what one pass over all of them would.
     pub fn gathered(&self) -> PackageFacts {
-        let all: Vec<&ParsedFile> = self.per_package.iter().flat_map(|(_, f)| f.iter()).collect();
+        let all: Vec<&ParsedFile> = self
+            .per_package
+            .iter()
+            .flat_map(|(_, f)| f.iter())
+            .collect();
         PackageFacts::gather(&all)
     }
 
@@ -206,7 +214,10 @@ impl Prepared {
             let Some(name) = pkg["name"].as_str() else {
                 continue;
             };
-            let manifest_path = pkg["manifest_path"].as_str().unwrap_or_default().to_string();
+            let manifest_path = pkg["manifest_path"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
             let pkg_dir = parent_of(&manifest_path);
             let pkg_id = Id::package(name);
             stats.packages += 1;
@@ -425,4 +436,3 @@ fn manifest_line(text: &str, dep: &str) -> Option<u32> {
     }
     None
 }
-

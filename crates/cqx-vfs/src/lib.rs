@@ -121,41 +121,45 @@ fn normalise(path: &str) -> String {
 
 /// Shared by snapshot discovery and frontend dispatch.
 pub fn is_typescript_source(path: &str) -> bool {
-    matches!(path.rsplit('.').next(), Some("ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" | "mts" | "cts"))
+    matches!(
+        path.rsplit('.').next(),
+        Some("ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" | "mts" | "cts")
+    )
 }
 
-/// What a source snapshot is worth carrying: the manifests that describe the
-/// workspace, the lockfile that pins it, and the code itself.
+/// Source and manifest discovery uses the same project-root policy as readers.
 pub fn is_interesting(path: &str) -> bool {
-    path.ends_with(".rs")
-        || is_typescript_source(path)
-        || path.ends_with(".go")
-        || path == "go.mod" || path.ends_with("/go.mod")
-        || path == "package.json" || path.ends_with("/package.json")
-        || path == "cqx.json"
-        || path.ends_with("/Cargo.toml")
-        || path == "Cargo.toml"
-        || path.ends_with("/Cargo.lock")
-        || path == "Cargo.lock"
+    let name = path.rsplit('/').next().unwrap_or(path);
+    matches!(
+        path.rsplit('.').next(),
+        Some("rs" | "go" | "java" | "kt" | "kts" | "swift" | "zig" | "py" | "php")
+    ) || is_typescript_source(path)
+        || cqx_layout::is_manifest(name)
+        || matches!(name, "cqx.json" | "Cargo.lock" | "pyvenv.cfg")
 }
-
-/// Directories that hold build output or history rather than source.
 pub fn is_ignored_dir(name: &str) -> bool {
-    matches!(name, "target" | ".git" | "node_modules" | ".next" | "dist" | "build" | "coverage" | ".tmp" | ".open-next" | ".wrangler" | ".turbo") || name.starts_with(".target")
+    cqx_layout::excluded_name("", name)
 }
-
-/// Fills a snapshot from a directory on disk.
-///
-/// The only part of analysis that touches a filesystem, and it is not part of
-/// analysis — it is what happens before it.
+fn project_dir(path: &Path, root: &Path) -> bool {
+    path == root
+        || std::fs::read_dir(path).is_ok_and(|mut entries| {
+            entries
+                .any(|e| e.is_ok_and(|e| cqx_layout::is_manifest(&e.file_name().to_string_lossy())))
+        })
+}
 pub fn from_dir(root: &Path) -> std::io::Result<Vfs> {
     let mut vfs = Vfs::new(root.display().to_string());
     for entry in walkdir::WalkDir::new(root)
         .into_iter()
         .filter_entry(|e| {
-            !e.file_type().is_dir()
-                || !is_ignored_dir(&e.file_name().to_string_lossy())
-                || e.depth() == 0
+            if !e.file_type().is_dir() || e.depth() == 0 {
+                return true;
+            }
+            if e.path().join("pyvenv.cfg").is_file() {
+                return false;
+            }
+            !(is_ignored_dir(&e.file_name().to_string_lossy())
+                && e.path().parent().is_some_and(|p| project_dir(p, root)))
         })
         .filter_map(Result::ok)
         .filter(|e| e.file_type().is_file())
@@ -166,13 +170,77 @@ pub fn from_dir(root: &Path) -> std::io::Result<Vfs> {
             .unwrap_or(entry.path())
             .to_string_lossy()
             .replace('\\', "/");
-        if !is_interesting(&rel) {
+        if is_interesting(&rel) {
+            if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                vfs.insert(rel, content);
+            }
+        }
+    }
+    let layout = cqx_layout::Layout::from_paths(vfs.paths());
+    for rel in composer_bins(&vfs) {
+        if layout.excluded_dir("php", &rel) {
             continue;
         }
-        // Source that is not valid UTF-8 is not source we can parse.
-        if let Ok(content) = std::fs::read_to_string(entry.path()) {
-            vfs.insert(rel, content);
+        let candidate = root.join(&rel);
+        if vfs.read(&rel).is_none()
+            && std::fs::canonicalize(root)
+                .ok()
+                .zip(std::fs::canonicalize(&candidate).ok())
+                .is_some_and(|(root, target)| target.starts_with(root))
+        {
+            if let Ok(content) = std::fs::read_to_string(candidate) {
+                vfs.insert(rel, content);
+            }
         }
     }
     Ok(vfs)
+}
+
+/// Literal Composer binaries, resolved relative to each nested manifest.
+pub fn composer_bins(vfs: &Vfs) -> std::collections::BTreeSet<String> {
+    let mut paths = std::collections::BTreeSet::new();
+    for path in vfs
+        .paths()
+        .filter(|p| p.rsplit('/').next() == Some("composer.json"))
+    {
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(vfs.read(path).unwrap_or_default())
+        else {
+            continue;
+        };
+        let bins: Vec<_> = if let Some(s) = v["bin"].as_str() {
+            vec![s]
+        } else {
+            v["bin"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(serde_json::Value::as_str)
+                .collect()
+        };
+        for bin in bins {
+            if bin.starts_with('/') || bin.contains('\\') {
+                continue;
+            }
+            let base = path.rsplit_once('/').map_or("", |(p, _)| p);
+            let joined = format!("{base}/{bin}");
+            let mut parts = Vec::new();
+            let mut valid = true;
+            for p in joined.split('/') {
+                match p {
+                    "" | "." => {}
+                    ".." => {
+                        if parts.pop().is_none() {
+                            valid = false;
+                            break;
+                        }
+                    }
+                    _ => parts.push(p),
+                }
+            }
+            if valid && !parts.is_empty() {
+                paths.insert(parts.join("/"));
+            }
+        }
+    }
+    paths
 }

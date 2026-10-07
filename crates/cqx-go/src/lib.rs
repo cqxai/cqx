@@ -51,6 +51,7 @@ pub struct Prepared {
     files: Vec<ParsedFile>,
     skipped: Vec<(String, String)>,
     modules: BTreeMap<String, String>,
+    layout: cqx_layout::Layout,
 }
 
 struct ParsedFile {
@@ -63,6 +64,19 @@ pub fn prepare(
     vfs: &Vfs,
     modules: BTreeMap<String, String>,
     tick: &dyn Fn(),
+) -> io::Result<Prepared> {
+    prepare_with_layout(
+        vfs,
+        modules,
+        tick,
+        cqx_layout::Layout::from_paths(vfs.paths()),
+    )
+}
+pub fn prepare_with_layout(
+    vfs: &Vfs,
+    modules: BTreeMap<String, String>,
+    tick: &dyn Fn(),
+    layout: cqx_layout::Layout,
 ) -> io::Result<Prepared> {
     let mut files = Vec::new();
     let mut skipped = Vec::new();
@@ -87,6 +101,7 @@ pub fn prepare(
         files,
         skipped,
         modules,
+        layout,
     })
 }
 
@@ -144,9 +159,8 @@ impl Prepared {
                         c.text.trim().trim_start_matches('/').trim(),
                         "go:build tools" | "go:build ignore" | "+build tools" | "+build ignore"
                     )
-            }) || path.ends_with("_test.go")
-                || path.split('/').any(|s| matches!(s, "testdata" | "vendor"))
-                || generated(source, tokens);
+            }) || self.layout.is_test("go", path)
+                || self.layout.excluded("go", path, source);
             writer.node(
                 Node::new(file.clone(), NodeKind::File)
                     .attr("path", path.clone())
@@ -271,22 +285,6 @@ impl Prepared {
                 .collect(),
         })
     }
-}
-
-/// Go's standard generated-code marker is an exact line comment in the header.
-/// https://pkg.go.dev/cmd/go#hdr-Generate_Go_files_by_processing_source
-fn generated(source: &str, tokens: &[gosyn::LexicalToken]) -> bool {
-    tokens
-        .iter()
-        .take_while(|token| matches!(token.token, Token::Comment(_)))
-        .any(|token| {
-            matches!(&token.token, Token::Comment(text)
-                if text.trim_end_matches('\r')
-                    .strip_prefix("// Code generated ")
-                    .and_then(|text| text.strip_suffix(" DO NOT EDIT."))
-                    .is_some()
-                && (token.start == 0 || source.chars().nth(token.start - 1) == Some('\n')))
-        })
 }
 
 #[derive(Clone)]

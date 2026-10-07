@@ -1,0 +1,1120 @@
+// Derived from @lezer/java 1.1.3 and maintained against JLS 26.
+
+@precedence {
+  cast
+  update @left
+  unaryPlus @left
+  negate @left
+  instanceof
+  times @left
+  plus @left
+  shift @left
+  compare @left
+  equality @left
+  bitAnd @left
+  bitXor @left
+  bitOr @left
+  and @left
+  or @left
+  ternary @right
+  valuePair
+  assign @right
+  array @right
+  new @right
+  switchLabel @right
+  else @right
+  typeArgs
+}
+
+@top Program {
+  CompilationUnit
+}
+
+@top ClassContent {
+  classBodyDeclaration*
+}
+
+CompilationUnit {
+  PackageDeclaration ImportDeclaration* TopLevelDeclaration* |
+  ImportDeclaration* UnnamedCompilationUnit
+}
+
+UnnamedCompilationUnit {
+  ModuleDeclaration |
+  UnitBeforeFirstMethod
+}
+
+UnitBeforeFirstMethod {
+  TopLevelDeclaration UnitBeforeFirstMethod |
+  FieldDeclaration CompactBeforeFirstMethod |
+  MethodDeclaration CompactMemberDeclaration* |
+  ()
+}
+
+CompactBeforeFirstMethod {
+  CompactMemberDeclarationNoMethod*
+  MethodDeclaration
+  CompactMemberDeclaration*
+}
+
+TopLevelDeclaration {
+  ClassDeclaration |
+  RecordDeclaration |
+  InterfaceDeclaration |
+  AnnotationTypeDeclaration |
+  EnumDeclaration |
+  ";"
+}
+
+CompactMemberDeclarationNoMethod {
+  FieldDeclaration |
+  ClassDeclaration |
+  RecordDeclaration |
+  InterfaceDeclaration |
+  AnnotationTypeDeclaration |
+  EnumDeclaration |
+  ";"
+}
+
+CompactMemberDeclaration {
+  CompactMemberDeclarationNoMethod |
+  MethodDeclaration
+}
+
+literal {
+  IntegerLiteral |
+  FloatingPointLiteral |
+  @specialize[@name=BooleanLiteral]<identifier, "true" | "false"> |
+  CharacterLiteral |
+  StringLiteral |
+  TextBlock |
+  kw<"null">
+}
+
+@local tokens {
+  textBlockEnd { '"""' }
+  textBlockEscape { "\\" (![\n] | "\n") }
+  @else textBlockContent
+}
+
+@skip {} {
+  TextBlock { textBlockStart (textBlockContent | textBlockEscape)* textBlockEnd }
+}
+
+expression[@isGroup=Expression] {
+  AssignmentExpression |
+  BinaryExpression |
+  InstanceofExpression |
+  LambdaExpression |
+  SwitchExpression |
+  TernaryExpression |
+  UpdateExpression |
+  baseExpression |
+  UnaryExpression |
+  CastExpression
+}
+
+CastExpression {
+  "(" primitiveType ~castType ")" !cast primitiveCastOperand |
+  "(" type ~castType ("&" type)* ")" !cast referenceCastOperand
+}
+
+primitiveCastOperand {
+  baseExpression |
+  castPostfixUpdateExpression |
+  castPrefixUpdateExpression |
+  CastExpression |
+  SwitchExpression |
+  UnaryExpression
+}
+
+referenceCastOperand {
+  baseExpression |
+  castPostfixUpdateExpression |
+  CastExpression |
+  SwitchExpression |
+  LambdaExpression |
+  referenceUnaryExpression
+}
+
+referenceUnaryExpression[@name=UnaryExpression] {
+  (op<Logic, "!"> | op<Bit, "~">) !negate expression
+}
+
+castPostfixUpdateExpression[@name=UpdateExpression] {
+  baseExpression !update op<Update, "--" | "++">
+}
+
+castPrefixUpdateExpression[@name=UpdateExpression] {
+  op<Update, "--" | "++"> !update expression
+}
+
+AssignmentExpression {
+  (Identifier | FieldAccess | ArrayAccess)
+  !assign (AssignOp | "=") expression
+}
+
+BinaryExpression {
+  expression !compare (op<Compare, ">=" | "<="> | CompareOp { "<" | ">" }) expression |
+  expression !equality op<Compare, "==" | "!="> expression |
+  expression !and op<Logic, "&&"> expression |
+  expression !or op<Logic, "||"> expression |
+  expression !bitAnd BitOp { "&" } expression |
+  expression !bitOr op<Bit, "|"> expression |
+  expression !bitXor op<Bit, "^"> expression |
+  expression !plus op<Arith, "+" | "-"> expression |
+  expression !times (times | op<Arith, "%">) expression |
+  expression !shift BitOp expression
+}
+
+BitOp { "<<" | shiftRight ">"? }
+
+InstanceofExpression {
+  expression !instanceof kw<"instanceof"> (
+    PatternModifiers? unannotatedType InstanceofPattern ~instanceofPattern |
+    type ~instanceofPattern
+  )
+}
+
+InstanceofPattern {
+  PatternVariable |
+  RecordPatternBody
+}
+
+LambdaExpression {
+  (Definition | LambdaFormalParameters | InferredParameters) "->" (expression | Block)
+}
+
+LambdaFormalParameters {
+  "(" commaSep<FormalParameter | LambdaVarParameter | SpreadParameter> ")"
+}
+
+LambdaVarParameter {
+  Modifiers? InferredLambdaType variableDeclaratorId
+}
+
+InferredLambdaType[@dynamicPrecedence=1] {
+  ckw<"var">
+}
+
+InferredParameters {
+  "(" commaSep1<Definition ~identifier> ")"
+}
+
+TernaryExpression {
+  expression !ternary op<Logic, "?"> expression ":" expression
+}
+
+UnaryExpression {
+  op<Arith, "+" | "-"> !unaryPlus expression |
+  (op<Logic, "!"> | op<Bit, "~">) !negate expression
+}
+
+UpdateExpression {
+  expression !update op<Update, "--" | "++"> |
+  op<Update, "--" | "++"> !update expression
+}
+
+baseExpression {
+  literal |
+  ClassLiteral |
+  ThisExpression |
+  QualifiedSuperExpression |
+  Identifier ~identifier |
+  ParenthesizedExpression |
+  ObjectCreationExpression |
+  FieldAccess |
+  ArrayAccess |
+  MethodInvocation |
+  MethodReference |
+  ArrayCreationExpression
+}
+
+ThisExpression {
+  kw<"this">
+}
+
+SuperExpression {
+  kw<"super">
+}
+
+QualifiedSuperExpression {
+  name ~qualifiedSuper "." SuperExpression
+}
+
+ArrayCreationExpression {
+  kw<"new"> ArrayCreationType (
+    DimExpr arrayCreationDimensionsAfterExpression? |
+    Dimension+ ArrayInitializer
+  )
+}
+
+arrayCreationDimensionsAfterExpression {
+  DimExpr arrayCreationDimensionsAfterExpression? |
+  Dimension+
+}
+
+ArrayCreationType {
+  annotation* simpleType
+}
+
+DimExpr {
+  annotation* !array "[" expression "]"
+}
+
+ParenthesizedExpression {
+  "(" expression ")"
+}
+
+ClassLiteral {
+  (unannotatedType ~qualifiedType | kw<"void">) "." kw<"class">
+}
+
+ObjectCreationExpression {
+  unqualifiedObjectCreationExpression |
+  baseExpression "." unqualifiedObjectCreationExpression
+}
+
+unqualifiedObjectCreationExpression {
+  kw<"new"> TypeArguments? CreatedClassType !new ArgumentList ClassBody?
+}
+
+CreatedClassType {
+  annotation* referenceSimpleType
+}
+
+FieldAccess {
+  (baseExpression | SuperExpression) ~qualifiedSuper "." (Identifier | ThisExpression)
+}
+
+ArrayAccess {
+  baseExpression "[" expression "]"
+}
+
+MethodName { Identifier }
+
+MethodInvocation {
+  (MethodName |
+   (baseExpression | SuperExpression) "." TypeArguments? MethodName)
+  ArgumentList
+}
+
+ArgumentList {
+  "(" commaSep<expression> ")"
+}
+
+MethodReference {
+  (methodReferenceType | baseExpression | SuperExpression)
+  "::" TypeArguments? (kw<"new"> | MethodReferenceName)
+}
+
+methodReferenceType[@dynamicPrecedence=1] { type }
+
+MethodReferenceName { Identifier }
+
+TypeArguments {
+  "<" commaSep<type | Wildcard> typeClose
+}
+
+Wildcard {
+  annotation* "?" wildcardBounds?
+}
+
+wildcardBounds {
+  kw<"extends"> type |
+  kw<"super"> type
+}
+
+Dimension {
+  annotation* !array "[" "]"
+}
+
+statement[@isGroup=Statement] {
+  LocalTypeDeclaration |
+  ExpressionStatement |
+  LabeledStatement |
+  IfStatement |
+  WhileStatement |
+  ForStatement |
+  EnhancedForStatement |
+  Block |
+  EmptyStatement |
+  AssertStatement |
+  SwitchStatement |
+  DoStatement |
+  BreakStatement |
+  ContinueStatement |
+  ReturnStatement |
+  YieldStatement |
+  SynchronizedStatement |
+  LocalVariableDeclaration |
+  ThrowStatement |
+  TryStatement |
+  TryWithResourcesStatement
+}
+
+EmptyStatement {
+  ";"
+}
+
+Block {
+  "{" statement* "}"
+}
+
+ExpressionStatement {
+  StatementExpression ";"
+}
+
+StatementExpression {
+  AssignmentExpression |
+  UpdateExpression |
+  MethodInvocation |
+  ObjectCreationExpression
+}
+
+LabeledStatement {
+  Label ":" statement
+}
+
+Label { Identifier }
+
+AssertStatement {
+  kw<"assert"> expression ";" |
+  kw<"assert"> expression ":" expression ";"
+}
+
+SwitchStatement[@dynamicPrecedence=1] {
+  kw<"switch"> ParenthesizedExpression SwitchStatementBlock ~switch
+}
+
+SwitchExpression {
+  kw<"switch"> ParenthesizedExpression SwitchExpressionBlock ~switch
+}
+
+SwitchStatementBlock {
+  "{" (SwitchStatementRule* | SwitchBlockStatementGroup*) "}"
+}
+
+SwitchExpressionBlock {
+  "{" (SwitchExpressionRule* | SwitchBlockStatementGroup*) "}"
+}
+
+SwitchBlockStatementGroup {
+  SwitchLabel ":" ~switchGroup SwitchBlockStatementGroupBody
+}
+
+SwitchBlockStatementGroupBody {
+  SwitchGroupStatements
+}
+
+SwitchGroupStatements {
+  statement ~switchGroup SwitchGroupStatements |
+  () ~switchGroup
+}
+
+SwitchStatementRule[@dynamicPrecedence=1] {
+  SwitchLabel "->" statementSwitchOutcome ~switch
+}
+
+SwitchExpressionRule {
+  SwitchLabel "->" expressionSwitchOutcome ~switch
+}
+
+statementSwitchOutcome {
+  StatementExpression ~switch ";" |
+  ThrowStatement |
+  Block
+}
+
+expressionSwitchOutcome {
+  expression ~switch ";" |
+  ThrowStatement |
+  Block
+}
+
+SwitchLabel {
+  kw<"case"> SwitchCaseLabelRest |
+  kw<"default">
+}
+
+SwitchCaseLabelRest {
+  commaSep1<SwitchCaseElement> Guard?
+}
+
+SwitchCaseElement {
+  [@dynamicPrecedence=1] { expression ~case } |
+  [@dynamicPrecedence=2] { Pattern ~case } |
+  kw<"default">
+}
+
+Guard {
+  ckw<"when"> expression
+}
+
+Pattern {
+  PatternModifiers? unannotatedType (PatternVariable | RecordPatternBody)
+}
+
+PatternModifiers {
+  annotation+ (kw<"final"> annotation*)* ~annotations |
+  (kw<"final"> annotation*)+ ~annotations
+}
+
+PatternVariable {
+  Definition |
+  UnnamedPattern
+}
+
+RecordPatternBody {
+  "(" commaSep<ComponentPattern> ")"
+}
+
+ComponentPattern {
+  Pattern |
+  UnnamedPattern
+}
+
+UnnamedPattern[@dynamicPrecedence=1] {
+  ckw<"_">
+}
+
+DoStatement {
+  kw<"do"> statement kw<"while"> ParenthesizedExpression ";"
+}
+
+BreakStatement {
+  kw<"break"> Label? ";"
+}
+
+ContinueStatement {
+  kw<"continue"> Label? ";"
+}
+
+ReturnStatement {
+  kw<"return"> expression? ";"
+}
+
+YieldStatement[@dynamicPrecedence=1] {
+  ckw<"yield"> expression ";"
+}
+
+SynchronizedStatement {
+  kw<"synchronized"> ParenthesizedExpression Block
+}
+
+ThrowStatement {
+  kw<"throw"> expression ";"
+}
+
+TryStatement {
+  kw<"try"> Block (
+    CatchClause+ FinallyClause? |
+    FinallyClause
+  )
+}
+
+CatchClause {
+  !else kw<"catch"> CatchFormalParameter Block
+}
+
+CatchFormalParameter {
+  "(" Modifiers? CatchType variableDeclaratorId ")"
+}
+
+CatchType {
+  referenceSimpleType ("|" CatchAlternativeType)*
+}
+
+FinallyClause {
+  kw<"finally"> Block
+}
+
+TryWithResourcesStatement {
+  kw<"try"> ResourceSpecification Block CatchClause* FinallyClause?
+}
+
+ResourceSpecification {
+  "(" Resource (";" Resource)* ";"? ")"
+}
+
+Resource {
+  Modifiers? (InferredLocalType | unannotatedType) variableDeclaratorId "=" expression |
+  Identifier |
+  FieldAccess
+}
+
+IfStatement {
+  kw<"if"> ParenthesizedExpression statement (!else kw<"else"> statement)?
+}
+
+WhileStatement {
+  kw<"while"> ParenthesizedExpression statement
+}
+
+ForStatement {
+  kw<"for">
+  ForSpec {
+    "(" ForInitializer? ";" ForCondition? ";" ForUpdate? ")"
+  }
+  statement
+}
+
+ForInitializer {
+  LocalVariableDeclarationCore |
+  commaSep1<StatementExpression>
+}
+
+ForCondition {
+  expression
+}
+
+ForUpdate {
+  commaSep1<StatementExpression>
+}
+
+EnhancedForStatement {
+  kw<"for">
+  ForSpec {
+    "(" Modifiers? (InferredLocalType | unannotatedType) variableDeclaratorId ":" expression ")"
+  }
+  statement
+}
+
+annotation {
+  MarkerAnnotation |
+  Annotation
+}
+
+MarkerAnnotation {
+  "@" name
+}
+
+Annotation {
+  "@" name AnnotationArgumentList
+}
+
+AnnotationArgumentList {
+  "(" (elementValue | commaSep<ElementValuePair>) ")"
+}
+
+ElementValuePair {
+  Identifier !valuePair "=" elementValue
+}
+
+elementValue {
+  (expression |
+   ElementValueArrayInitializer |
+   annotation) !valuePair
+}
+
+ElementValueArrayInitializer {
+  "{" commaSepTrailing<elementValue> "}"
+}
+
+ModuleDeclaration {
+  annotation* ckw<"open">? ckw<"module"> name ModuleBody
+}
+
+ModuleBody {
+  "{" ModuleDirective* "}"
+}
+
+ModuleDirective {
+  (ckw<"requires"> requiresModifier* name |
+   ckw<"exports"> name ckw<"to">? commaSep<name> |
+   ckw<"opens"> name ckw<"to">? commaSep<name> |
+   ckw<"uses"> name | ckw<"provides"> name ckw<"with"> commaSep1<name>)
+  ";"
+}
+
+requiresModifier {
+  ckw<"transitive"> |
+  kw<"static">
+}
+
+PackageDeclaration {
+  annotation* kw<"package"> name ";"
+}
+
+ImportDeclaration {
+  ModuleImportDeclaration |
+  TypeOrStaticImportDeclaration
+}
+
+ModuleImportDeclaration {
+  kw<"import"> ckw<"module"> name ";"
+}
+
+TypeOrStaticImportDeclaration {
+  kw<"import"> kw<"static">? name ("." Asterisk)? ";"
+}
+
+EnumDeclaration {
+  Modifiers? EnumDeclarationCore
+}
+
+EnumDeclarationCore {
+  kw<"enum"> Definition SuperInterfaces? EnumBody
+}
+
+EnumBody {
+  "{" commaSepTrailing<EnumConstant> EnumBodyDeclarations? "}"
+}
+
+EnumBodyDeclarations {
+  ";" classBodyDeclaration*
+}
+
+EnumConstant {
+  Modifiers? Definition ArgumentList? ClassBody?
+}
+
+ClassDeclaration {
+  Modifiers? ClassDeclarationCore
+}
+
+ClassDeclarationCore {
+  kw<"class"> Definition TypeParameters? Superclass? SuperInterfaces? Permits? ClassBody
+}
+
+Modifiers {
+  annotation+ (modifier annotation*)* ~annotations |
+  (modifier annotation*)+ ~annotations
+}
+
+modifier {
+  kw<"public"> | kw<"protected"> | kw<"private"> | kw<"abstract"> | kw<"static"> | kw<"final"> | kw<"strictfp"> |
+  kw<"default"> | kw<"synchronized"> | kw<"native"> | kw<"transient"> | kw<"volatile"> |
+  ckw<"sealed"> | NonSealedModifier
+}
+
+NonSealedModifier {
+  ckw<"non"> "-" ckw<"sealed">
+}
+
+LocalTypeDeclaration {
+  LocalTypeModifiers? (
+    ClassDeclarationCore |
+    RecordDeclarationCore |
+    InterfaceDeclarationCore |
+    AnnotationTypeDeclarationCore |
+    EnumDeclarationCore
+  )
+}
+
+LocalTypeModifiers {
+  annotation+ (localTypeModifier annotation*)* ~annotations |
+  (localTypeModifier annotation*)+ ~annotations
+}
+
+localTypeModifier {
+  kw<"abstract"> |
+  kw<"static"> |
+  kw<"final"> |
+  kw<"strictfp"> |
+  ckw<"sealed"> |
+  NonSealedModifier
+}
+
+TypeParameters {
+  "<" commaSep1<TypeParameter> typeClose
+}
+
+TypeParameter {
+  annotation* Definition TypeBound?
+}
+
+TypeBound {
+  kw<"extends"> type ("&" type)*
+}
+
+Superclass {
+  kw<"extends"> type
+}
+
+SuperInterfaces {
+  kw<"implements"> InterfaceTypeList
+}
+
+Permits {
+  ckw<"permits"> InterfaceTypeList
+}
+
+InterfaceTypeList {
+  commaSep1<type>
+}
+
+ClassBody {
+  "{" classBodyDeclaration* "}"
+}
+
+classBodyDeclaration {
+  FieldDeclaration |
+  MethodDeclaration |
+  ClassDeclaration |
+  RecordDeclaration |
+  InterfaceDeclaration |
+  AnnotationTypeDeclaration |
+  EnumDeclaration |
+  Block |
+  StaticInitializer |
+  ConstructorDeclaration |
+  ";"
+}
+
+StaticInitializer {
+  kw<"static"> Block
+}
+
+ConstructorDeclaration {
+  Modifiers? constructorDeclarator Throws? ConstructorBody
+}
+
+constructorDeclarator {
+  TypeParameters? Definition FormalParameters
+}
+
+ConstructorBody {
+  "{" statement* (ExplicitConstructorInvocation statement*)? "}"
+}
+
+ExplicitConstructorInvocation {
+  (TypeArguments? (kw<"this"> | kw<"super">) | (baseExpression) "." TypeArguments? kw<"super">) ArgumentList ";"
+}
+
+name {
+  Identifier |
+  ScopedIdentifier
+}
+
+ScopedIdentifier {
+  name "." Identifier
+}
+
+FieldDeclaration {
+  Modifiers? unannotatedType commaSep1<VariableDeclarator> ";"
+}
+
+RecordDeclaration[@dynamicPrecedence=1] {
+  Modifiers? RecordDeclarationCore
+}
+
+RecordDeclarationCore {
+  record Definition TypeParameters? RecordHeader SuperInterfaces? RecordBody
+}
+
+RecordHeader[@dynamicPrecedence=1] {
+  "(" commaSep<RecordComponent> ")"
+}
+
+RecordComponent {
+  Modifiers? unannotatedType (
+    annotation* "..." Definition |
+    variableDeclaratorId
+  )
+}
+
+RecordBody {
+  "{" recordBodyDeclaration* "}"
+}
+
+recordBodyDeclaration {
+  CompactConstructorDeclaration |
+  classBodyDeclaration
+}
+
+CompactConstructorDeclaration {
+  Modifiers? Definition Block
+}
+
+AnnotationTypeDeclaration {
+  Modifiers? AnnotationTypeDeclarationCore
+}
+
+AnnotationTypeDeclarationCore {
+  "@interface" Identifier AnnotationTypeBody
+}
+
+AnnotationTypeBody {
+  "{" (
+    AnnotationTypeElementDeclaration |
+    ConstantDeclaration |
+    ClassDeclaration |
+    EnumDeclaration |
+    RecordDeclaration |
+    InterfaceDeclaration |
+    AnnotationTypeDeclaration |
+    ";"
+  )* "}"
+}
+
+AnnotationTypeElementDeclaration {
+  Modifiers? unannotatedType Identifier "(" ")" Dimension* DefaultValue? ";"
+}
+
+DefaultValue {
+  kw<"default"> elementValue
+}
+
+InterfaceDeclaration {
+  Modifiers? InterfaceDeclarationCore
+}
+
+InterfaceDeclarationCore {
+  kw<"interface"> Definition TypeParameters? ExtendsInterfaces? Permits? InterfaceBody
+}
+
+ExtendsInterfaces {
+  kw<"extends"> InterfaceTypeList
+}
+
+InterfaceBody {
+  "{" (
+    ConstantDeclaration |
+    EnumDeclaration |
+    RecordDeclaration |
+    MethodDeclaration |
+    ClassDeclaration |
+    InterfaceDeclaration |
+    AnnotationTypeDeclaration |
+    ";"
+  )* "}"
+}
+
+ConstantDeclaration {
+  Modifiers? unannotatedType commaSep1<VariableDeclarator> ";"
+}
+
+VariableDeclarator {
+  variableDeclaratorId ("=" variableInitializer)?
+}
+
+variableDeclaratorId[@inline] {
+  Definition Dimension*
+}
+
+variableInitializer {
+  expression |
+  ArrayInitializer
+}
+
+ArrayInitializer {
+  "{" commaSepTrailing<variableInitializer> "}"
+}
+
+type[@isGroup=Type] {
+  unannotatedType |
+  AnnotatedType { annotation+ unannotatedType }
+}
+
+unannotatedType {
+  ~annotations simpleType |
+  ArrayType
+}
+
+simpleType {
+  primitiveType |
+  referenceSimpleType
+}
+
+primitiveType {
+  @specialize[@name=PrimitiveType]<identifier, "byte" | "short" | "int" | "long" | "char" | "float" | "double" | "boolean">
+}
+
+referenceSimpleType[@inline] {
+  TypeName |
+  ScopedTypeName |
+  GenericType
+}
+
+CatchAlternativeType {
+  annotation* referenceSimpleType
+}
+
+TypeName {
+  ~annotations identifier ~identifier
+}
+
+Identifier {
+  identifier ~identifier
+}
+
+Definition {
+  identifier ~identifier
+}
+
+ScopedTypeName {
+  (TypeName | ScopedTypeName | GenericType) ~qualifiedType "." annotation* TypeName
+}
+
+GenericType[@dynamicPrecedence=1] {
+  (TypeName | ScopedTypeName) !typeArgs TypeArguments
+}
+
+ArrayType {
+  unannotatedType !array Dimension+
+}
+
+methodHeader {
+  (TypeParameters annotation*)? (
+    unannotatedType methodDeclarator |
+    kw<"void"> methodDeclarator
+  ) Throws?
+}
+
+methodDeclarator {
+  Definition FormalParameters Dimension*
+}
+
+FormalParameters {
+  "(" ReceiverParameter? commaSep<FormalParameter | SpreadParameter> ")"
+}
+
+FormalParameter {
+  Modifiers? unannotatedType variableDeclaratorId
+}
+
+ReceiverParameter {
+  annotation* unannotatedType (Identifier ".")? kw<"this">
+}
+
+SpreadParameter {
+  Modifiers? unannotatedType annotation* "..." Definition
+}
+
+Throws {
+  kw<"throws"> commaSep1<ExceptionType>
+}
+
+ExceptionType {
+  annotation* referenceSimpleType
+}
+
+LocalVariableDeclaration {
+  LocalVariableDeclarationCore ";"
+}
+
+LocalVariableDeclarationCore {
+  Modifiers? (InferredLocalType | unannotatedType) commaSep1<VariableDeclarator>
+}
+
+InferredLocalType[@dynamicPrecedence=1] {
+  ckw<"var">
+}
+
+MethodDeclaration {
+  Modifiers? methodHeader (Block | ";")
+}
+
+kw<term> { @specialize[@name={term}]<identifier, term> }
+
+ckw<term> { @extend[@name={term}]<identifier, term> }
+
+commaSep<expr> { (expr ("," expr)*)? }
+
+commaSep1<expr> { expr ("," expr)* }
+
+commaSepTrailing<expr> { (expr ("," expr?)*)? }
+
+@skip { LineComment | BlockComment | whitespace }
+
+@external extend { identifier } specialize_record from "./identifier" {
+  record[@name=record]
+}
+
+@external tokens TOKENIZER from "./identifier" {
+  identifier
+}
+
+@tokens {
+  whitespace {
+    @whitespace+
+  }
+
+  digits {
+    $[0-9]+ ("_"+ $[0-9]+)*
+  }
+
+  hexDigits {
+    $[A-Fa-f0-9]+ ("_" $[A-Fa-f0-9]+)*
+  }
+
+  IntegerLiteral {
+    (digits |
+     ("0x" | "0X") hexDigits |
+     ("0o" | "0O") $[0-7]+ ("_" $[0-7]+)* |
+     ("0b" | "0B") $[01]+ ("_" $[01]+)*)
+    ("l" | "L")?
+  }
+
+  exponent {
+    $[eE] ("-" | "+")? digits
+  }
+
+  hexExponent {
+    $[pP] ("-" | "+")? digits
+  }
+
+  floatSuffix {
+    $[fFdD]
+  }
+
+  FloatingPointLiteral {
+    digits ("." digits? exponent? floatSuffix? | exponent floatSuffix? | floatSuffix) |
+    "." digits exponent? floatSuffix? |
+    ("0x" | "0X") (hexDigits ("." hexDigits?)? | "." hexDigits) hexExponent floatSuffix?
+  }
+
+  @precedence { FloatingPointLiteral, IntegerLiteral }
+
+  characterCodeUnit {
+    $[\u{0}-\u{9}\u{b}-\u{26}\u{28}-\u{5b}\u{5d}-\u{ffff}]
+  }
+  CharacterLiteral[isolate] {
+    "'" (characterCodeUnit | "\\" ("'" | "\\" | characterCodeUnit+)) "'"
+  }
+  StringLiteral[isolate] {
+    "\"" (![\\"\n] | "\\" (![\n] | "\n"))* "\""
+  }
+  textBlockStart {
+    '"""' $[ \t]* "\n"
+  }
+  @precedence { textBlockStart, StringLiteral }
+
+  // A generic close must remain distinct from the longest shift token when
+  // unrelated token rules change the main DFA partition.
+  typeClose { ">" }
+  shiftRight { ">>" }
+  @conflict { typeClose, shiftRight }
+
+  Asterisk { "*" }
+
+  AssignOp {
+    ("+" | "-" | "*" | "/" | "&" | "|" | "^" | "%" | "<<" | ">>" ">"?) "="
+  }
+
+  op[@name={name} "Op"]<name, body> { body }
+
+  times[@name=ArithOp] { "*" | "/" }
+
+  LineComment[isolate] {
+    "//" ![\n]*
+  }
+
+  BlockComment[isolate] { "/*" blockCommentRest }
+
+  blockCommentRest { ![*] blockCommentRest | "*" blockCommentAfterStar }
+
+  blockCommentAfterStar { "/" | "*" blockCommentAfterStar | ![/*] blockCommentRest }
+
+  @precedence { LineComment, times }
+  @precedence { BlockComment, times }
+
+  "="[@name=AssignOp]
+
+  "{" "}" "(" ")" "[" "]" "." "," ";" ":" "?" "..." "->" "::" "@"
+}
+
+@external propSource java_highlighting from "./highlighting"
+
+@detectDelim

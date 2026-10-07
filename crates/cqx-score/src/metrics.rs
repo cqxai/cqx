@@ -147,7 +147,10 @@ pub fn about(what: impl Into<String>, file: impl Into<String>, line: u32) -> Fin
 }
 
 fn frontend_language(n: &cqx_schema::Node) -> &str {
-    n.attrs.get("language").and_then(|v| v.as_str()).unwrap_or("rust")
+    n.attrs
+        .get("language")
+        .and_then(|v| v.as_str())
+        .unwrap_or("rust")
 }
 
 pub struct Metrics {
@@ -166,11 +169,14 @@ impl Metrics {
     pub fn compute(stream: &Stream, config: &Config) -> Metrics {
         // Keep the Rust-only memory profile; split additional frontends only
         // when they occur, then feed each the shared neutral measurements.
-        if !stream.nodes.iter().any(|n| {
-            n.kind == NodeKind::File && matches!(frontend_language(n), "typescript" | "go")
-        }) {
+        if !stream
+            .nodes
+            .iter()
+            .any(|n| n.kind == NodeKind::File && frontend_language(n) != "rust")
+        {
             return Self::compute_one(stream, config);
         }
+        let languages = config.frontend_languages();
         let subset = |lang: &str| Stream {
             nodes: stream
                 .nodes
@@ -185,7 +191,7 @@ impl Metrics {
                     if lang == "rust" {
                         !e.ev
                             .iter()
-                            .any(|ev| matches!(ev.extractor.as_str(), "typescript" | "go"))
+                            .any(|ev| languages.contains(ev.extractor.as_str()))
                     } else {
                         e.ev.iter().any(|ev| ev.extractor == lang)
                     }
@@ -195,7 +201,7 @@ impl Metrics {
             ..Stream::default()
         };
         let mut metrics = Self::compute_one(&subset("rust"), config);
-        for lang in ["typescript", "go"] {
+        for lang in languages.iter().copied() {
             let part = subset(lang);
             // Absent frontends must not add empty rules or config to another
             // language's report. Skipped files still identify their frontend.
@@ -246,22 +252,33 @@ impl Metrics {
             metrics.skipped_files.extend(part_metrics.skipped_files);
             metrics.lines += part_metrics.lines;
         }
-        metrics.skipped_files.sort_by(|a, b| {
-            a["file"].as_str().cmp(&b["file"].as_str())
-        });
+        metrics
+            .skipped_files
+            .sort_by(|a, b| a["file"].as_str().cmp(&b["file"].as_str()));
         metrics.scale = (metrics.lines as f64 / 10_000.0).max(0.05);
+        // Reader completion order must not select/reorder frontend findings.
+        // Rust retains its existing report ordering for compatibility.
+        for (rule, measure) in &mut metrics.values {
+            if rule.contains('/') {
+                measure.findings.sort_by(|a, b| {
+                    (&a.file, a.line, a.col, &a.what).cmp(&(&b.file, b.line, b.col, &b.what))
+                });
+            }
+        }
         metrics.locate(stream);
         metrics
     }
 
     fn compute_one(stream: &Stream, config: &Config) -> Metrics {
-        let source_locations = stream.nodes.iter().any(|n| {
-            matches!(frontend_language(n), "typescript" | "go")
-        });
-        let skipped_files = stream.nodes.iter().filter_map(|n| {
-            let reason = n.attrs.get("skipped")?.as_str()?;
-            Some(serde_json::json!({"file": n.attrs.get("path")?, "reason": reason}))
-        }).collect();
+        let source_locations = stream.nodes.iter().any(|n| frontend_language(n) != "rust");
+        let skipped_files = stream
+            .nodes
+            .iter()
+            .filter_map(|n| {
+                let reason = n.attrs.get("skipped")?.as_str()?;
+                Some(serde_json::json!({"file": n.attrs.get("path")?, "reason": reason}))
+            })
+            .collect();
         let exclude = &config.exclude;
         let excluded = |path: &str| exclude.iter().any(|p| path.starts_with(p.as_str()));
 
@@ -285,11 +302,19 @@ impl Metrics {
             {
                 continue;
             }
-            let path = node.attrs.get("path").and_then(|v| v.as_str()).unwrap_or("");
+            let path = node
+                .attrs
+                .get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             if excluded(path) {
                 continue;
             }
-            let n = node.attrs.get("lines").and_then(|v| v.as_u64()).unwrap_or(0);
+            let n = node
+                .attrs
+                .get("lines")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
             lines += n;
             files.push((path.to_string(), n));
         }
@@ -303,7 +328,6 @@ impl Metrics {
             .filter(|e| e.kind == EdgeKind::Contains && e.to.0.starts_with("bin:"))
             .filter_map(|e| e.from.0.strip_prefix("pkg:").map(str::to_string))
             .collect();
-
 
         // Only effect edges carry a test role; a declaration edge has to be
         // placed by the file that holds its symbol, or test helpers count as
@@ -384,9 +408,7 @@ impl Metrics {
                 .edges
                 .iter()
                 .filter(|e| e.kind == EdgeKind::EffectExec && is_product(e))
-                .filter(|e| {
-                    package_of(&e.from.0).is_some_and(|p| !binary_packages.contains(p))
-                })
+                .filter(|e| package_of(&e.from.0).is_some_and(|p| !binary_packages.contains(p)))
                 .map(|e| finding("library ends the process", e))
                 .collect(),
         );
@@ -401,12 +423,7 @@ impl Metrics {
             spawns
                 .iter()
                 .filter(|e| attr(e, "via") == "env")
-                .map(|e| {
-                    finding(
-                        format!("spawn target from ${}", attr(e, "env_var")),
-                        e,
-                    )
-                })
+                .map(|e| finding(format!("spawn target from ${}", attr(e, "env_var")), e))
                 .collect(),
         );
         density(
@@ -473,7 +490,9 @@ impl Metrics {
             if !matches!(edge.kind, EdgeKind::Param | EdgeKind::Returns) {
                 continue;
             }
-            let Some(p) = package_of(&edge.from.0) else { continue };
+            let Some(p) = package_of(&edge.from.0) else {
+                continue;
+            };
             let written = edge.to.0.trim_start_matches("type:");
             if PRIMITIVES.contains(&written) {
                 continue;
@@ -486,7 +505,9 @@ impl Metrics {
                 .rsplit("::")
                 .next()
                 .unwrap_or(written);
-            let Some(owners) = type_owner.get(base) else { continue };
+            let Some(owners) = type_owner.get(base) else {
+                continue;
+            };
             // A name defined in more than one crate cannot be attributed
             // without resolution, and guessing is not free: picking one owner
             // arbitrarily out of a HashSet made this metric change between runs
@@ -529,7 +550,12 @@ impl Metrics {
             .collect();
         let bare = params
             .iter()
-            .filter(|e| matches!(e.to.0.as_str(), "type:&str" | "type:String" | "type:&String"))
+            .filter(|e| {
+                matches!(
+                    e.to.0.as_str(),
+                    "type:&str" | "type:String" | "type:&String"
+                )
+            })
             .count();
         values.insert(
             "bare-string-params".into(),
@@ -546,9 +572,7 @@ impl Metrics {
         let targets: Vec<&Edge> = stream
             .edges
             .iter()
-            .filter(|e| {
-                matches!(e.kind, EdgeKind::Spawns | EdgeKind::ReadsEnv) && is_product(e)
-            })
+            .filter(|e| matches!(e.kind, EdgeKind::Spawns | EdgeKind::ReadsEnv) && is_product(e))
             .collect();
         let unproven: Vec<Finding> = targets
             .iter()
@@ -588,14 +612,20 @@ impl Metrics {
             .filter(|e| is_check(e.to.0.trim_start_matches("ext:")))
             .map(|e| {
                 finding(
-                    format!("{}(..) called, answer discarded", e.to.0.trim_start_matches("ext:")),
+                    format!(
+                        "{}(..) called, answer discarded",
+                        e.to.0.trim_start_matches("ext:")
+                    ),
                     e,
                 )
             })
             .collect();
         values.insert(
             "discarded-check".into(),
-            Measure { value: discarded.len() as f64 / scale, findings: discarded },
+            Measure {
+                value: discarded.len() as f64 / scale,
+                findings: discarded,
+            },
         );
 
         // A catch-all that does nothing, in a function that checks elsewhere.
@@ -613,13 +643,20 @@ impl Metrics {
             .filter(|e| e.attrs.get("empty").and_then(serde_json::Value::as_bool) == Some(true))
             .filter(|e| checks_in.contains_key(e.from.0.as_str()))
             .map(|e| {
-                let arms = e.attrs.get("arms").and_then(serde_json::Value::as_u64).unwrap_or(0);
+                let arms = e
+                    .attrs
+                    .get("arms")
+                    .and_then(serde_json::Value::as_u64)
+                    .unwrap_or(0);
                 finding(format!("{arms} arms check; the catch-all does nothing"), e)
             })
             .collect();
         values.insert(
             "default-allow-dispatch".into(),
-            Measure { value: open_dispatch.len() as f64 / scale, findings: open_dispatch },
+            Measure {
+                value: open_dispatch.len() as f64 / scale,
+                findings: open_dispatch,
+            },
         );
 
         // A shell, and an argument nobody could follow. Either alone is
@@ -631,7 +668,10 @@ impl Metrics {
             .filter(|e| {
                 let program = e.to.0.trim_start_matches("proc:");
                 let bare = program.rsplit('/').next().unwrap_or(program);
-                matches!(bare, "sh" | "zsh" | "bash" | "dash" | "ksh" | "fish" | "cmd.exe" | "powershell")
+                matches!(
+                    bare,
+                    "sh" | "zsh" | "bash" | "dash" | "ksh" | "fish" | "cmd.exe" | "powershell"
+                )
             })
             .map(|e| e.from.0.as_str())
             .collect();
@@ -644,7 +684,10 @@ impl Metrics {
             .collect();
         values.insert(
             "shell-argument-unchecked".into(),
-            Measure { value: loose.len() as f64 / scale, findings: loose },
+            Measure {
+                value: loose.len() as f64 / scale,
+                findings: loose,
+            },
         );
 
         // A literal that turns a child's own checks off.
@@ -657,7 +700,10 @@ impl Metrics {
             .collect();
         values.insert(
             "permission-granting-argument".into(),
-            Measure { value: granting.len() as f64 / scale, findings: granting },
+            Measure {
+                value: granting.len() as f64 / scale,
+                findings: granting,
+            },
         );
 
         // A promise about every `T`, made without asking anything of `T`.
@@ -670,14 +716,20 @@ impl Metrics {
             .filter(|e| e.attrs.get("bounded").and_then(serde_json::Value::as_bool) == Some(false))
             .map(|e| {
                 finding(
-                    format!("unsafe impl {} with no Send or Sync bound", attr(e, "trait")),
+                    format!(
+                        "unsafe impl {} with no Send or Sync bound",
+                        attr(e, "trait")
+                    ),
                     e,
                 )
             })
             .collect();
         values.insert(
             "unbounded-send-sync".into(),
-            Measure { value: unbounded.len() as f64 / scale, findings: unbounded },
+            Measure {
+                value: unbounded.len() as f64 / scale,
+                findings: unbounded,
+            },
         );
 
         // JSON assembled by interpolation.
@@ -689,7 +741,10 @@ impl Metrics {
             .collect();
         values.insert(
             "hand-built-json".into(),
-            Measure { value: hand_built.len() as f64 / scale, findings: hand_built },
+            Measure {
+                value: hand_built.len() as f64 / scale,
+                findings: hand_built,
+            },
         );
 
         // --- modularity: a house standard, so the threshold is a parameter ---
@@ -698,8 +753,7 @@ impl Metrics {
             .get("oversized-files")
             .map(|r| r.param("max_lines", 1000.0))
             .unwrap_or(1000.0) as u64;
-        let oversized: Vec<&(String, u64)> =
-            files.iter().filter(|(_, n)| *n > max_lines).collect();
+        let oversized: Vec<&(String, u64)> = files.iter().filter(|(_, n)| *n > max_lines).collect();
         values.insert(
             "oversized-files".into(),
             Measure {
@@ -721,7 +775,11 @@ impl Metrics {
             .get("oversized-line-share")
             .map(|r| r.param("max_lines", 1000.0))
             .unwrap_or(1000.0) as u64;
-        let in_big: u64 = files.iter().filter(|(_, n)| *n > share_max).map(|(_, n)| *n).sum();
+        let in_big: u64 = files
+            .iter()
+            .filter(|(_, n)| *n > share_max)
+            .map(|(_, n)| *n)
+            .sum();
         values.insert(
             "oversized-line-share".into(),
             Measure {
@@ -769,28 +827,37 @@ impl Metrics {
             .filter(|n| n.kind == NodeKind::Symbol)
             .filter_map(|n| {
                 let name = n.attrs.get("name")?.as_str()?;
-                let kind = n.attrs.get("lang:kind").and_then(|v| v.as_str()).unwrap_or("item");
+                let kind = n
+                    .attrs
+                    .get("lang:kind")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("item");
                 Some((n.id.0.as_str(), (name, kind)))
             })
             .collect();
 
         // file -> the items in it, each with its extent.
-        let mut items: HashMap<&str, Vec<Item>> = HashMap::new();
+        let mut items: HashMap<&str, Vec<(Item, [u32; 2])>> = HashMap::new();
         for edge in &stream.edges {
             if edge.kind != EdgeKind::Contains {
                 continue;
             }
-            let Some((name, kind)) = named.get(edge.to.0.as_str()) else { continue };
+            let Some((name, kind)) = named.get(edge.to.0.as_str()) else {
+                continue;
+            };
             let Some(ev) = edge.ev.first() else { continue };
             if ev.line[0] == 0 {
                 continue;
             }
-            items.entry(ev.file.as_str()).or_default().push(Item {
-                name: (*name).to_string(),
-                kind: (*kind).to_string(),
-                from: ev.line[0],
-                to: ev.line[1].max(ev.line[0]),
-            });
+            items.entry(ev.file.as_str()).or_default().push((
+                Item {
+                    name: (*name).to_string(),
+                    kind: (*kind).to_string(),
+                    from: ev.line[0],
+                    to: ev.line[1].max(ev.line[0]),
+                },
+                ev.col,
+            ));
         }
 
         for measure in self.values.values_mut() {
@@ -798,15 +865,23 @@ impl Metrics {
                 if finding.line == 0 {
                     continue;
                 }
-                let Some(candidates) = items.get(finding.file.as_str()) else { continue };
+                let Some(candidates) = items.get(finding.file.as_str()) else {
+                    continue;
+                };
                 // The innermost one: a call inside a closure inside a method is
                 // most usefully shown as the method, not as the impl block that
                 // also contains it.
                 finding.item = candidates
                     .iter()
-                    .filter(|i| i.from <= finding.line && finding.line <= i.to)
-                    .min_by_key(|i| i.to - i.from)
-                    .cloned();
+                    .filter(|(i, col)| {
+                        i.from <= finding.line
+                            && finding.line <= i.to
+                            && (finding.col == [0, 0]
+                                || (i.from != finding.line || finding.col[0] >= col[0])
+                                    && (i.to != finding.line || finding.col[1] <= col[1]))
+                    })
+                    .min_by_key(|(i, _)| i.to - i.from)
+                    .map(|(i, _)| i.clone());
             }
         }
     }

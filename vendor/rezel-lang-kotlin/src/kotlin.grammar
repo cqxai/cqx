@@ -1,0 +1,1507 @@
+// Kotlin 2.4 grammar rebuilt around generated lexing and centralized layout.
+//
+// This first vertical slice intentionally covers the positive runtime corpus.
+// Syntax families are added from the official grammar without restoring the
+// former procedural boundary-token layer.
+
+@precedence {
+  statementAnnotation
+  loopBody
+  functionBody
+  labeledThis
+  superQualifier
+  destructuringLambdaParameter
+  body @cut
+  controlLambdaCompletion
+  constructor @cut
+  initializer @cut
+  receiver
+  namedFunctionReceiver
+  anonymousFunctionReceiver
+  namelessFunctionReceiver
+  typeArguments
+  typeConstraints
+  typeConstraint @left
+  nullable
+  functionType
+  whenBlock
+  qualifiedType @left
+  trailingLambda
+  postfix
+  unary @right
+  cast @left
+  multiplicative @left
+  additive @left
+  range @left
+  whenGuard
+  infix @left
+  comparison @left
+  equality @left
+  conjunction @left
+  disjunction @left
+  elvis @right
+  assignment @right
+  else @right
+  return
+}
+
+@top KotlinFile {
+  ShebangLine? FileAnnotation* (PackageHeader FileAnnotation*)?
+  ImportList? declarationList
+}
+
+@top DeferredKotlinExpression {
+  deferredExpression
+}
+
+@skip { horizontalWhitespace | lineBreakTrivia | LineComment | BlockComment }
+
+PackageHeader {
+  kw<"package"> QualifiedIdentifier statementEnd
+}
+
+FileAnnotation {
+  "@" ckw<"file"> ":" (UnescapedAnnotation | "[" UnescapedAnnotation+ "]")
+}
+
+QualifiedIdentifier {
+  Identifier ("." Identifier)*
+}
+
+ImportList {
+  ImportHeader+
+}
+
+ImportHeader {
+  importKeyword ImportPath ImportAlias? statementEnd
+}
+
+ImportPath {
+  Identifier ("." Identifier)* ("." "*")?
+}
+
+ImportAlias {
+  kw<"as"> Definition
+}
+
+declarationList {
+  (topLevelDeclaration statementEnd)*
+}
+
+topLevelDeclaration {
+  nonPropertyDeclaration |
+  PropertyDeclaration |
+  EnumPropertyDeclaration
+}
+
+nonPropertyDeclaration {
+  ClassDeclaration |
+  ObjectDeclaration |
+  EnumObjectDeclaration |
+  FunctionDeclaration |
+  EnumFunctionDeclaration |
+  TypeAliasDeclaration
+}
+
+declaration[@isGroup=Declaration] {
+  nonPropertyDeclaration |
+  LocalPropertyDeclaration
+}
+
+FunctionDeclaration {
+  Modifiers? kw<"fun"> functionDeclarationTail
+}
+
+EnumFunctionDeclaration[@name=FunctionDeclaration] {
+  EnumModifiers kw<"fun"> functionDeclarationTail
+}
+
+functionDeclarationTail {
+  functionDeclarationSignature functionBodySuffix
+}
+
+functionDeclarationSignature {
+  TypeParameters?
+  (FunctionQualifiedReceiverName | Definition)
+  FunctionValueParameters
+  TypeAnnotation? (!typeConstraints TypeConstraints)?
+}
+
+FunctionQualifiedReceiverName[@name=QualifiedReceiverName] {
+  TypeModifiers ReceiverType "." functionReceiverName |
+  ParenthesizedType "." functionReceiverName |
+  SimpleUserType "." (functionReceiverName | FunctionQualifiedReceiverName) |
+  ReceiverNullableType "." functionReceiverName
+}
+
+functionReceiverName {
+  !namedFunctionReceiver Definition |
+  !namelessFunctionReceiver ""
+}
+
+functionBodySuffix {
+  (!body FunctionBody)? ~functionBodyContinuation
+}
+
+TypeAnnotation {
+  ":" type
+}
+
+FunctionValueParameters {
+  "(" delimitedCommaSep<DeclarationFunctionValueParameter> ")"
+}
+
+FunctionValueParameter {
+  FunctionParameterModifiers? Parameter PropertyInitializer?
+}
+
+DeclarationFunctionValueParameter[@name=FunctionValueParameter] {
+  FunctionParameterModifiers? Parameter PropertyInitializer?
+}
+
+Parameter {
+  Definition TypeAnnotation
+}
+
+FunctionBody {
+  Block |
+  "=" expression
+}
+
+ContextDeclarationModifier {
+  ckw<"context"> "(" delimitedCommaSep<contextDeclarationParameter> ")"
+}
+
+contextDeclarationParameter {
+  Parameter PropertyInitializer? |
+  type
+}
+
+PropertyDeclaration {
+  propertyDeclarationHead propertyDeclarationTail ~propertyAccessor propertyAccessors?
+}
+
+EnumPropertyDeclaration[@name=PropertyDeclaration] {
+  enumPropertyDeclarationHead propertyDeclarationTail
+  ~propertyAccessor propertyAccessors?
+}
+
+LocalPropertyDeclaration[@name=PropertyDeclaration] {
+  propertyDeclarationHead propertyDeclarationTail ~propertyAccessor
+}
+
+propertyDeclarationHead {
+  Modifiers? propertyDeclarationCore
+}
+
+enumPropertyDeclarationHead {
+  EnumModifiers propertyDeclarationCore
+}
+
+propertyDeclarationCore {
+  (kw<"val"> | kw<"var">) TypeParameters?
+  (MultiVariableDeclaration |
+    QualifiedReceiverName TypeAnnotation? |
+    VariableDeclaration) TypeConstraints?
+}
+
+propertyDeclarationTail {
+  (!initializer PropertyInitializer |
+    PropertyDelegate)?
+}
+
+PropertyDelegate {
+  ckw<"by"> expression
+}
+
+VariableDeclaration {
+  Definition TypeAnnotation?
+}
+
+MultiVariableDeclaration {
+  "(" delimitedCommaSep1<destructuringEntry> ")" |
+  "[" delimitedCommaSep1<destructuringEntry> "]"
+}
+
+destructuringEntry {
+  DestructuringVariableDeclaration (!initializer PropertyInitializer)?
+}
+
+DestructuringVariableDeclaration[@name=VariableDeclaration] {
+  (Annotation+ ~parameterAnnotation)? Definition TypeAnnotation?
+}
+
+PropertyInitializer {
+  "=" expression
+}
+
+Getter {
+  propertyAccessorPrefix? ckw<"get">
+  ("(" ")" TypeAnnotation? FunctionBody)?
+}
+
+propertyAccessors {
+  BackingField ~propertyAccessorContinuation (
+    Getter ~propertyAccessorContinuation Setter? |
+    Setter ~propertyAccessorContinuation Getter?
+  )? |
+  Getter ~propertyAccessorContinuation Setter? |
+  Setter ~propertyAccessorContinuation Getter?
+}
+
+Setter {
+  propertyAccessorPrefix? ckw<"set">
+  ("(" ParameterWithOptionalType ")" TypeAnnotation? FunctionBody)?
+}
+
+BackingField {
+  propertyAccessorPrefix? ckw<"field">
+  TypeAnnotation? (!initializer PropertyInitializer)?
+}
+
+propertyAccessorPrefix {
+  (sameLineIdentifier | lineBreakPrefix) Modifiers |
+  ";" Modifiers?
+}
+
+ParameterWithOptionalType {
+  Definition TypeAnnotation?
+}
+
+TypeAliasDeclaration {
+  Modifiers? kw<"typealias"> Definition TypeParameters? "=" type
+}
+
+ClassDeclaration {
+  Modifiers? (kw<"class"> | kw<"interface"> | kw<"fun"> kw<"interface"> |
+    ckw<"value"> kw<"class">)
+  Definition TypeParameters? classDeclarationRest |
+  EnumModifiers kw<"class"> Definition
+  TypeParameters? PrimaryConstructor? enumClassDeclarationSuffix |
+  EnumModifiers kw<"interface"> Definition
+  TypeParameters? classDeclarationRest
+}
+
+classDeclarationRest {
+  PrimaryConstructor? classDeclarationSuffix ~classContinuation
+}
+
+PrimaryConstructor {
+  ClassParameters |
+  (sameLineIdentifier | lineBreakPrefix)
+  Modifiers? ckw<"constructor"> ClassParameters
+}
+
+classDeclarationSuffix {
+  delegationClause ~classContinuation classTypeConstraints? (!body ClassBody)? |
+  ~classContinuation classTypeConstraints? (!body ClassBody)?
+}
+
+enumClassDeclarationSuffix {
+  delegationClause ~classContinuation classTypeConstraints? (!body EnumClassBody)? |
+  ~classContinuation classTypeConstraints? (!body EnumClassBody)?
+}
+
+classTypeConstraints {
+  TypeConstraints
+}
+
+ClassParameters {
+  !constructor "(" delimitedCommaSep<ClassParameter> ")"
+}
+
+ClassParameter {
+  Modifiers? (kw<"val"> | kw<"var">)? VariableDeclaration
+  (!initializer PropertyInitializer)?
+}
+
+ClassBody {
+  "{" ClassMemberDeclarations "}"
+}
+
+ClassMemberDeclarations {
+  (terminatedClassMemberDeclaration | ";")* classMemberDeclaration?
+}
+
+terminatedClassMemberDeclaration {
+  nonPropertyClassMemberDeclaration statementEnd |
+  classPropertyDeclaration (statementEnd | adjacentClassMemberEnd)
+}
+
+classMemberDeclaration {
+  nonPropertyClassMemberDeclaration |
+  classPropertyDeclaration
+}
+
+nonPropertyClassMemberDeclaration {
+  nonPropertyDeclaration |
+  CompanionObject |
+  SecondaryConstructor |
+  AnonymousInitializer
+}
+
+classPropertyDeclaration {
+  PropertyDeclaration |
+  EnumPropertyDeclaration
+}
+
+EnumClassBody {
+  "{" (EnumEntries (";" ClassMemberDeclarations)? | ClassMemberDeclarations)
+  "}"
+}
+
+EnumEntries {
+  EnumEntry ("," EnumEntry)* ","?
+}
+
+EnumEntry {
+  Modifiers? Definition ValueArguments? ClassBody?
+}
+
+CompanionObject {
+  Modifiers? ckw<"companion"> (ckw<"data"> | ckw<"value">)*
+  kw<"object"> Definition?
+  objectDeclarationSuffix
+}
+
+SecondaryConstructor {
+  Modifiers? ckw<"constructor"> FunctionValueParameters
+  secondaryConstructorSuffix
+}
+
+secondaryConstructorSuffix {
+  (":" ConstructorDelegationCall)? secondaryConstructorBodySuffix
+}
+
+secondaryConstructorBodySuffix {
+  (!body Block)? ~secondaryConstructorContinuation
+}
+
+ConstructorDelegationCall {
+  (kw<"this"> | kw<"super">) ConstructorValueArguments
+}
+
+AnonymousInitializer {
+  Modifiers? ckw<"init"> Block
+}
+
+ObjectDeclaration {
+  Modifiers? kw<"object"> objectDeclarationTail
+}
+
+EnumObjectDeclaration[@name=ObjectDeclaration] {
+  EnumModifiers kw<"object"> objectDeclarationTail
+}
+
+objectDeclarationTail {
+  Definition objectDeclarationSuffix
+}
+
+objectDeclarationSuffix {
+  delegationClause (!body ClassBody)? |
+  (!body ClassBody)?
+}
+
+delegationClause {
+  ":" DelegationSpecifiers
+}
+
+DelegationSpecifiers {
+  annotatedDelegationSpecifier ("," annotatedDelegationSpecifier)*
+}
+
+annotatedDelegationSpecifier {
+  Annotation* DelegationSpecifier
+}
+
+DelegationSpecifier {
+  ConstructorInvocation |
+  ExplicitDelegation |
+  UserType |
+  FunctionType |
+  ParenthesizedType |
+  ckw<"suspend"> FunctionType
+}
+
+ConstructorInvocation {
+  UserType !postfix ConstructorValueArguments
+}
+
+ConstructorValueArguments[@name=ValueArguments] {
+  "(" delimitedCommaSep<ValueArgument> ")"
+}
+
+ExplicitDelegation {
+  (UserType | FunctionType | ParenthesizedType | ckw<"suspend"> FunctionType)
+  ckw<"by"> expression
+}
+
+Modifiers {
+  ModifierEntry+
+}
+
+ModifierEntry {
+  Annotation ~annotationPrefix |
+  Modifier | ContextDeclarationModifier ~contextAnonymousFunction
+}
+
+Annotation[@name=AnnotationEntry] {
+  "@" AnnotationUseSiteTarget?
+  (UnescapedAnnotation | "[" UnescapedAnnotation+ "]")
+}
+
+AnnotationUseSiteTarget {
+  (ckw<"all"> |
+    ckw<"field"> |
+    ckw<"property"> |
+    ckw<"get"> |
+    ckw<"set"> |
+    ckw<"receiver"> |
+    ckw<"param"> |
+    ckw<"setparam"> |
+    ckw<"delegate">) ":"
+}
+
+UnescapedAnnotation {
+  UserType ~annotationArguments ValueArguments?
+}
+
+Modifier {
+  ckw<"public"> |
+  ckw<"private"> |
+  ckw<"protected"> |
+  ckw<"internal"> |
+  ckw<"final"> |
+  ckw<"open"> |
+  ckw<"abstract"> |
+  ckw<"sealed"> |
+  ckw<"data"> |
+  ckw<"annotation"> |
+  ckw<"inner"> |
+  ckw<"inline"> |
+  ckw<"reified"> |
+  ckw<"tailrec"> |
+  ckw<"operator"> |
+  ckw<"infix"> |
+  // A local declaration and an anonymous expression share `suspend fun` until
+  // the token after `fun`; keep both readings only across that short prefix.
+  ckw<"suspend"> ~suspendAnonymousFunction |
+  ckw<"external"> |
+  ckw<"override"> |
+  ckw<"lateinit"> |
+  ckw<"const"> |
+  ckw<"expect"> |
+  ckw<"actual"> |
+  ParameterModifier
+}
+
+FunctionParameterModifiers {
+  // `@A Foo` is shared with an annotated function-type parameter. The matching
+  // marker on TypeModifiers keeps both readings only until `:` or `,` decides.
+  (Annotation | ParameterModifier)+ ~parameterAnnotation
+}
+
+ParameterModifier {
+  ckw<"vararg"> |
+  ckw<"noinline"> |
+  ckw<"crossinline">
+}
+
+type[@isGroup=Type] {
+  AnnotatedType |
+  SuspendFunctionType |
+  FunctionType |
+  DefinitelyNonNullableType |
+  NullableType |
+  ParenthesizedType |
+  DynamicType |
+  UserType
+}
+
+AnnotatedType[@isGroup=Type] {
+  TypeModifiers (SuspendFunctionType |
+    FunctionType |
+    DefinitelyNonNullableType |
+    NullableType |
+    ParenthesizedType |
+    DynamicType |
+    UserType)
+}
+
+TypeModifiers {
+  Annotation+ ~parameterAnnotation
+}
+
+UserType[@isGroup=Type] {
+  SimpleUserType (~functionTypeReceiver "." SimpleUserType)* ~functionTypeReceiver
+}
+
+SimpleUserType {
+  TypeName (!typeArguments TypeArguments)?
+}
+
+QualifiedReceiverName {
+  TypeModifiers ReceiverType "." Definition |
+  ParenthesizedType "." Definition |
+  SimpleUserType "." (Definition | QualifiedReceiverName) |
+  ReceiverNullableType "." Definition
+}
+
+DynamicType[@isGroup=Type] {
+  ckw<"dynamic">
+}
+
+NullableType[@isGroup=Type] {
+  (DynamicType | UserType | ParenthesizedType) !nullable "?"+
+}
+
+ReceiverNullableType[@name=NullableType,@isGroup=Type] {
+  (DynamicType | UserType | ParenthesizedType)
+  !nullable "?"* receiverQuestion
+}
+
+ParenthesizedType[@isGroup=Type] {
+  singleParenthesizedType
+}
+
+singleParenthesizedType {
+  "(" type ~functionTypeParameters ")"
+}
+
+DefinitelyNonNullableType[@isGroup=Type] {
+  (UserType | ParenthesizedType) "&"
+  TypeModifiers? (UserType | ParenthesizedType)
+}
+
+ReceiverType[@isGroup=Type] {
+  (
+    ParenthesizedType |
+    ReceiverNullableType |
+    DynamicType |
+    FunctionTypeUserType
+  ) !receiver
+}
+
+FunctionTypeUserType[@name=UserType,@isGroup=Type] {
+  SimpleUserType (~functionTypeReceiver "." SimpleUserType)* ~functionTypeReceiver
+}
+
+FunctionType[@isGroup=Type] {
+  ContextParameters?
+  (ReceiverType ".")?
+  !functionType (FunctionTypeParameters | SingleFunctionTypeParameters) "->" type
+}
+
+SuspendFunctionType[@name=FunctionType,@isGroup=Type] {
+  ckw<"suspend"> FunctionType
+}
+
+ContextParameters {
+  ckw<"context"> "(" delimitedCommaSep1<contextParameter> ")"
+}
+
+contextParameter {
+  Parameter |
+  type
+}
+
+FunctionTypeParameters {
+  "(" (
+    NamedFunctionTypeParameter |
+    FunctionTypeParameter "," delimitedCommaSep<FunctionTypeParameter>
+  )? ")"
+}
+
+SingleFunctionTypeParameters[@name=FunctionTypeParameters] {
+  singleParenthesizedType !functionType
+}
+
+NamedFunctionTypeParameter[@name=FunctionTypeParameter] {
+  FunctionValueParameter
+}
+
+FunctionTypeParameter {
+  FunctionValueParameter |
+  type
+}
+
+TypeArguments {
+  "<" delimitedCommaSep1<TypeProjection> ">"
+}
+
+TypeProjection {
+  "*" |
+  VarianceModifier? type
+}
+
+VarianceModifier {
+  kw<"in"> |
+  ckw<"out">
+}
+
+TypeParameters {
+  "<" delimitedCommaSep1<TypeParameter> ">"
+}
+
+TypeParameter {
+  Modifiers? VarianceModifier? Definition TypeAnnotation?
+}
+
+TypeConstraints {
+  ckw<"where"> TypeConstraint (!typeConstraint "," TypeConstraint)*
+}
+
+TypeConstraint {
+  Annotation* Definition ":" type
+}
+
+Block {
+  !body "{" Statements "}"
+}
+
+Statements {
+  (emptyIfStatement ";" | statement statementEnd | ";")* statement?
+}
+
+statementEnd[@inline] {
+  ";" |
+  insertedStatementEnd
+}
+
+statement {
+  statementPrefix* (declaration | nonDeclarationStatement)
+}
+
+statementPrefix {
+  (Label | Annotation) !statementAnnotation
+}
+
+Label {
+  LabelIdentifier
+}
+
+LabelIdentifier[@name=Identifier] {
+  labeledIdentifier
+}
+
+nonDeclarationStatement {
+  LoopStatement |
+  AnnotatedAssignmentStatement |
+  PrefixAssignmentStatement |
+  AssignmentStatement |
+  ExpressionStatement
+}
+
+LoopStatement {
+  ForStatement |
+  WhileStatement |
+  DoWhileStatement
+}
+
+ForStatement {
+  kw<"for"> "(" forVariable kw<"in"> expression ")"
+  (!loopBody ControlStructureBody)?
+}
+
+forVariable {
+  Annotation* (kw<"val"> | kw<"var">)?
+  (Definition | MultiVariableDeclaration)
+}
+
+WhileStatement {
+  kw<"while"> "(" expression ")" (!loopBody ControlStructureBody)?
+}
+
+DoWhileStatement {
+  kw<"do"> (
+    DoWhileControlStructureBody statementEnd? kw<"while"> "(" expression ")" |
+    kw<"while"> "(" expression ")"
+  )
+}
+
+DoWhileControlStructureBody[@name=ControlStructureBody] {
+  DirectControlLambdaStatement |
+  !controlLambdaCompletion ControlArrowLambdaStatement |
+  Block |
+  ControlClassDeclaration |
+  ControlFunctionDeclaration |
+  TypeAliasDeclaration |
+  prefixedControlStatement |
+  DoWhileLoopStatement |
+  PrefixAssignmentStatement |
+  AssignmentStatement |
+  ExpressionStatement
+}
+
+DoWhileLoopStatement[@name=LoopStatement] {
+  ForStatement |
+  DoWhileStatement
+}
+
+ControlStructureBody {
+  DirectControlLambdaStatement |
+  !controlLambdaCompletion ControlArrowLambdaStatement |
+  Block |
+  ControlClassDeclaration |
+  ControlFunctionDeclaration |
+  TypeAliasDeclaration |
+  prefixedControlStatement |
+  nonDeclarationStatement
+}
+
+prefixedControlStatement {
+  (Annotation !statementAnnotation)* Label !statementAnnotation
+  statementPrefix* (
+    ControlFunctionDeclaration |
+    LoopStatement |
+    PrefixedAnonymousFunctionStatement |
+    ControlLocalPropertyDeclaration |
+    ControlObjectDeclaration |
+    ControlClassDeclaration
+  ) |
+  Annotation !statementAnnotation (
+    LoopStatement |
+    ControlLocalPropertyDeclaration |
+    ControlObjectDeclaration |
+    ControlClassDeclaration
+  )
+}
+
+PrefixedAnonymousFunctionStatement[@name=ExpressionStatement] {
+  AnonymousFunction |
+  LambdaLiteral
+}
+
+ControlLocalPropertyDeclaration[@name=PropertyDeclaration] {
+  (kw<"val"> | kw<"var">)
+  (MultiVariableDeclaration | VariableDeclaration)
+  (!initializer PropertyInitializer | PropertyDelegate)?
+}
+
+ControlObjectDeclaration[@name=ObjectDeclaration] {
+  kw<"object"> Definition !body ClassBody
+}
+
+ControlClassDeclaration[@name=ClassDeclaration] {
+  kw<"fun"> kw<"interface"> Definition !body ClassBody |
+  ckw<"annotation"> kw<"class"> Definition |
+  kw<"class"> Definition |
+  kw<"class"> Definition !typeArguments TypeParameters
+  !typeConstraints TypeConstraints !body ClassBody
+}
+
+DirectControlLambda[@name=LambdaLiteral] {
+  !body "{" "->" Statements "}"
+}
+
+DirectControlLambdaStatement[@name=ExpressionStatement] {
+  DirectControlLambda
+}
+
+ControlArrowLambda[@name=LambdaLiteral] {
+  !body "{" LambdaParameters "->" Statements "}"
+}
+
+ControlArrowLambdaStatement[@name=ExpressionStatement] {
+  ControlArrowLambda
+}
+
+ControlFunctionDeclaration[@name=FunctionDeclaration] {
+  Modifiers? controlFunctionKeyword functionDeclarationSignature
+  controlFunctionBodySuffix
+}
+
+controlFunctionBodySuffix {
+  !functionBody FunctionBody |
+  () ~functionBodyContinuation
+}
+
+AssignmentStatement {
+  expression !assignment sameLineOperator AssignOp expression
+}
+
+PrefixAssignmentStatement[@name=AssignmentStatement] {
+  PrefixOp expression !assignment sameLineOperator AssignOp expression
+}
+
+AnnotatedAssignmentStatement[@name=AssignmentStatement] {
+  Annotation+ ~annotationPrefix
+  expression !assignment sameLineOperator AssignOp expression
+}
+
+AssignOp {
+  "=" |
+  "+=" |
+  "-=" |
+  "*=" |
+  "/=" |
+  "%="
+}
+
+ExpressionStatement {
+  expression
+}
+
+expression[@isGroup=Expression] {
+  AnnotatedExpression |
+  LiteralConstant |
+  NameExpression |
+  ThisExpression |
+  SuperExpression |
+  ParenthesizedExpression |
+  LambdaLiteral |
+  AnonymousFunction |
+  IfExpression |
+  CallExpression {
+    expression !postfix (
+      sameLineCall CallSuffix |
+      sameLineOperator GenericCallSuffix |
+      sameLineLambda BareLambdaCallSuffix |
+      LabeledLambdaCallSuffix
+    )
+  } |
+  IndexExpression {
+    expression !postfix sameLineOperator "[" delimitedCommaSep1<expression> "]"
+  } |
+  MemberExpression {
+    expression !postfix ("." | "?.") (Identifier | ParenthesizedExpression)
+  } |
+  CallableReference {
+    expression !postfix (
+      nullableCallableQuestion+ sameLineCallableReference
+      "::" (Identifier | kw<"class">) |
+      sameLineCallableReference "::" (Identifier | kw<"class">) |
+      sameLineOperator GenericCallTypeArguments
+      "::" (Identifier | kw<"class">) |
+      sameLineOperator GenericCallTypeArguments
+      genericNullableCallableQuestion "::" (Identifier | kw<"class">)
+    ) |
+    "::" (Identifier | kw<"class">)
+  } |
+  ReturnExpression |
+  ThrowExpression |
+  BreakExpression |
+  ContinueExpression |
+  WhenExpression |
+  TryExpression |
+  CollectionLiteral |
+  ObjectLiteral |
+  NotNullExpression {
+    expression !postfix sameLineNotNull "!!"
+  } |
+  PostfixUpdateExpression {
+    expression !postfix sameLineOperator ("++" | "--")
+  } |
+  UnaryExpression {
+    !unary PrefixOp expression
+  } |
+  InfixExpression {
+    expression !infix sameLineIdentifier Identifier expression
+  } |
+  TypeCheckExpression {
+    expression !comparison TypeCheckOp type
+  } |
+  ContainmentExpression {
+    expression !comparison ContainmentOp expression
+  } |
+  CastExpression {
+    expression !cast CastOp type
+  } |
+  RangeExpression {
+    expression !range sameLineRange (".." | "..<") expression
+  } |
+  ComparisonExpression |
+  BinaryExpression {
+    expression !multiplicative sameLineOperator ArithOp<"*" | "/" | "%"> expression |
+    expression !additive sameLineOperator ArithOp<"+" | "-"> expression |
+    expression !equality sameLineEquality EqualityOp expression |
+    expression !conjunction "&&" expression |
+    expression !disjunction "||" expression |
+    expression !elvis "?:" expression
+  }
+}
+
+deferredExpression[@isGroup=Expression] {
+  AnonymousFunction
+}
+
+ObjectLiteral {
+  kw<"object"> delegationClause? !body ClassBody
+}
+
+ComparisonExpression[@name=BinaryExpression] {
+  expression !comparison sameLineOperator CompareOp expression
+}
+
+ReturnExpression {
+  kw<"return"> (sameLineJump !return expression)? |
+  ReturnAt (sameLineJump !return expression)?
+}
+
+ThrowExpression {
+  kw<"throw"> sameLineJump expression
+}
+
+BreakExpression {
+  kw<"break"> |
+  BreakAt
+}
+
+ContinueExpression {
+  kw<"continue"> |
+  ContinueAt
+}
+
+AnnotatedExpression {
+  Annotation ~annotationPrefix expression
+}
+
+CallSuffix {
+  ValueArguments (!trailingLambda LambdaLiteral)?
+}
+
+BareLambdaCallSuffix[@name=CallSuffix] {
+  LambdaLiteral
+}
+
+LabeledLambdaCallSuffix[@name=CallSuffix] {
+  sameLineIdentifier AnnotatedLambda
+}
+
+GenericCallSuffix[@name=CallSuffix] {
+  GenericCallTypeArguments
+  (ValueArguments (!trailingLambda LambdaLiteral)? |
+    !trailingLambda (LambdaLiteral | AnnotatedLambda))?
+}
+
+AnnotatedLambda {
+  Annotation+ Label? LambdaLiteral |
+  Label LambdaLiteral
+}
+
+GenericCallTypeArguments[@name=TypeArguments] {
+  "<" ~genericCall commaSep1<GenericCallTypeProjection> ">"
+}
+
+GenericCallTypeProjection[@name=TypeProjection] {
+  "*" |
+  VarianceModifier? (GenericCallFunctionType | NullableType | UserType)
+}
+
+GenericCallFunctionType[@name=FunctionType,@isGroup=Type] {
+  GenericCallFunctionTypeParameters !functionType "->" type
+}
+
+GenericCallFunctionTypeParameters[@name=FunctionTypeParameters] {
+  "(" delimitedCommaSep<type> ~functionTypeParameters ")"
+}
+
+LambdaLiteral {
+  "{" (LambdaParameters "->" | "->")? Statements "}"
+}
+
+AnonymousFunction {
+  Modifiers?
+  kw<"fun"> TypeParameters?
+  (TypeModifiers? ReceiverType "." !anonymousFunctionReceiver)?
+  AnonymousFunctionValueParameters TypeAnnotation? FunctionBody
+}
+
+AnonymousFunctionValueParameters[@name=FunctionValueParameters] {
+  "(" delimitedCommaSep<AnonymousFunctionValueParameter> ")"
+}
+
+AnonymousFunctionValueParameter[@name=FunctionValueParameter] {
+  FunctionParameterModifiers? AnonymousParameter PropertyInitializer?
+}
+
+AnonymousParameter[@name=Parameter] {
+  Definition TypeAnnotation?
+}
+
+LambdaParameters {
+  commaSep1<LambdaParameter>
+}
+
+LambdaParameter {
+  VariableDeclaration |
+  LambdaMultiVariableDeclaration (":" type)?
+}
+
+LambdaMultiVariableDeclaration[@name=MultiVariableDeclaration] {
+  "(" delimitedCommaSep1<LambdaVariableDeclaration> ")" |
+  "[" delimitedCommaSep1<LambdaVariableDeclaration> "]"
+}
+
+LambdaVariableDeclaration[@name=VariableDeclaration] {
+  LambdaDefinition TypeAnnotation? (!initializer PropertyInitializer)?
+}
+
+LambdaDefinition[@name=Definition] {
+  !destructuringLambdaParameter identifier ~propertyBinding
+}
+
+ValueArguments {
+  "(" delimitedCommaSep<ValueArgument> ")"
+}
+
+ValueArgument {
+  Annotation+ ~annotationPrefix Identifier "=" "*"? expression |
+  Identifier "=" "*"? expression |
+  "*" expression |
+  expression
+}
+
+IfExpression {
+  kw<"if"> "(" expression ")" (
+    ControlStructureBody (
+      (~elseContinuation ";")? ~elseContinuation
+      kw<"else"> ifElseBody
+    )? |
+    emptyIfBody ~emptyIf (
+      (~elseContinuation ";")? ~elseContinuation
+      kw<"else"> ifElseBody
+    )
+  ) ~elseContinuation
+}
+
+ifElseBody {
+  ControlStructureBody |
+  emptyIfBody ";"
+}
+
+emptyIfBody[@name=ControlStructureBody] {}
+
+emptyIfStatement[@name=ExpressionStatement] {
+  emptyIfExpression
+}
+
+emptyIfExpression[@name=IfExpression,@isGroup=Expression] {
+  kw<"if"> "(" expression ")" emptyIfBody ~emptyIf
+}
+
+WhenExpression {
+  kw<"when"> WhenSubject? "{" WhenEntries "}"
+}
+
+WhenSubject {
+  "(" (((Annotation ~annotationPrefix)*
+    kw<"val"> VariableDeclaration "=")? expression) ")"
+}
+
+WhenEntries {
+  (
+    ConditionalWhenEntry
+    (statementEnd ConditionalWhenEntry)*
+    (statementEnd? ElseWhenEntry)?
+    statementEnd? |
+    ElseWhenEntry statementEnd?
+  )?
+}
+
+ConditionalWhenEntry[@name=WhenEntry] {
+  WhenConditions "->" WhenControlStructureBody
+}
+
+ElseWhenEntry[@name=WhenEntry] {
+  kw<"else"> "->" WhenControlStructureBody
+}
+
+WhenControlStructureBody[@name=ControlStructureBody] {
+  DirectControlLambdaStatement |
+  !controlLambdaCompletion ControlArrowLambdaStatement |
+  WhenBlock |
+  whenEmptyIfStatement |
+  ControlClassDeclaration |
+  ControlFunctionDeclaration |
+  TypeAliasDeclaration |
+  prefixedControlStatement |
+  nonDeclarationStatement
+}
+
+whenEmptyIfStatement[@name=ExpressionStatement] {
+  emptyIfExpression
+}
+
+WhenBlock[@name=Block] {
+  !body "{" Statements "}" !whenBlock
+}
+
+WhenConditions {
+  WhenCondition ("," WhenCondition)+ ","? |
+  WhenCondition (!whenGuard WhenGuard)? ","?
+}
+
+WhenGuard {
+  kw<"if"> expression
+}
+
+WhenCondition {
+  WhenRangeCondition |
+  WhenTypeCondition |
+  expression
+}
+
+WhenRangeCondition {
+  kw<"in"> expression |
+  sameLineNegatedTypeOperator "!" kw<"in"> expression
+}
+
+WhenTypeCondition {
+  kw<"is"> type |
+  sameLineNegatedTypeOperator "!" kw<"is"> type
+}
+
+TryExpression {
+  kw<"try"> Block tryTail
+}
+
+tryTail {
+  CatchClause
+    (~tryContinuation CatchClause)*
+    (~tryContinuation FinallyClause)?
+    ~tryContinuation |
+  FinallyClause
+}
+
+CatchClause {
+  catchKeyword "(" Annotation* Definition ":" type ","? ")" Block
+}
+
+FinallyClause {
+  finallyKeyword Block
+}
+
+CollectionLiteral {
+  "[" delimitedCommaSep<expression> "]"
+}
+
+ParenthesizedExpression {
+  "(" expression ")"
+}
+
+LiteralConstant {
+  BooleanLiteral |
+  NullLiteral |
+  IntegerLiteral |
+  RealLiteral |
+  CharacterLiteral |
+  StringLiteral |
+  multiLineStringLiteral |
+  MultiDollarStringLiteral
+}
+
+BooleanLiteral { kw<"true"> | kw<"false"> }
+NullLiteral { kw<"null"> }
+NameExpression {
+  Identifier ~genericCall
+}
+
+ThisExpression {
+  kw<"this"> (!labeledThis "@" Identifier)? |
+  labeledThisStart Identifier
+}
+
+SuperExpression {
+  kw<"super"> |
+  kw<"super"> !superQualifier "<" type ">" ("@" Identifier)? |
+  kw<"super"> !superQualifier "@" Identifier |
+  labeledSuperStart Identifier
+}
+
+Identifier { identifier }
+Definition { identifier ~propertyBinding }
+TypeName {
+  identifier ~propertyBinding ~genericCall |
+  adjacentAnnotationIdentifier
+}
+
+ArithOp<term> { term }
+EqualityOp { "===" | "!==" | "==" | "!=" }
+CompareOp { "<=" | ">=" | "<" ~genericCall | ">" }
+TypeCheckOp {
+  sameLineIdentifier kw<"is"> |
+  sameLineNegatedTypeOperator "!" kw<"is">
+}
+ContainmentOp {
+  sameLineIdentifier kw<"in"> |
+  sameLineNegatedTypeOperator "!" kw<"in">
+}
+CastOp { kw<"as"> "?"? }
+PrefixOp { "+" | "-" | "!" | "++" | "--" }
+
+commaSep1<item> {
+  item ("," item)* ","?
+}
+
+delimitedCommaSep<item> {
+  (item ("," item)* ","?)?
+}
+
+delimitedCommaSep1<item> {
+  item ("," item)* ","?
+}
+
+@local tokens {
+  blockCommentStart[@export] { "/*" }
+  blockCommentEnd[@export] { "*/" }
+  blockCommentLineBreak[@export] { "\n" | "\r\n" }
+  @else blockCommentContent[@export]
+}
+
+@skip {} {
+  BlockComment[isolate] {
+    blockCommentOpen
+    (nestedBlockComment | blockCommentLineBreak | blockCommentContent)*
+    blockCommentEnd
+  }
+
+  nestedBlockComment {
+    blockCommentStart
+    (nestedBlockComment | blockCommentLineBreak | blockCommentContent)*
+    blockCommentEnd
+  }
+}
+
+@local tokens {
+  stringEnd { "\"" }
+  interpolationExpressionStart { "${" }
+  interpolationIdentifier {
+    "$" ($[A-Z_a-z\u{a1}-\u{10ffff}] $[0-9A-Z_a-z\u{a1}-\u{10ffff}]* |
+      "`" ![`\n\r]+ "`")
+  }
+  stringEscape { "\\" _ }
+  @else stringContent
+  @precedence { interpolationExpressionStart, interpolationIdentifier }
+}
+
+@skip {} {
+  StringLiteral[isolate] {
+    "\"" (StringContent | InterpolatedExpression | InterpolatedIdentifier)* stringEnd
+  }
+
+  StringContent { stringContent | stringEscape }
+
+  InterpolatedExpression {
+    interpolationExpressionStart interpolationExpressionBody
+  }
+
+  InterpolatedIdentifier {
+    interpolationIdentifier
+  }
+}
+
+interpolationExpressionBody {
+  expression "}"
+}
+
+@local tokens {
+  multiLineStringEnd { "\"\"\"" "\""* }
+  multiLineInterpolationExpressionStart { "${" }
+  multiLineInterpolationIdentifier {
+    "$" ($[A-Z_a-z\u{a1}-\u{10ffff}] $[0-9A-Z_a-z\u{a1}-\u{10ffff}]* |
+      "`" ![`\n\r]+ "`")
+  }
+  @else multiLineStringContent
+  @precedence {
+    multiLineStringEnd,
+    multiLineInterpolationExpressionStart,
+    multiLineInterpolationIdentifier
+  }
+}
+
+@skip {} {
+  multiLineStringLiteral {
+    MultiLineStringLiteral[@name=StringLiteral,@isGroup=Expression,isolate] {
+      "\"\"\"" (MultiLineStringContent |
+        MultiLineInterpolatedExpression |
+        MultiLineInterpolatedIdentifier)* multiLineStringEnd
+    }
+  }
+
+  MultiLineStringContent[@name=StringContent] { multiLineStringContent }
+
+  MultiLineInterpolatedExpression[@name=InterpolatedExpression] {
+    multiLineInterpolationExpressionStart interpolationExpressionBody
+  }
+
+  MultiLineInterpolatedIdentifier[@name=InterpolatedIdentifier] {
+    multiLineInterpolationIdentifier
+  }
+}
+
+MultiDollarStringLiteral[@name=StringLiteral,@isGroup=Expression,isolate] {
+  multiDollarLineStringStart
+    (MultiDollarStringContent | multiDollarInterpolation)*
+    multiDollarLineStringEnd |
+  multiDollarMultiLineStringStart
+    (MultiDollarStringContent | multiDollarInterpolation)*
+    multiDollarMultiLineStringEnd
+}
+
+MultiDollarStringContent[@name=StringContent] {
+  multiDollarStringContent
+}
+
+multiDollarInterpolation {
+  multiDollarInterpolationExpressionStart
+    MultiDollarInterpolatedExpression[@name=InterpolatedExpression] { expression }
+    multiDollarInterpolationExpressionEnd |
+  multiDollarInterpolationIdentifierStart
+    MultiDollarInterpolatedIdentifier[@name=InterpolatedIdentifier] {
+      Identifier | _interpolationThis
+    }
+}
+
+_interpolationThis[@name=Identifier] { kw<"this"> }
+
+kw<term> { @specialize[@name={term}]<identifier, term> }
+ckw<term> { @extend[@name={term}]<identifier, term> }
+
+EnumModifiers[@name=Modifiers] {
+  ModifierEntry* EnumModifierEntry ModifierEntry*
+}
+
+EnumModifierEntry[@name=ModifierEntry] {
+  EnumModifier
+}
+
+EnumModifier[@name=Modifier] {
+  ckw<"enum">
+}
+
+@external tokens IMPORT_KEYWORDS from "./tokens" {
+  importKeyword[@name="import"]
+}
+
+@external tokens TRY_CLAUSE_KEYWORDS from "./tokens" {
+  catchKeyword[@name="catch"],
+  finallyKeyword[@name="finally"]
+}
+
+@external tokens CONTROL_FUNCTION_KEYWORDS from "./tokens" {
+  controlFunctionKeyword[@name="fun"]
+}
+
+@external tokens SAME_LINE_JUMP_GUARDS from "./tokens" {
+  sameLineJump
+}
+
+@external tokens SAME_LINE_GUARDS from "./tokens" {
+  sameLineCall,
+  sameLineRange,
+  sameLineNotNull,
+  sameLineEquality,
+  sameLineNegatedTypeOperator,
+  sameLineCallableReference,
+  nullableCallableQuestion[@name="?"]
+}
+
+@external tokens SAME_LINE_LAMBDA_GUARDS from "./tokens" {
+  sameLineLambda
+}
+
+@external tokens NULLABLE_RECEIVER_QUESTIONS from "./tokens" {
+  receiverQuestion[@name="?"]
+}
+
+@external tokens GENERIC_NULLABLE_CALLABLE_QUESTIONS from "./tokens" {
+  genericNullableCallableQuestion[@name="?"]
+}
+
+@external tokens MULTI_DOLLAR_STRING_STARTS from "./tokens" {
+  multiDollarLineStringStart,
+  multiDollarMultiLineStringStart
+}
+
+@external tokens MULTI_DOLLAR_STRING_SEGMENTS from "./tokens" {
+  multiDollarLineStringEnd,
+  multiDollarMultiLineStringEnd,
+  multiDollarInterpolationExpressionStart,
+  multiDollarInterpolationExpressionEnd,
+  multiDollarInterpolationIdentifierStart
+}
+
+@external tokens MULTI_DOLLAR_STRING_CONTENTS from "./tokens" {
+  multiDollarStringContent
+}
+
+@context TRACK_LINE_BREAK from "./tokens"
+
+@external tokens ADJACENT_CLASS_MEMBER_ENDS from "./tokens" {
+  adjacentClassMemberEnd
+}
+
+@tokens {
+  blockCommentOpen[@export] { "/*" }
+
+  ShebangLine { "#!" ![\n\r]* }
+
+  identifier[@export] {
+    $[A-Z_a-z\u{a1}-\u{10ffff}] $[0-9A-Z_a-z\u{a1}-\u{10ffff}]* |
+    "`" ![`\n\r]+ "`"
+  }
+
+  lineBreakTrivia[@export] { ("\n" | "\r\n")+ }
+  horizontalWhitespace[@export] { $[ \t\u{000c}]+ }
+  LineComment { "//" ![\n\r]* }
+
+  IntegerLiteral {
+    ("0" $[xX] $[0-9A-Fa-f] $[0-9A-F_a-f]* |
+      "0" $[bB] $[01] $[01_]* |
+      $[0-9] $[0-9_]* )
+    ($[uU] $[lL]? | $[lL] $[uU]?)?
+  }
+  RealLiteral {
+    (($[0-9] $[0-9_]*)? "." $[0-9] $[0-9_]*
+      ($[eE] $[+-]? $[0-9] $[0-9_]*)? $[fF]?) |
+    $[0-9] $[0-9_]* (
+      $[eE] $[+-]? $[0-9] $[0-9_]* $[fF]? |
+      $[fF]
+    )
+  }
+  CharacterLiteral {
+    "'" ("\\u" $[0-9A-Fa-f] $[0-9A-Fa-f] $[0-9A-Fa-f] $[0-9A-Fa-f] |
+      "\\u" !['\n\r]* |
+      "\\" _ |
+      ![\\'\n\r]) "'"
+  }
+
+  ReturnAt { "return@" identifier }
+  BreakAt { "break@" identifier }
+  ContinueAt { "continue@" identifier }
+  labeledIdentifier { identifier "@" }
+  labeledThisStart[@name="this"] { "this@" }
+  labeledSuperStart[@name="super"] { "super@" }
+
+  @precedence { LineComment, "/" }
+  @precedence { blockCommentOpen, "/" }
+  @precedence { RealLiteral, IntegerLiteral }
+  @precedence { RealLiteral, "." }
+  @precedence { ReturnAt, labeledIdentifier, identifier }
+  @precedence { BreakAt, labeledIdentifier, identifier }
+  @precedence { ContinueAt, labeledIdentifier, identifier }
+  @precedence { labeledThisStart, labeledIdentifier, identifier }
+  @precedence { labeledSuperStart, labeledIdentifier, identifier }
+}
+
+@external tokens ADJACENT_ANNOTATION_IDENTIFIERS from "./tokens" {
+  adjacentAnnotationIdentifier
+}
+
+@external tokens SAME_LINE_FALLBACK_GUARDS from "./tokens" {
+  sameLineOperator,
+  sameLineIdentifier
+}
+
+@external tokens LINE_BREAK_PREFIXES from "./tokens" {
+  lineBreakPrefix
+}
+
+@external tokens STATEMENT_ENDS from "./tokens" {
+  insertedStatementEnd
+}
+
+@external propSource kotlin_highlighting from "./highlighting"
+
+@detectDelim
