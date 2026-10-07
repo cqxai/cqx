@@ -1,0 +1,513 @@
+{
+  "measurements": {
+    "modules": {
+      "clang": {
+        "bytes": 18371595,
+        "cold_ms_median": 19.152355999999997,
+        "cold_ms_runs": [
+          21.499445000000037,
+          18.917408999999992,
+          19.337664000000004,
+          18.660955,
+          19.152355999999997
+        ]
+      },
+      "zig": {
+        "bytes": 18360071,
+        "cold_ms_median": 18.940160000000006,
+        "cold_ms_runs": [
+          21.272548999999998,
+          18.940160000000006,
+          18.790466999999992,
+          18.66004500000001,
+          19.492642000000004
+        ]
+      },
+      "core": {
+        "bytes": 4775530,
+        "cold_ms_median": 7.030118999999999,
+        "cold_ms_runs": [
+          6.879269000000008,
+          7.198679999999996,
+          6.8855800000000045,
+          7.030118999999999,
+          7.243673999999999
+        ]
+      },
+      "c": {
+        "bytes": 6833786,
+        "cold_ms_median": 7.690792999999999,
+        "cold_ms_runs": [
+          7.690792999999999,
+          7.572089000000005,
+          7.726327999999995,
+          7.706090000000003,
+          7.618403999999998
+        ]
+      },
+      "cs": {
+        "bytes": 11937965,
+        "cold_ms_median": 12.029789999999991,
+        "cold_ms_runs": [
+          12.153753999999992,
+          12.044959000000006,
+          11.65361,
+          12.029789999999991,
+          11.559300000000007
+        ]
+      }
+    },
+    "repos": {
+      "redis": {
+        "snapshot_files": 797,
+        "clang": {
+          "extract_ms": 1923.8258580000002,
+          "facts_sha256": "2d4a13f68d909d5127584e956dd22cb8764eb7f5d7f356dd47d2aa3ab0cf7080",
+          "report_sha256": "2511b8f2b3a2012ca9e7e724a24983842892762f1d3db7d260b11ab50a7114a0",
+          "coverage": {
+            "typescript": {
+              "parsed": 1,
+              "skipped": 0
+            },
+            "c": {
+              "parsed": 143,
+              "skipped": 50
+            },
+            "cpp": {
+              "parsed": 82,
+              "skipped": 5
+            }
+          },
+          "scores": {
+            "containment": 100,
+            "legibility": 100,
+            "modularity": 100,
+            "quality": 100,
+            "security": 100
+          }
+        },
+        "zig": {
+          "extract_ms": 1962.270978999999,
+          "facts_sha256": "2d4a13f68d909d5127584e956dd22cb8764eb7f5d7f356dd47d2aa3ab0cf7080",
+          "report_sha256": "2511b8f2b3a2012ca9e7e724a24983842892762f1d3db7d260b11ab50a7114a0",
+          "coverage": {
+            "typescript": {
+              "parsed": 1,
+              "skipped": 0
+            },
+            "c": {
+              "parsed": 143,
+              "skipped": 50
+            },
+            "cpp": {
+              "parsed": 82,
+              "skipped": 5
+            }
+          },
+          "scores": {
+            "containment": 100,
+            "legibility": 100,
+            "modularity": 100,
+            "quality": 100,
+            "security": 100
+          }
+        },
+        "split": {
+          "ms_including_load": 2169.9582809999993,
+          "modules": [
+            "core",
+            "c"
+          ],
+          "full_report_parity": true
+        }
+      },
+      "double-conversion": {
+        "snapshot_files": 40,
+        "clang": {
+          "extract_ms": 5880.184404,
+          "facts_sha256": "c82f48c30a0b02ab060f81b34b385f5a1fc93735c735c7895524c8dd234e3b3d",
+          "report_sha256": "709ce644e7e2b872449c23425a7e57194d5865977bcfd2ba2a48cd0ef6ca11dd",
+          "coverage": {
+            "cpp": {
+              "parsed": 35,
+              "skipped": 5
+            }
+          },
+          "scores": {
+            "containment": 100,
+            "legibility": 100,
+            "modularity": 100,
+            "quality": 94,
+            "security": 100
+          }
+        },
+        "zig": {
+          "extract_ms": 5992.224102999997,
+          "facts_sha256": "c82f48c30a0b02ab060f81b34b385f5a1fc93735c735c7895524c8dd234e3b3d",
+          "report_sha256": "709ce644e7e2b872449c23425a7e57194d5865977bcfd2ba2a48cd0ef6ca11dd",
+          "coverage": {
+            "cpp": {
+              "parsed": 35,
+              "skipped": 5
+            }
+          },
+          "scores": {
+            "containment": 100,
+            "legibility": 100,
+            "modularity": 100,
+            "quality": 94,
+            "security": 100
+          }
+        },
+        "split": {
+          "ms_including_load": 6074.1220509999985,
+          "modules": [
+            "core",
+            "c"
+          ],
+          "full_report_parity": true
+        }
+      },
+      "humanizer": {
+        "snapshot_files": 766,
+        "clang": {
+          "extract_ms": 3002.3363859999954,
+          "facts_sha256": "6ed6d8d59742c381a96b22c89160d1873aad2fd7100ede8aaf8bd5ace14623df",
+          "report_sha256": "1438a5be3345cb7ab4b461e5476debbc2b7f00576c4562f2b065dadb21fe7c9b",
+          "coverage": {
+            "typescript": {
+              "parsed": 30,
+              "skipped": 0
+            },
+            "csharp": {
+              "parsed": 728,
+              "skipped": 7
+            }
+          },
+          "scores": {
+            "containment": 100,
+            "legibility": 100,
+            "modularity": 100,
+            "quality": 90,
+            "security": 100
+          }
+        },
+        "zig": {
+          "extract_ms": 3145.4852119999996,
+          "facts_sha256": "6ed6d8d59742c381a96b22c89160d1873aad2fd7100ede8aaf8bd5ace14623df",
+          "report_sha256": "1438a5be3345cb7ab4b461e5476debbc2b7f00576c4562f2b065dadb21fe7c9b",
+          "coverage": {
+            "typescript": {
+              "parsed": 30,
+              "skipped": 0
+            },
+            "csharp": {
+              "parsed": 728,
+              "skipped": 7
+            }
+          },
+          "scores": {
+            "containment": 100,
+            "legibility": 100,
+            "modularity": 100,
+            "quality": 90,
+            "security": 100
+          }
+        },
+        "split": {
+          "ms_including_load": 3858.939674000001,
+          "modules": [
+            "core",
+            "cs"
+          ],
+          "full_report_parity": true
+        }
+      }
+    },
+    "mixed": {
+      "modules": [
+        "core",
+        "c",
+        "cs"
+      ],
+      "full_report_parity": true,
+      "scores": {
+        "containment": 0,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 100,
+        "security": 70
+      }
+    }
+  },
+  "tree_parse_walk": {
+    "redis": {
+      "files": 280,
+      "parse_and_cst_walk_ms_runs": [
+        1347.278277,
+        1320.556894,
+        1323.170067
+      ],
+      "median_ms": 1323.170067
+    },
+    "double-conversion": {
+      "files": 40,
+      "parse_and_cst_walk_ms_runs": [
+        3101.312119,
+        2935.3844230000004,
+        2931.6967220000006
+      ],
+      "median_ms": 2935.3844230000004
+    },
+    "humanizer": {
+      "files": 735,
+      "parse_and_cst_walk_ms_runs": [
+        1730.6251530000009,
+        1721.066492,
+        1687.443138999999
+      ],
+      "median_ms": 1721.066492
+    }
+  },
+  "ubuntu": {
+    "bytes": 18359081,
+    "corpora": [
+      "redis",
+      "double-conversion",
+      "humanizer"
+    ],
+    "exact_facts_and_reports": true
+  },
+  "individual_parity": {
+    "redis": {
+      "individual_compilers_exact_facts_reports": true,
+      "matches_combined_report": true
+    },
+    "double-conversion": {
+      "individual_compilers_exact_facts_reports": true,
+      "matches_combined_report": true
+    },
+    "humanizer": {
+      "individual_compilers_exact_facts_reports": true,
+      "matches_combined_report": true
+    }
+  },
+  "negative_controls": {
+    "c": {
+      "removed_frontend_detected": true
+    },
+    "cs": {
+      "removed_frontend_detected": true
+    }
+  },
+  "lezer_js": {
+    "redis": {
+      "eligible": 280,
+      "rust_clean": 128,
+      "js_clean": 201,
+      "js_parse_walk_ms": 2619.738265000001,
+      "wall_ms": 2740.971441,
+      "clean_status_mismatch_count": 73,
+      "mismatch_examples": [
+        {
+          "path": "modules/vector-sets/fastjson.c",
+          "rust_errors": 8,
+          "js_errors": 0
+        },
+        {
+          "path": "modules/vector-sets/fastjson_test.c",
+          "rust_errors": 4,
+          "js_errors": 0
+        },
+        {
+          "path": "modules/vector-sets/vset.c",
+          "rust_errors": 46,
+          "js_errors": 0
+        },
+        {
+          "path": "modules/vector-sets/w2v.c",
+          "rust_errors": 21,
+          "js_errors": 0
+        },
+        {
+          "path": "src/ae_select.c",
+          "rust_errors": 2,
+          "js_errors": 0
+        }
+      ]
+    },
+    "double-conversion": {
+      "eligible": 40,
+      "rust_clean": 5,
+      "js_clean": 37,
+      "js_parse_walk_ms": 3928.555364999998,
+      "wall_ms": 3946.2509169999994,
+      "clean_status_mismatch_count": 32,
+      "mismatch_examples": [
+        {
+          "path": "double-conversion/bignum-dtoa.cc",
+          "rust_errors": 33,
+          "js_errors": 0
+        },
+        {
+          "path": "double-conversion/bignum-dtoa.h",
+          "rust_errors": 2,
+          "js_errors": 0
+        },
+        {
+          "path": "double-conversion/bignum.cc",
+          "rust_errors": 86,
+          "js_errors": 0
+        },
+        {
+          "path": "double-conversion/bignum.h",
+          "rust_errors": 6,
+          "js_errors": 0
+        },
+        {
+          "path": "double-conversion/double-to-string.cc",
+          "rust_errors": 167,
+          "js_errors": 0
+        }
+      ]
+    }
+  },
+  "lezer": {
+    "redis": {
+      "bytes": 482733,
+      "cold_ms": 0.9185450000000088,
+      "parse_and_cst_walk_ms": 1011.9156029999997,
+      "parse_and_cst_walk_ms_runs": [
+        1013.76632,
+        1011.9156029999997,
+        1009.095926
+      ],
+      "files": 280,
+      "clean": 128,
+      "skipped": 152,
+      "baseline_finding_locations_in_rejected_files": {
+        "duplicated-bodies": 1,
+        "exit-in-library": 5,
+        "oversized-files": 13,
+        "undocumented-suppressions": 2
+      }
+    },
+    "double-conversion": {
+      "bytes": 482733,
+      "cold_ms": 0.8124550000002273,
+      "parse_and_cst_walk_ms": 1352.2517560000001,
+      "parse_and_cst_walk_ms_runs": [
+        1352.2517560000001,
+        1387.8494609999998,
+        1347.1444940000001
+      ],
+      "files": 40,
+      "clean": 5,
+      "skipped": 35,
+      "baseline_finding_locations_in_rejected_files": {
+        "duplicated-bodies": 1
+      }
+    },
+    "humanizer": {
+      "bytes": 307798,
+      "cold_ms": 0.7785169999997379,
+      "parse_and_cst_walk_ms": 384.05629899999985,
+      "parse_and_cst_walk_ms_runs": [
+        421.5529269999997,
+        381.5368019999987,
+        384.05629899999985
+      ],
+      "files": 735,
+      "clean": 570,
+      "skipped": 165,
+      "baseline_finding_locations_in_rejected_files": {
+        "duplicated-bodies": 6,
+        "oversized-files": 2,
+        "swallowed-errors": 1,
+        "undocumented-suppressions": 2
+      }
+    }
+  },
+  "artifacts": {
+    "c-monolithic-clang.wasm": {
+      "bytes": 9114347,
+      "sha256": "116d17580dd5f62b5c760cc2ec455eb14af30ce03867d1f4b1022631cae8bb3c"
+    },
+    "c-monolithic-zig.wasm": {
+      "bytes": 9103087,
+      "sha256": "8656170390d3e5c213b49afd13dd86108153209a0789f44441300bce415f4112"
+    },
+    "c-verified.wasm": {
+      "bytes": 6833786,
+      "sha256": "876e2d9cadee908a01947ed41776aba5ccd221be143d479b1cdbb156e10870f7"
+    },
+    "c.wasm": {
+      "bytes": 6833786,
+      "sha256": "876e2d9cadee908a01947ed41776aba5ccd221be143d479b1cdbb156e10870f7"
+    },
+    "clang.wasm": {
+      "bytes": 18371595,
+      "sha256": "3b81a1b17c631ab01e7029f6123531aa127ad491396430d9ff4418c10e76883e"
+    },
+    "core.wasm": {
+      "bytes": 4775530,
+      "sha256": "9413aace959b5ebd0cfa6f90bfce12cbe03cbd768c8e9c8cb25217a96f657458"
+    },
+    "cs-monolithic-clang.wasm": {
+      "bytes": 14219584,
+      "sha256": "164f18376d7ee428f737cadaf8e331c52c7abf7ca457b3eea930813897e57883"
+    },
+    "cs-monolithic-zig.wasm": {
+      "bytes": 14207643,
+      "sha256": "8dbaef542fd7e379ac084f14bf318184241a00e813973eeeb4d0b35592aa8eb1"
+    },
+    "cs.wasm": {
+      "bytes": 11937965,
+      "sha256": "70aa45cf98f419cac0b9bd4930fbf6fe6e85c4ca546c90e9af2af52b5203ea87"
+    },
+    "lezer-linked.wasm": {
+      "bytes": 5135117,
+      "sha256": "ce290a8532908988e4f715b400d136d1e5d4d49f19cb583ecb1c2447bbbb60d4"
+    },
+    "lezer_c.wasm": {
+      "bytes": 482733,
+      "sha256": "5b996dd12922a654f184d19d9f38e0587d556dbde045c651c08bb7e2ada951c5"
+    },
+    "lezer_cs.wasm": {
+      "bytes": 307798,
+      "sha256": "f2fd0ad534d2a7a8bb734c6d411999032337aab8f5c621c5202c8c03a9b34ab0"
+    },
+    "main.wasm": {
+      "bytes": 4755814,
+      "sha256": "a13b77212e09e32dd7c478ecbfbf7c72fbecc79b2cb2812dcfd5df5b7443f52d"
+    },
+    "tree_probe.wasm": {
+      "bytes": 13462988,
+      "sha256": "b9d1f917beae3f4baa467de0cf05a530be7f4119b55d1dccd9792a47cded50e7"
+    },
+    "ubuntu-zig.wasm": {
+      "bytes": 18359081,
+      "sha256": "a2489b8c61846da4b5b7ca8d14dfd842b230e41d6d0eb466b7dbaf4492e9759a"
+    },
+    "zig.wasm": {
+      "bytes": 18360071,
+      "sha256": "e0333f0b15e599e3f084201d12d18273f063bf1d924e5bbd9b224bde6e0b39b4"
+    }
+  },
+  "inputs": {
+    "base": "519c1a303bfb41f2d22e5dcf2c7d967bb62728c4",
+    "c_cpp": "dd7801fa8b7cb611e659a5c54ffa8060c049e3d0",
+    "csharp": "ee16c2cc498f6b05a18c2179c9a760436135eea6",
+    "redis": "e1d873123a15a37c65c876cdf7cb6450a0b5a58b",
+    "double_conversion": "080217fda2b360f4d8466680b17d8900870b4940",
+    "humanizer": "e4da08c5e631975e15bb98ae020aede819d376ca",
+    "rust": "1.98.1",
+    "zig": "0.15.2",
+    "clang": "23.1.2",
+    "node": "26.3.1",
+    "lezer_cpp": "1.1.6",
+    "rezel_generator": "0.0.0",
+    "rezel_lr": "0.0.0",
+    "lezer_csharp": "23b0bda779e091f31d6581d7f4c46125fd084df6"
+  }
+}

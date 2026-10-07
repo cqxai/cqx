@@ -1,0 +1,54 @@
+name: parser experiment
+on:
+  pull_request:
+    paths:
+      - 'scripts/parser-experiment/**'
+      - '.github/workflows/parser-experiment.yml'
+jobs:
+  zig-wasm:
+    runs-on: ubuntu-24.04
+    environment: public-ci
+    env:
+      RUSTC_WRAPPER: sccache
+      SCCACHE_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      SCCACHE_REGION: auto
+      SCCACHE_BUCKET: cqx-sccache-linux-x64
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.98.1
+          targets: wasm32-unknown-unknown
+      - uses: ./.github/actions/sccache
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Fetch immutable experiment inputs
+        run: |
+          git fetch origin 519c1a303bfb41f2d22e5dcf2c7d967bb62728c4 dd7801fa8b7cb611e659a5c54ffa8060c049e3d0 ee16c2cc498f6b05a18c2179c9a760436135eea6
+          mkdir -p .tmp
+          chmod 700 .tmp
+          python3 scripts/parser-experiment/download.py
+          python3 scripts/parser-experiment/prepare.py
+          chmod +x scripts/parser-experiment/zig-*.py
+      - name: Build with Zig and no system LLVM on PATH
+        run: |
+          python3 scripts/parser-experiment/build.py zig
+          python3 scripts/parser-experiment/build.py zig --features core --name core
+          python3 scripts/parser-experiment/build.py zig --features c --name c
+          python3 scripts/parser-experiment/build.py zig --features cs --name cs
+          node .experiment/combined/scripts/test-c-wasm.mjs .experiment/artifacts/zig.wasm
+          node .experiment/combined/scripts/test-csharp-wasm.mjs .experiment/artifacts/zig.wasm
+      - name: Generate and build pure Rust parser probes
+        run: python3 scripts/parser-experiment/lezer.py
+      - uses: ./.github/actions/sccache-stats
+        if: always()
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zig-parser-experiment
+          path: |
+            .tmp/*-build.log
+            .experiment/artifacts/*
