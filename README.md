@@ -725,28 +725,23 @@ NOLINT/diagnostic/CS warning codes stay quiet; broad unexplained suppression
 still fires. Calibration remains in `cqx.json`, using the existing ramps.
 
 Pinned corpus evidence and full-report hashes are in `docs/heavy-language-evidence.json`.
-Before uses the original held frontend commits inside the current engine and
-all pure-Rust frontends; after uses shared layout. Both read the identical pinned
-snapshot. Thus Redis now includes Python findings absent from the older
-three-language experiment; the before/after comparison does not attribute them
-to the C port. Scores are containment / legibility / modularity / quality / security:
+Scores below are containment / legibility / modularity / quality / security.
+Each headline weights independent language scores by actual product lines.
 
-| Repository | Before | After | Coverage parsed/skipped |
-| --- | --- | --- | --- |
-| Redis | 79/100/100/95/100 | 76/100/100/95/100 | C 143/50, C++ 82/5 |
-| double-conversion | 100/100/100/94/100 | 100/100/100/94/100 | C++ 35/5 |
-| Humanizer | 100/100/100/90/100 | 100/100/100/90/100 | C# 728/7 |
+| Repository | Scores | Coverage parsed/skipped |
+| --- | --- | --- |
+| Redis | 98/100/100/100/100 | C 143/50, C++ 82/5 |
+| double-conversion | 100/100/100/94/100 | C++ 35/5 |
+| Humanizer | 100/100/100/90/100 | C# 728/7 |
 
-Redis C library termination findings grow 5→13 after scoping main exemptions to
-the declaration (2.3 deducted); narrow C suppressions drop 2→0. Humanizer keeps
-22 duplicate findings (10 deducted), 11 oversized files and one empty catch;
-narrow warning suppressions drop 2→0. Product lines grow 69,408→70,131 under the
-shared classifier, with parse coverage unchanged. No weights or ramps changed.
-Split and monolithic **after** reports have identical complete JSON bytes on all
-three corpora, all language fixtures and the Rust/TS/Go/C/C++/C# fixture; complete
-datasets also agree. Existing main goldens and the held C# golden are unchanged.
+Split and monolithic reports have identical complete JSON bytes on all three
+pinned corpora, all language fixtures and the Rust/TS/Go/C/C++/C# fixture;
+complete datasets also agree. Existing main goldens and the C# golden are
+unchanged. The corpus evidence records all frontend coverage and full hashes.
+C/C++ `out`, `external`, and `deps` exclusions are relative to the project root
+or a recognized build-system marker; source such as `src/external/` is scored.
 
 Directory discovery retains sibling sources under C/C#-specific names such as
 `deps/` and `bin/`; the owning frontend applies its exclusion. Adding a language
 must not remove another language's input before dispatch. Actual directory CLI
-scans reproduce the after score tuples above.
+scans reproduce the score tuples above.

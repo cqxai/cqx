@@ -40,8 +40,8 @@ const files = [
 ];
 snapshot(files);
 const report = JSON.parse(call('cqx_score',''));
-assert.equal(report.scores.containment,33);
-assert.equal(report.scores.security,55);
+assert.equal(report.scores.containment,81); // (70*1 + 70*3 + 100*1 + 93*2) / 7.
+assert.equal(report.scores.security,91); // (100*4 + 70*1 + 85*2) / 7.
 assert.equal(report.rules.find(r=>r.language==='csharp'&&r.rule==='exit-in-library').total_findings,1);
 assert.equal(report.skipped_files[0].file,'Broken.cs');
 const dataset=JSON.parse(call('cqx_dataset','fixture',''));

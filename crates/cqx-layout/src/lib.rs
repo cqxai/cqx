@@ -204,16 +204,9 @@ pub fn excluded_name(language: &str, name: &str) -> bool {
             }
             "csharp" => matches!(name, "obj" | "bin" | "packages"),
             "go" | "rust" => false,
-            "" => [
-                "java",
-                "swift",
-                "zig",
-                "python",
-                "php",
-                "typescript",
-            ]
-            .iter()
-            .any(|l| excluded_name(l, name)),
+            "" => ["java", "swift", "zig", "python", "php", "typescript"]
+                .iter()
+                .any(|l| excluded_name(l, name)),
             _ => false,
         }
 }
@@ -363,9 +356,21 @@ pub fn broad_directive(language: &str, comment: &str) -> bool {
                     return broad_suppression(SuppressionScope::Member, &codes);
                 }
             }
-            if comment.contains("diagnostic ignored") {
-                let codes: Vec<_> = comment.split('"').nth(1).into_iter().collect();
-                return broad_suppression(SuppressionScope::Member, &codes);
+            if let Some(tail) = comment
+                .strip_prefix("pragma ")
+                .and_then(|s| s.strip_prefix("GCC ").or_else(|| s.strip_prefix("clang ")))
+                .and_then(|s| s.strip_prefix("diagnostic ignored "))
+            {
+                // A directive must name a quoted warning code. Prose or an
+                // incomplete pragma is not an empty (blanket) suppression.
+                if let Some((code, _)) = tail
+                    .trim()
+                    .strip_prefix('"')
+                    .and_then(|s| s.split_once('"'))
+                    .filter(|(code, _)| !code.is_empty())
+                {
+                    return broad_suppression(SuppressionScope::Member, &[code]);
+                }
             }
             false
         }

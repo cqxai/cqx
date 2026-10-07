@@ -520,6 +520,7 @@ fn finalize(repo: &str, config_text: &str, envelope: bool) -> String {
 }
 
 /// Pass the complete report to dataset consumers, including the language block.
+#[cfg(feature = "core")]
 fn score_report(
     stream: &cqx_store::facts::Stream,
     config: &cqx_score::config::Config,
