@@ -167,10 +167,11 @@ impl Metrics {
         // Keep the Rust-only memory profile; split additional frontends only
         // when they occur, then feed each the shared neutral measurements.
         if !stream.nodes.iter().any(|n| {
-            n.kind == NodeKind::File && matches!(frontend_language(n), "typescript" | "go")
+            n.kind == NodeKind::File && frontend_language(n) != "rust"
         }) {
             return Self::compute_one(stream, config);
         }
+        let languages = config.frontend_languages();
         let subset = |lang: &str| Stream {
             nodes: stream
                 .nodes
@@ -185,7 +186,7 @@ impl Metrics {
                     if lang == "rust" {
                         !e.ev
                             .iter()
-                            .any(|ev| matches!(ev.extractor.as_str(), "typescript" | "go"))
+                            .any(|ev| languages.contains(ev.extractor.as_str()))
                     } else {
                         e.ev.iter().any(|ev| ev.extractor == lang)
                     }
@@ -195,7 +196,7 @@ impl Metrics {
             ..Stream::default()
         };
         let mut metrics = Self::compute_one(&subset("rust"), config);
-        for lang in ["typescript", "go"] {
+        for lang in languages.iter().copied() {
             let part = subset(lang);
             // Absent frontends must not add empty rules or config to another
             // language's report. Skipped files still identify their frontend.
@@ -256,7 +257,7 @@ impl Metrics {
 
     fn compute_one(stream: &Stream, config: &Config) -> Metrics {
         let source_locations = stream.nodes.iter().any(|n| {
-            matches!(frontend_language(n), "typescript" | "go")
+            frontend_language(n) != "rust"
         });
         let skipped_files = stream.nodes.iter().filter_map(|n| {
             let reason = n.attrs.get("skipped")?.as_str()?;

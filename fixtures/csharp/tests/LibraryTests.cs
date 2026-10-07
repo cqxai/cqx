@@ -1,0 +1,1 @@
+class LibraryTests { void Stop() { System.Environment.Exit(1); } }

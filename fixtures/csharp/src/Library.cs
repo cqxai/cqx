@@ -1,0 +1,1 @@
+class Library { void Stop(string input) { System.Environment.Exit(1); System.Diagnostics.Process.Start(input); } }

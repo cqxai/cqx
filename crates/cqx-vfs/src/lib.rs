@@ -130,6 +130,7 @@ pub fn is_interesting(path: &str) -> bool {
     path.ends_with(".rs")
         || is_typescript_source(path)
         || path.ends_with(".go")
+        || matches!(path.rsplit('.').next(), Some("cs" | "csx"))
         || path == "go.mod" || path.ends_with("/go.mod")
         || path == "package.json" || path.ends_with("/package.json")
         || path == "cqx.json"

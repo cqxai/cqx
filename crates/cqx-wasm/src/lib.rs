@@ -1,9 +1,9 @@
 //! The analysis, callable from a browser.
 //!
 //! No bindgen. The surface is four functions and a length-prefixed buffer,
-//! which keeps the build to `cargo build --target wasm32-unknown-unknown` with
-//! no extra toolchain — and a project that is awkward to build does not get
-//! contributed to.
+//! Building tree-sitter frontends requires LLVM clang with wasm32 support;
+//! scripts/build-tree-wasm.sh sets up the pinned headers and compiler.
+//! This deliberately changes the original no-extra-toolchain principle.
 //!
 //! The division of labour matters more than the calling convention: JavaScript
 //! does the fetching, because that is where `fetch`, credentials and rate

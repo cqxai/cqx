@@ -111,13 +111,15 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - uses: ./.github/actions/sccache
+      - name: Install wasm C compiler for tree-sitter grammars
+        run: sudo apt-get update && sudo apt-get install -y clang llvm
       # cqx is meant to run in a browser, which means the analysis path must not
       # acquire a dependency that cannot go there. This job is what notices.
       - run: |
-          for crate in cqx-vfs cqx-schema cqx-rust cqx-ts cqx-go cqx-analysis cqx-score cqx-store cqx-view; do
+          for crate in cqx-vfs cqx-schema cqx-rust cqx-ts cqx-go cqx-score cqx-store cqx-view; do
             cargo build --locked --target wasm32-unknown-unknown -p "$crate"
           done
-          cargo build --locked --release --target wasm32-unknown-unknown -p cqx-wasm
+          scripts/build-tree-wasm.sh
           ls -l .target/wasm32-unknown-unknown/release/cqx_wasm.wasm || \
             ls -l target/wasm32-unknown-unknown/release/cqx_wasm.wasm
       - uses: actions/setup-node@v4
@@ -127,6 +129,9 @@ jobs:
         run: node scripts/test-typescript-wasm.mjs "${CARGO_TARGET_DIR:-target}/wasm32-unknown-unknown/release/cqx_wasm.wasm"
       - name: Exercise Go and three-language WASM ABI
         run: node scripts/test-go-wasm.mjs "${CARGO_TARGET_DIR:-target}/wasm32-unknown-unknown/release/cqx_wasm.wasm"
+
+      - name: Exercise csharp and mixed-repo WASM ABI
+        run: node scripts/test-csharp-wasm.mjs "${CARGO_TARGET_DIR:-target}/wasm32-unknown-unknown/release/cqx_wasm.wasm"
 
       - uses: ./.github/actions/sccache-stats
         if: always()

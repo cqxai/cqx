@@ -1,0 +1,1 @@
+class Generated { void Stop() { System.Environment.Exit(1); } }

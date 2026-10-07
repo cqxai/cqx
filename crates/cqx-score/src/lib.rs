@@ -494,7 +494,7 @@ fn build_report(
                 })
                 .unwrap_or_default();
             serde_json::json!({
-                "rule": d.rule.strip_prefix("typescript/").or_else(|| d.rule.strip_prefix("go/")).unwrap_or(&d.rule), "category": d.category,
+                "rule": d.rule.rsplit('/').next().unwrap_or(&d.rule), "category": d.category,
                 // The language prefixes the name wherever it is shown and
                 // names its page in the docs, so it travels with the rule
                 // rather than being assumed by whoever renders it.
@@ -512,7 +512,7 @@ fn build_report(
     // should show the standards it was actually scored against.
     let mut shown_config = config.clone();
     // A Rust-only report retains main's full JSON, including its rule config.
-    for language in ["typescript", "go"] {
+    for language in config.frontend_languages() {
         if m.get(&format!("{language}/duplicated-bodies")).is_none() {
             shown_config.rules.retain(|_, r| r.language != language);
         }

@@ -169,6 +169,37 @@ gosyn limitation is compact grouped imports lacking a final semicolon or
 newline before `)`; gofmt-style imports work. All build-tag variants are read
 as source; analysis does not choose a GOOS/GOARCH build or invoke Go tooling.
 
+## C#
+
+CLI and browser scans read `.cs` and `.csx` using the maintained WillBooster tree-sitter C# grammar 2.0.2.
+Rules are `csharp/exit-in-library`, `csharp/nonliteral-process`,
+`csharp/swallowed-errors`, `csharp/undocumented-suppressions`, exact duplicated
+bodies, oversized files and oversized line share. They use the original five
+categories and borrowed ramps, with a C# product-line denominator. Calibration
+is only through `cqx.json`; there is no independent C# calibration.
+
+Static Main (including async Task forms), top-level statements and `.csx`
+scripts are entry units. Test/benchmark directories, conventional test filenames
+and NUnit/xUnit/MSTest attributes exclude test code from scoring. NuGet packages,
+obj/bin, generated source suffixes and auto-generated headers are excluded.
+Parse failures skip/report whole files. The grammar has gaps for some conditional-compilation fragments; skipped files contribute no score lines.
+Final-newline normalization for directives preserves original source spans.
+
+Process checks cover standard Environment.Exit and Process.Start calls. Literal
+executables with dynamic arguments and literal ProcessStartInfo constructors or
+FileName initializers stay quiet, as do locally shadowed/aliased API types. This
+is bounded syntax analysis: cross-file binding, value flow, type/domain design
+and argument taint are not established. Empty catches with explanatory comments
+and warning suppressions with adjacent reasons stay quiet.
+
+Tree-sitter deliberately changes cqx-wasm's original Rust-only toolchain rule.
+Install LLVM clang with wasm32 support (`brew install llvm` on macOS;
+`apt-get install clang llvm` on Ubuntu), then run `scripts/build-tree-wasm.sh`
+with a Rust toolchain that has `wasm32-unknown-unknown` installed. The script uses
+the pinned tree-sitter-language freestanding headers and LLVM archiver; these
+variables are build tooling only. CI installs clang/llvm and runs the mixed ABI
+harness, including parse skips, calibration, progress and sharded readers.
+
 ## The model
 
 ### One graph, not several views

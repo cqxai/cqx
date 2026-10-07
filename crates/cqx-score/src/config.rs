@@ -265,10 +265,27 @@ pub fn defaults() -> BTreeMap<String, Rule> {
         let rule = rules.get_mut(&format!("go/{id}")).unwrap();
         rule.describes = describes.into(); rule.remedy = remedy.into();
     }
+    for id in ["duplicated-bodies", "oversized-files", "oversized-line-share", "exit-in-library", "undocumented-suppressions"] {
+        let mut rule = rules[id].clone();
+        rule.language = "csharp".into();
+        rule.describes = format!("csharp syntax findings for {id}, using the existing ramp");
+        rule.remedy = format!("Review {id}; configure csharp/{id} only in cqx.json.");
+        rules.insert(format!("csharp/{id}"), rule);
+    }
+    for (id, category, weight, free, full, describes, remedy) in [
+      ("swallowed-errors", "quality", 10.0, 1.0, 6.0, "unexplained empty catches, per 10k product lines", "Handle the error or explain why ignoring it is safe."),
+      ("nonliteral-process", "security", 15.0, 0.0, 6.0, "non-literal executable or command at standard process APIs, per 10k product lines", "Use a literal executable and separate arguments; review input validation for dynamic commands.")
+    ] {
+      rules.insert(format!("csharp/{id}"), Rule { category: category.into(), language: "csharp".into(), describes: describes.into(), remedy: remedy.into(), weight, free, full, enabled: true, params: BTreeMap::new() });
+    }
     rules
 }
 
 impl Config {
+    pub fn frontend_languages(&self) -> std::collections::BTreeSet<&str> {
+        self.rules.values().map(|r| r.language.as_str()).filter(|l| *l != "rust").collect()
+    }
+
     /// Builds a configuration from text, or from the defaults when there is
     /// none. No filesystem: this is the form a browser can use, and the form
     /// `resolve` finishes with once it has found a file.
