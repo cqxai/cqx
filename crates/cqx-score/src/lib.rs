@@ -62,6 +62,11 @@ pub fn register(registry: &mut Registry) {
         description: "exit non-zero when any category falls below this",
     });
     registry.add_flag(FlagSpec {
+        name: "--strict",
+        aliases: &[],
+        description: "fail when a configured language floor has no scored product lines",
+    });
+    registry.add_flag(FlagSpec {
         name: "--explain",
         aliases: &[],
         description: "show every rule, its thresholds, and where each came from",
@@ -133,7 +138,13 @@ pub fn evaluate(config: &Config, m: &Metrics) -> Scoring {
             continue;
         }
         let Some(measure) = m.get(id) else { continue };
-        let taken = deduction(measure.value, rule.free, rule.full, rule.weight);
+        // Keep the zero-deduction report entries for compatibility, but a
+        // language with no scored product lines cannot incur a product loss.
+        let taken = if m.language_lines.get(&rule.language) == Some(&0) {
+            0.0
+        } else {
+            deduction(measure.value, rule.free, rule.full, rule.weight)
+        };
         *totals.entry(rule.category.clone()).or_default() += taken;
         deductions.push(Deduction {
             rule: id.clone(),
@@ -172,6 +183,15 @@ pub fn evaluate(config: &Config, m: &Metrics) -> Scoring {
             )
         })
         .collect();
+    // Zero deductions need no bucket. Every actual loss must enter the headline.
+    for d in &deductions {
+        assert!(
+            d.taken == 0.0 || languages.contains_key(&config.rules[&d.rule].language),
+            "deduction {} has no scored language bucket ({})",
+            d.rule,
+            config.rules[&d.rule].language
+        );
+    }
     let scores = if languages.len() == 1 {
         languages.values().next().unwrap().scores.clone()
     } else if languages.len() > 1 {
@@ -260,7 +280,13 @@ fn cmd_score(context: &Context) {
     }
 
     if let Some(min) = &config.min_score {
-        for failure in min.failures(&scoring) {
+        let strict = context.args.flags.get("--strict").copied().unwrap_or(false);
+        if !strict {
+            for warning in min.warnings(&scoring) {
+                eprintln!("cqx: warning: {warning}");
+            }
+        }
+        for failure in min.failures(&scoring, strict) {
             eprintln!("\ncqx: {failure}");
             FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
         }
@@ -645,4 +671,23 @@ fn print_json(config: &Config, scoring: &Scoring, m: &Metrics) {
         "{}",
         serde_json::to_string_pretty(&build_report(config, scoring, m)).unwrap_or_default()
     );
+}
+
+#[cfg(test)]
+mod scoring_tests {
+    use super::*;
+
+    #[test]
+    #[should_panic(expected = "has no scored language bucket (synthetic)")]
+    fn deduction_cannot_disappear_from_weighted_headline() {
+        let mut config = Config::from_text(None).unwrap();
+        // A synthetic rule deliberately assigns an existing measured loss to
+        // a language absent from the line inventory.
+        let rule = config.rules.get_mut("oversized-line-share").unwrap();
+        rule.language = "synthetic".into();
+        rule.free = -1.0;
+        let mut metrics = Metrics::compute(&cqx_store::facts::Stream::default(), &config);
+        metrics.language_lines.insert("rust".into(), 1);
+        evaluate(&config, &metrics);
+    }
 }

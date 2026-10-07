@@ -123,7 +123,7 @@ fn scan_and_score_enforce_language_floors_and_numeric_headline_override() {
         (r#"{"rust":70,"typescript":70}"#, true, false),
         (r#"{"rust":81,"typescript":70}"#, false, false),
         (r#"{"rust":70,"typescript":71}"#, false, false),
-        (r#"{"java":100}"#, true, false), // No Java product code, so no Java gate.
+        (r#"{"java":100}"#, true, false), // Unscored Java warns by default; strict fails below.
         ("70", true, false),
         ("71", false, false),
         // A Rust floor above the headline can pass, while a TS floor below
@@ -170,6 +170,22 @@ fn scan_and_score_enforce_language_floors_and_numeric_headline_override() {
             );
             if !expected && floor.starts_with('{') {
                 assert!(String::from_utf8_lossy(&out.stderr).contains("/security scored"));
+            }
+            if floor == r#"{"java":100}"# {
+                let warning = "min_score: java has no scored product lines";
+                assert!(
+                    String::from_utf8_lossy(&out.stderr).contains(&format!("warning: {warning}"))
+                );
+                let strict = Command::new(env!("CARGO_BIN_EXE_cqx"))
+                    .args(&args)
+                    .arg("--strict")
+                    .output()
+                    .unwrap();
+                assert!(
+                    !strict.status.success(),
+                    "{command}: unscored floor passed strict"
+                );
+                assert!(String::from_utf8_lossy(&strict.stderr).contains(warning));
             }
             let override_out = Command::new(env!("CARGO_BIN_EXE_cqx"))
                 .args(&args)

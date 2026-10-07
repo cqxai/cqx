@@ -1,9 +1,7 @@
 //! The analysis, callable from a browser.
 //!
-//! No bindgen. The surface is four functions and a length-prefixed buffer,
-//! which keeps the build to `cargo build --target wasm32-unknown-unknown` with
-//! no extra toolchain — and a project that is awkward to build does not get
-//! contributed to.
+//! No bindgen. Release modules use the versioned length-prefixed ABI and a
+//! checksum-verified pinned Zig toolchain for native grammar sources.
 //!
 //! The division of labour matters more than the calling convention: JavaScript
 //! does the fetching, because that is where `fetch`, credentials and rate
@@ -107,6 +105,17 @@ fn respond(body: String) -> *mut u8 {
     let ptr = out.as_mut_ptr();
     std::mem::forget(out);
     ptr
+}
+
+/// Module identity and ABI contract, checked before loading any source.
+#[no_mangle]
+pub extern "C" fn cqx_module_info() -> *mut u8 {
+    respond(
+        serde_json::json!({
+            "module": "core", "version": env!("CARGO_PKG_VERSION"), "abi_version": 1
+        })
+        .to_string(),
+    )
 }
 
 /// Starts a new snapshot, discarding whatever was being assembled.
@@ -441,30 +450,60 @@ pub unsafe extern "C" fn cqx_fold_done(
     config: *const u8,
     config_len: usize,
 ) -> *mut u8 {
-    let repo = borrow(repo, repo_len);
-    let config_text = borrow(config, config_len);
+    respond(finalize(
+        &borrow(repo, repo_len),
+        &borrow(config, config_len),
+        false,
+    ))
+}
+
+/// Finalize once, retaining Rust's exact report JSON number spelling for hosts.
+///
+/// # Safety
+/// Both pointers must reference that many bytes of valid UTF-8.
+#[no_mangle]
+pub unsafe extern "C" fn cqx_finalize(
+    repo: *const u8,
+    repo_len: usize,
+    config: *const u8,
+    config_len: usize,
+) -> *mut u8 {
+    respond(finalize(
+        &borrow(repo, repo_len),
+        &borrow(config, config_len),
+        true,
+    ))
+}
+
+fn finalize(repo: &str, config_text: &str, envelope: bool) -> String {
     let result = FOLDING.with(|f| -> Result<String, String> {
         let mut stream = f.borrow_mut();
         // Readers all describe the packages, because they all read every
         // manifest. The same node twice says nothing new, and the same
         // containment edge twice multiplies every path through it.
         stream.dedupe();
-        let config = SNAPSHOT.with(|s| snapshot_config(&s.borrow(), &config_text))?;
+        let config = SNAPSHOT.with(|s| snapshot_config(&s.borrow(), config_text))?;
         let report = score_report(&stream, &config);
         let meta = cqx_view::Meta {
-            repo: repo.as_str(),
+            repo,
             branch: "",
             remote: None,
             commits_url: None,
             analysed_ms: None,
             fetched_ms: None,
         };
-        Ok(cqx_view::dataset(&stream, report, serde_json::json!([]), &meta).to_string())
+        let report_json = report.to_string();
+        let dataset = cqx_view::dataset(&stream, report, serde_json::json!([]), &meta);
+        Ok(if envelope {
+            serde_json::json!({"dataset": dataset, "report_json": report_json}).to_string()
+        } else {
+            dataset.to_string()
+        })
     });
-    respond(match result {
+    match result {
         Ok(json) => json,
         Err(e) => serde_json::json!({ "error": e }).to_string(),
-    })
+    }
 }
 
 /// Pass the complete report to dataset consumers, including the language block.

@@ -9,6 +9,10 @@ description = "The cqx analysis, callable from a browser."
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = ["core"]
+core = []
+
 [dependencies]
 cqx-analysis = { path = "../cqx-analysis" }
 cqx-rust = { path = "../cqx-rust" }
