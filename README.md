@@ -125,7 +125,8 @@ category. To gate languages independently, use, for example:
 ```
 
 Every category of each named language must meet its floor. A language with no
-product lines is not gated. `--min-score N` overrides either form with a
+product lines emits a stderr warning in `scan` and `score`; `--strict` makes
+that unevaluable floor fail the command. `--min-score N` overrides either form with a
 headline floor. Changing between headline and language floors cannot be proven
 to tighten the standard, so `--tighten-only` refuses that change.
 Test files (`*.test.*`, `*.spec.*`, test/tests/__tests__ directories) are present
@@ -633,7 +634,7 @@ stay quiet. No extra WASM toolchain is required.
 
 ## Modular browser/Worker host
 
-`scripts/cqx-loader.mjs` exposes `createLoader({manifest, baseURL, fetchBytes?,
+`scripts/cqx-loader.mjs` exposes `createLoader({manifest, manifestSha256, baseURL, fetchBytes?,
 compiledModules?, onProgress?})`. Keep one loader per immutable release manifest;
 its compiled-module cache is keyed by version, ABI and SHA-256. Every scan gets
 fresh instances. `await loader.scan(files, {repo, label?, config?})` accepts an
@@ -643,14 +644,28 @@ floating-point spelling). Empty config uses the root `cqx.json`. Module facts en
 core engine before scoring; language scores are never combined.
 
 ```js
-import { createLoader } from './scripts/cqx-loader.mjs';
+import { createLoader, verifyManifest } from './scripts/cqx-loader.mjs';
 const baseURL = 'https://your-versioned-wasm-host/v0.1.24/';
-const manifest = await (await fetch(new URL('manifest.json', baseURL))).json();
-const loader = createLoader({ manifest, baseURL });
+const releaseURL = 'https://github.com/cqxai/cqx/releases/download/v0.1.24/';
+// Check response.ok for both requests in your host's fetch/error adapter.
+const checksums = await (await fetch(new URL('SHA256SUMS', releaseURL))).text();
+const bytes = new Uint8Array(await (await fetch(new URL('manifest.json', baseURL))).arrayBuffer());
+const trusted = await verifyManifest(bytes, checksums);
+const loader = createLoader({ ...trusted, baseURL });
 const {dataset, reportJson} = await loader.scan([['src/lib.ts', 'export function f() {}']], {
   repo: 'org/repo',
 });
 ```
+
+The trust anchor is the immutable GitHub release's `SHA256SUMS`, retrieved over
+HTTPS independently of the WASM CDN, or its manifest SHA-256 pinned in the host's
+build. Do not obtain the pin from the module origin. `verifyManifest` verifies raw
+manifest bytes; the loader also checks the generated manifest serialization against
+that pin before any scan or module fetch. A CDN replacement of both the manifest
+and module therefore fails. This trusts the GitHub release publisher and HTTPS;
+it is integrity verification, not a signature or protection from a compromised
+release account. Hosts whose browsers cannot fetch GitHub assets directly should
+embed the checksum at build/deploy time (Workers do the same).
 
 Browser/Node hosts verify downloaded bytes before compilation. Workers that
 cannot compile bytes at runtime pass trusted deployment bindings as

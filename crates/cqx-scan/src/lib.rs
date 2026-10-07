@@ -375,7 +375,13 @@ fn gate(context: &Context, here: &Scanned, against: Option<(&str, &Scanned)>) {
         .and_then(|c| c.get("min_score"))
         .and_then(|v| serde_json::from_value::<cqx_score::config::MinScore>(v.clone()).ok())
     {
-        for failure in min.failures(&here.scoring) {
+        let strict = context.args.flags.get("--strict").copied().unwrap_or(false);
+        if !strict {
+            for warning in min.warnings(&here.scoring) {
+                eprintln!("cqx scan: warning: {warning}");
+            }
+        }
+        for failure in min.failures(&here.scoring, strict) {
             eprintln!("cqx scan: {failure}");
             refused = true;
         }

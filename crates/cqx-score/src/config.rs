@@ -110,8 +110,19 @@ pub enum MinScore {
 }
 
 impl MinScore {
-    /// A missing language has no product code to gate.
-    pub fn failures(&self, scoring: &crate::Scoring) -> Vec<String> {
+    /// Floors for unscored languages cannot be evaluated.
+    pub fn warnings(&self, scoring: &crate::Scoring) -> Vec<String> {
+        match self {
+            Self::Headline(_) => Vec::new(),
+            Self::Languages(floors) => floors
+                .keys()
+                .filter(|language| !scoring.languages.contains_key(*language))
+                .map(|language| format!("min_score: {language} has no scored product lines"))
+                .collect(),
+        }
+    }
+
+    pub fn failures(&self, scoring: &crate::Scoring, strict: bool) -> Vec<String> {
         let mut failures = Vec::new();
         let mut check = |prefix: &str, scores: &BTreeMap<String, u32>, min: u32| {
             for (category, value) in scores {
@@ -131,6 +142,9 @@ impl MinScore {
                     }
                 }
             }
+        }
+        if strict {
+            failures.extend(self.warnings(scoring));
         }
         failures
     }

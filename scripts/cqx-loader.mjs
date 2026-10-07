@@ -3,6 +3,22 @@ import { ABI_VERSION, MODULES, moduleFor } from './wasm-catalog.mjs';
 
 const encoder = new TextEncoder(), decoder = new TextDecoder();
 function fail(message) { throw new Error(`cqx WASM: ${message}`); }
+async function sha256(bytes) {
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** The checksum inventory must come from the trusted GitHub release (or a build
+ * pin), independently of the module CDN. Verify raw manifest bytes before use. */
+export async function verifyManifest(bytes, checksums) {
+  const entries = checksums.split('\n').filter(line => /^[a-f0-9]{64} [ *]manifest\.json$/.test(line));
+  if (entries.length !== 1) fail('release SHA256SUMS must contain exactly one manifest.json');
+  const manifestSha256 = entries[0].slice(0, 64);
+  if (await sha256(bytes) !== manifestSha256) fail('manifest SHA-256 mismatch');
+  const manifest = JSON.parse(decoder.decode(bytes));
+  return { manifest, manifestSha256 };
+}
+
 export function connect(instance) {
   const api = instance.exports;
   for (const name of ['memory', 'cqx_alloc', 'cqx_free', 'cqx_reset', 'cqx_add_file', 'cqx_module_info', 'cqx_gather', 'cqx_emit']) {
@@ -42,12 +58,19 @@ function snapshot(host, label, files) {
   for (const [path, source] of files) host.call('cqx_add_file', path, source);
 }
 
-/** createLoader({manifest, baseURL, fetchBytes?, compiledModules?, onProgress?})
+/** createLoader({manifest, manifestSha256, baseURL, fetchBytes?, compiledModules?, onProgress?})
  * compiledModules is a trusted deployment binding: {id: {module, sha256}}.
  * Byte downloads are SHA-256 verified before compilation. All module identities
  * are checked even for precompiled Worker bindings. No partial result on error.
  */
-export function createLoader({ manifest, baseURL, fetchBytes, compiledModules = {}, onProgress = () => {} }) {
+export function createLoader({ manifest, manifestSha256, baseURL, fetchBytes, compiledModules = {}, onProgress = () => {} }) {
+  if (!/^[a-f0-9]{64}$/.test(manifestSha256 ?? '')) fail('a trusted release manifest SHA-256 is required');
+  // Snapshot caller data; a later mutation cannot change the verified routing.
+  manifest = structuredClone(manifest);
+  const verified = async () => {
+    // wasm-manifest.mjs defines this exact release serialization.
+    if (await sha256(encoder.encode(JSON.stringify(manifest, null, 2) + '\n')) !== manifestSha256) fail('manifest SHA-256 mismatch');
+  };
   if (manifest?.abi_version !== ABI_VERSION || typeof manifest.version !== 'string' || !manifest.modules?.core) fail('unsupported manifest version/ABI or missing core');
   for (const [id, entry] of Object.entries(manifest.modules)) {
     const descriptor = MODULES[id];
@@ -76,8 +99,7 @@ export function createLoader({ manifest, baseURL, fetchBytes, compiledModules = 
           if (!response.ok) fail(`module ${id}: HTTP ${response.status}`);
           bytes = await response.arrayBuffer();
         }
-        const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
-        const hash = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+        const hash = await sha256(bytes);
         if (hash !== entry.sha256) fail(`module ${id}: SHA-256 mismatch`);
         return WebAssembly.compile(bytes);
       })().catch(error => { cache.delete(key); fail(`load ${id}: ${error.message}`); });
@@ -100,6 +122,7 @@ export function createLoader({ manifest, baseURL, fetchBytes, compiledModules = 
   return {
     /** files: iterable [snapshot-relative path, UTF-8 source]. Returns one dataset. */
     async scan(files, { repo = '', label = repo, config = '' } = {}) {
+      await verified();
       // Match Vfs normalization, deduplication and ordering before partitioning.
       const normalized = new Map();
       for (const [path, source] of files) normalized.set(path.replaceAll('\\', '/').replace(/^(?:\.\/)+/, '').replace(/^\/+/, ''), source);
