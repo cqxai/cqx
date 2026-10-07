@@ -51,7 +51,7 @@ def install(cache):
             if archive.suffix == '.zip':
                 with zipfile.ZipFile(archive) as bundle:
                     for member in bundle.namelist():
-                        if not (pathlib.Path(staging) / member).resolve().is_relative_to(staging):
+                        if not (pathlib.Path(staging) / member).resolve().is_relative_to(pathlib.Path(staging).resolve()):
                             raise RuntimeError('unsafe path in Zig archive')
                     bundle.extractall(staging)
             else:

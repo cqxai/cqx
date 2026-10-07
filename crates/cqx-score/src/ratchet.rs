@@ -30,7 +30,7 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
-use crate::config::{Config, Rule};
+use crate::config::{Config, MinScore, Rule};
 
 /// Which way a single change moves the standard.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -82,35 +82,57 @@ pub fn compare(before: &Config, after: &Config) -> Vec<Change> {
 
     // The floor. Raising it is a tightening even though it changes no rule:
     // it is the number a run is refused for falling under.
-    match (before.min_score, after.min_score) {
-        // A guard does not count towards exhaustiveness, so the unchanged case
-        // is spelled out rather than leaned on.
-        (None, None) => {}
-        (a, b) if a == b => {}
-        (None, Some(n)) => out.push(Change {
-            rule: String::new(),
-            field: "min_score".into(),
-            before: "none".into(),
-            after: n.to_string(),
-            direction: Direction::Tighter,
-            why: "a run that could not fail on score now can".into(),
-        }),
-        (Some(n), None) => out.push(Change {
-            rule: String::new(),
-            field: "min_score".into(),
-            before: n.to_string(),
-            after: "none".into(),
-            direction: Direction::Looser,
-            why: "removing the floor means no score can fail a run".into(),
-        }),
-        (Some(a), Some(b)) => out.push(Change {
-            rule: String::new(),
-            field: "min_score".into(),
-            before: a.to_string(),
-            after: b.to_string(),
-            direction: if b > a { Direction::Tighter } else { Direction::Looser },
-            why: if b > a { "a higher floor refuses more" } else { "a lower floor refuses less" }.into(),
-        }),
+    match (&before.min_score, &after.min_score) {
+        (Some(MinScore::Headline(a)), Some(MinScore::Languages(b))) => {
+            floor_shape_change(&mut out, a.to_string(), serde_json::to_string(b).unwrap());
+        }
+        (Some(MinScore::Languages(a)), Some(MinScore::Headline(b))) => {
+            floor_shape_change(&mut out, serde_json::to_string(a).unwrap(), b.to_string());
+        }
+        (a, b) => {
+            let floors = |min: &Option<MinScore>| -> BTreeMap<String, u32> {
+                match min {
+                    None => BTreeMap::new(),
+                    Some(MinScore::Headline(n)) => BTreeMap::from([("min_score".into(), *n)]),
+                    Some(MinScore::Languages(languages)) => languages
+                        .iter()
+                        .map(|(language, n)| (format!("min_score.{language}"), *n))
+                        .collect(),
+                }
+            };
+            let a = floors(a);
+            let b = floors(b);
+            let fields: std::collections::BTreeSet<_> = a.keys().chain(b.keys()).collect();
+            for field in fields {
+                let old = a.get(field);
+                let new = b.get(field);
+                if old == new {
+                    continue;
+                }
+                let tighter = match (old, new) {
+                    (None, Some(_)) => true,
+                    (Some(old), Some(new)) => new > old,
+                    _ => false,
+                };
+                out.push(Change {
+                    rule: String::new(),
+                    field: field.clone(),
+                    before: old.map(u32::to_string).unwrap_or_else(|| "none".into()),
+                    after: new.map(u32::to_string).unwrap_or_else(|| "none".into()),
+                    direction: if tighter {
+                        Direction::Tighter
+                    } else {
+                        Direction::Looser
+                    },
+                    why: if tighter {
+                        "a higher floor refuses more"
+                    } else {
+                        "a lower floor refuses less"
+                    }
+                    .into(),
+                });
+            }
+        }
     }
 
     // Exclusions. Code that is not measured cannot fail, so every path added
@@ -279,6 +301,17 @@ fn rule(name: &str, a: &Rule, b: &Rule, out: &mut Vec<Change>) {
     }
 }
 
+fn floor_shape_change(out: &mut Vec<Change>, before: String, after: String) {
+    out.push(Change {
+        rule: String::new(),
+        field: "min_score".into(),
+        before,
+        after,
+        direction: Direction::Unclear,
+        why: "headline and language floors gate different scores".into(),
+    });
+}
+
 /// Whether a proposal is one an agent may apply on its own.
 ///
 /// True only when something changed and every change is a tightening. An empty
@@ -415,14 +448,31 @@ mod tests {
     #[test]
     fn raising_the_floor_is_tighter_and_removing_it_is_not() {
         let mut floored = config();
-        floored.min_score = Some(70);
+        floored.min_score = Some(MinScore::Headline(70));
         assert_eq!(one(&floored).direction, Direction::Tighter);
 
         let mut higher = config();
-        higher.min_score = Some(80);
+        higher.min_score = Some(MinScore::Headline(80));
         assert_eq!(compare(&floored, &higher)[0].direction, Direction::Tighter);
         assert_eq!(compare(&higher, &floored)[0].direction, Direction::Looser);
         assert_eq!(compare(&floored, &config())[0].direction, Direction::Looser);
+    }
+
+    #[test]
+    fn language_floors_ratchet_individually_and_shape_changes_are_unclear() {
+        let language_config = |text| Config::from_text(Some(text)).unwrap();
+        let before = language_config(r#"{"min_score":{"rust":70,"typescript":85}}"#);
+        let raised = language_config(r#"{"min_score":{"rust":80,"typescript":85}}"#);
+        assert!(tightens(&compare(&before, &raised)));
+        let removed = language_config(r#"{"min_score":{"rust":80}}"#);
+        assert!(!tightens(&compare(&before, &removed)));
+        assert!(compare(&before, &removed).iter().any(|change| {
+            change.field == "min_score.typescript" && change.direction == Direction::Looser
+        }));
+        let headline = language_config(r#"{"min_score":90}"#);
+        assert_eq!(compare(&before, &headline)[0].direction, Direction::Unclear);
+        assert_eq!(compare(&headline, &before)[0].direction, Direction::Unclear);
+        assert!(Config::from_text(Some(r#"{"min_score":{"typo":90}}"#)).is_err());
     }
 
     #[test]

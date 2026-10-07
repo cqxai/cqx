@@ -60,8 +60,10 @@ fn review_invalid_typescript_keeps_mixed_rust_scores_and_reports_each_file() {
     vfs.insert("redeclaration.ts", "let value; let value;");
     let got = snapshot_report(&vfs, "{}");
     assert_eq!(got["scores"], clean["scores"]);
-    assert_eq!(got["scores"]["containment"], 70);
-    assert_eq!(got["scores"]["security"], 70);
+    assert_eq!(got["scores"]["containment"], 85);
+    assert_eq!(got["languages"]["rust"]["scores"]["containment"], 70);
+    assert_eq!(got["scores"]["security"], 85);
+    assert_eq!(got["languages"]["typescript"]["scores"]["security"], 70);
     assert_eq!(got["lines"], 2);
     let skipped = got["skipped_files"].as_array().unwrap();
     assert_eq!(skipped.len(), 2);

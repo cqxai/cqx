@@ -185,8 +185,7 @@ pub unsafe extern "C" fn cqx_score(config: *const u8, config_len: usize) -> *mut
         cqx_analysis::run(&vfs, &mut facts).map_err(|e| e.to_string())?;
         let stream = cqx_store::facts::Stream::from_ndjson(&String::from_utf8_lossy(&facts));
         let config = snapshot_config(&vfs, &config_text)?;
-        let metrics = cqx_score::metrics::Metrics::compute(&stream, &config);
-        Ok(cqx_score::report_json(&config, &metrics).to_string())
+        Ok(score_report(&stream, &config).to_string())
     });
     respond(match result {
         Ok(json) => json,
@@ -228,8 +227,7 @@ pub unsafe extern "C" fn cqx_dataset(
             .map_err(|e| e.to_string())?;
         let stream = cqx_store::facts::Stream::from_ndjson(&String::from_utf8_lossy(&facts));
         let config = snapshot_config(&vfs, &config_text)?;
-        let metrics = cqx_score::metrics::Metrics::compute(&stream, &config);
-        let mut report = cqx_score::report_json(&config, &metrics);
+        let mut report = score_report(&stream, &config);
         // The snapshot is still here, so each finding can carry the line it
         // points at rather than only its number.
         cqx_view::quote(&mut report, &|path| vfs.read(path).map(str::to_string));
@@ -498,8 +496,7 @@ fn finalize(repo: &str, config_text: &str, envelope: bool) -> String {
         // containment edge twice multiplies every path through it.
         stream.dedupe();
         let config = SNAPSHOT.with(|s| snapshot_config(&s.borrow(), config_text))?;
-        let metrics = cqx_score::metrics::Metrics::compute(&stream, &config);
-        let report = cqx_score::report_json(&config, &metrics);
+        let report = score_report(&stream, &config);
         let meta = cqx_view::Meta {
             repo,
             branch: "",
@@ -520,6 +517,15 @@ fn finalize(repo: &str, config_text: &str, envelope: bool) -> String {
         Ok(json) => json,
         Err(e) => serde_json::json!({ "error": e }).to_string(),
     }
+}
+
+/// Pass the complete report to dataset consumers, including the language block.
+fn score_report(
+    stream: &cqx_store::facts::Stream,
+    config: &cqx_score::config::Config,
+) -> serde_json::Value {
+    let metrics = cqx_score::metrics::Metrics::compute(stream, config);
+    cqx_score::report_json(config, &metrics)
 }
 
 /// Empty host config uses the repository's real cqx.json when supplied in the

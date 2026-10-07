@@ -53,8 +53,9 @@ assert.match(facts, /"extractor":"rust"/);
 assert.match(facts, /"extractor":"typescript"/);
 const scored = JSON.parse(call('cqx_score', ''));
 assert.deepEqual(Object.keys(scored.scores).sort(), ['containment', 'legibility', 'modularity', 'quality', 'security']);
-assert.equal(scored.scores.security, 93);
+assert.equal(scored.scores.security, 94);
 assert.equal(scored.scores.containment, 100);
+assert.equal(scored.languages.go.scores.security, 93);
 const broken = [
   ['bad.go', 'package p\nfunc = ;'],
   ['bad-token.go', 'package p\nvar text = "unterminated'],
@@ -69,7 +70,7 @@ assert.ok(withSkips.skipped_files.every(s => s.reason.length > 0));
 const dataset = JSON.parse(call('cqx_dataset', 'cqxai/fixture', ''));
 assert.equal(expected, 12);
 assert.equal(parsed, expected);
-assert.deepEqual(dataset.score.scores, scored.scores);
+assert.deepEqual(dataset.score, JSON.parse(call('cqx_quote', JSON.stringify(withSkips))));
 assert.deepEqual(dataset.score.skipped_files, withSkips.skipped_files);
 const metadata = call('cqx_manifests');
 assert.equal(JSON.parse(metadata).go_modules[''], 'example.com/mixed');
@@ -95,6 +96,7 @@ for (const files of slices) {
 const folded = JSON.parse(call('cqx_fold_done', 'cqxai/fixture', config));
 assert.deepEqual(folded.score.scores, scored.scores);
 assert.deepEqual(folded.score.rules, scored.rules);
+assert.deepEqual(folded.score.languages, scored.languages);
 assert.deepEqual(folded.score.skipped_files, withSkips.skipped_files);
 snapshot([['broken.go', 'package p\nfunc = ;']]);
 const onlySkipped = JSON.parse(call('cqx_score', ''));
