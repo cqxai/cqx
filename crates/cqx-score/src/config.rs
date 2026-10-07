@@ -265,10 +265,24 @@ pub fn defaults() -> BTreeMap<String, Rule> {
         let rule = rules.get_mut(&format!("go/{id}")).unwrap();
         rule.describes = describes.into(); rule.remedy = remedy.into();
     }
+    for lang in ["c", "cpp"] {
+        for id in ["duplicated-bodies", "oversized-files", "oversized-line-share", "exit-in-library", "undocumented-suppressions", "discarded-check", "hand-built-json", "shell-argument-unchecked"] {
+            let mut rule = rules[id].clone();
+            rule.language = lang.into();
+            rule.describes = format!("{lang} syntax findings for {id}, measured using the existing ramp");
+            rule.remedy = format!("Review {id}; configure {lang}/{id} only in cqx.json.");
+            rules.insert(format!("{lang}/{id}"), rule);
+        }
+        rules.insert(format!("{lang}/unsafe-buffer-calls"), Rule { category: "security".into(), language: lang.into(), describes: "unbounded C buffer APIs, per 10k product lines".into(), remedy: "Use a bounded buffer API or an owning string type.".into(), weight: 20.0, free: 0.0, full: 6.0, enabled: true, params: BTreeMap::new() });
+    }
     rules
 }
 
 impl Config {
+    pub fn frontend_languages(&self) -> std::collections::BTreeSet<&str> {
+        self.rules.values().map(|r| r.language.as_str()).filter(|l| *l != "rust").collect()
+    }
+
     /// Builds a configuration from text, or from the defaults when there is
     /// none. No filesystem: this is the form a browser can use, and the form
     /// `resolve` finishes with once it has found a file.

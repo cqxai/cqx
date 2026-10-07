@@ -436,3 +436,35 @@ external project disagreed:
 Locally the test skips when the checkouts are absent. Setting
 `CQX_REFERENCE_DIR` asserts they are present, so a failed fetch fails the job
 rather than quietly checking nothing.
+
+### C and C++ analysis
+
+C/C++ files use tree-sitter syntax trees through the same native and browser
+analysis pipeline. Rules keep the original five categories and use `c/` and
+`cpp/` ids. Configure weights, thresholds and exclusions only in `cqx.json`.
+The frontend reports syntax errors and scores the remaining files. It excludes
+third-party/deps/vendor code, build output and generated banners, and tags test
+code using directory and filename conventions. `.h` files use the C++ grammar
+when the full snapshot contains C++ sources, including when readers are sharded.
+
+The initial rules measure standard process termination outside a main translation
+unit, non-literal standard shell commands, unbounded C buffer calls, ignored
+returns of locally annotated must-check declarations, undocumented suppressions,
+JSON printf templates, repeated bodies and oversized files. Standard API rules
+require the relevant standard header and keep project-defined functions and
+member methods quiet. This is syntax analysis, without preprocessing, name/type
+resolution across translation units, taint analysis or proof of buffer sizes.
+Functions marked must-check in another header are not resolved yet. Macro-heavy
+files that the grammar rejects appear in `skipped_files` rather than contributing
+partial facts or inflated product line counts.
+
+**Wasm build toolchain:** C/C++ deliberately relaxes the original “no extra
+C toolchain” build principle. Use LLVM clang with its wasm32 backend (Ubuntu:
+`sudo apt-get install clang llvm`; macOS: `brew install llvm`) and a Rust
+`wasm32-unknown-unknown` target, then run `scripts/build-tree-wasm.sh`.
+The script resolves tree-sitter-language's pinned wasm headers through Cargo
+metadata and supplies the C++ scanner's wchar/C11 compatibility flags. The
+result is a standalone browser module with no C runtime host imports. C grammar
+0.24.1 is pinned because 0.24.2's build script pulls incompatible tree-sitter
+0.26 stdlib sources into wasm even with runtime 0.27. Native builds use the
+normal platform C compiler; no compiler runs while scanning source.
