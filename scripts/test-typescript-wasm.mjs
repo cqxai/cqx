@@ -34,7 +34,7 @@ const rust = [
   ['src/lib.rs', 'pub fn shutdown() { std::process::exit(1); }'],
 ];
 const ts = [
-  ['package.json', '{"bin":"tools/start.js"}'],
+  ['package.json', '{"scripts":{"start":"node tools/start.js"}}'],
   ['src/library.tsx', 'export function render(s: string) { eval(s); return <p>{s}</p>; }'],
   ['tools/start.js', 'process.exit(1);'],
   ['module.jsx', 'export const view = <div/>;'],
@@ -77,6 +77,25 @@ for (const files of slices) {
 const folded = JSON.parse(call('cqx_fold_done', 'cqxai/fixture', config));
 assert.deepEqual(folded.score.scores, scored.scores);
 
-snapshot([['broken.ts', 'const = ;']]);
-assert.match(JSON.parse(call('cqx_score', '')).error, /broken.ts/);
-console.log('WASM TS/JS, mixed scoring, root config, progress, shards, and parse failure: passed');
+snapshot([...rust, ...ts, ['broken.ts', 'const = ;'], ['redeclaration.ts', 'let value; let value;']]);
+const partial = JSON.parse(call('cqx_score', ''));
+assert.deepEqual(partial.scores, scored.scores);
+assert.deepEqual(partial.skipped_files.map(f => f.file), ['broken.ts', 'redeclaration.ts']);
+const brokenMetadata = call('cqx_manifests');
+api.cqx_merge_reset();
+const brokenSlices = [[...rust, ts[0], ['broken.ts', 'const = ;']], [...ts.slice(1), ['redeclaration.ts', 'let value; let value;']]];
+for (const files of brokenSlices) {
+  snapshot(files);
+  call('cqx_merge_add', call('cqx_gather', brokenMetadata));
+}
+const brokenMerged = call('cqx_merge_done');
+api.cqx_fold_reset();
+for (const files of brokenSlices) {
+  snapshot(files);
+  call('cqx_gather', brokenMetadata);
+  call('cqx_fold_add', call('cqx_emit', brokenMerged));
+}
+const brokenFolded = JSON.parse(call('cqx_fold_done', 'cqxai/fixture', config));
+assert.deepEqual(brokenFolded.score.scores, partial.scores);
+assert.deepEqual(brokenFolded.score.skipped_files, partial.skipped_files);
+console.log('WASM TS/JS, mixed scoring, root config, progress, shards, and reported parse skips: passed');

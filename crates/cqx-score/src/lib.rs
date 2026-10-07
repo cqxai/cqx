@@ -377,6 +377,20 @@ fn explain(config: &Config) {
     );
 }
 
+/// Surface partial analysis in both human-readable scan and score output.
+pub fn print_skipped_files(skipped: &[serde_json::Value]) {
+    if !skipped.is_empty() {
+        println!("\n{} skipped file(s):", skipped.len());
+        for file in skipped {
+            println!(
+                "  {}: {}",
+                file["file"].as_str().unwrap_or("?"),
+                file["reason"].as_str().unwrap_or("?")
+            );
+        }
+    }
+}
+
 fn print_report(
     config: &Config,
     scores: &BTreeMap<String, u32>,
@@ -384,6 +398,7 @@ fn print_report(
     m: &Metrics,
 ) {
     println!("CodeQuality Score · {} product lines", m.lines);
+    print_skipped_files(&m.skipped_files);
     if let Some(p) = &config.loaded_from {
         println!("configuration: {}", p.display());
     }
@@ -479,7 +494,7 @@ fn build_report(
                 })
                 .unwrap_or_default();
             serde_json::json!({
-                "rule": d.rule.rsplit('/').next().unwrap_or(&d.rule), "category": d.category,
+                "rule": d.rule.strip_prefix("typescript/").unwrap_or(&d.rule), "category": d.category,
                 // The language prefixes the name wherever it is shown and
                 // names its page in the docs, so it travels with the rule
                 // rather than being assumed by whoever renders it.
@@ -495,12 +510,21 @@ fn build_report(
         .collect();
     // The configuration travels with the result: a consumer that renders this
     // should show the standards it was actually scored against.
-    serde_json::json!({
+    let mut shown_config = config.clone();
+    // A Rust-only report retains main's full JSON, including its rule config.
+    if m.get("typescript/dynamic-code").is_none() {
+        shown_config.rules.retain(|_, r| r.language != "typescript");
+    }
+    let mut report = serde_json::json!({
         "lines": m.lines,
         "scores": scores,
         "rules": rules,
-        "config": config_json(config),
-    })
+        "config": config_json(&shown_config),
+    });
+    if !m.skipped_files.is_empty() {
+        report["skipped_files"] = serde_json::json!(m.skipped_files);
+    }
+    report
 }
 
 fn print_json(

@@ -62,6 +62,7 @@ impl Prepared {
         stats.files += ts.files;
         stats.nodes += ts.nodes;
         stats.edges += ts.edges;
+        stats.unparsed.extend(ts.unparsed);
         Ok(stats)
     }
 }

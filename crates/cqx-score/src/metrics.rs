@@ -125,6 +125,7 @@ pub struct Metrics {
     /// Product lines, in units of ten thousand — the denominator for densities.
     pub scale: f64,
     pub lines: u64,
+    pub skipped_files: Vec<serde_json::Value>,
     values: HashMap<String, Measure>,
 }
 
@@ -224,6 +225,10 @@ impl Metrics {
                 },
             );
         }
+        metrics.skipped_files.extend(ts_metrics.skipped_files);
+        metrics.skipped_files.sort_by(|a, b| {
+            a["file"].as_str().cmp(&b["file"].as_str())
+        });
         metrics.lines += ts_metrics.lines;
         metrics.scale = (metrics.lines as f64 / 10_000.0).max(0.05);
         metrics.locate(stream);
@@ -231,6 +236,13 @@ impl Metrics {
     }
 
     fn compute_one(stream: &Stream, config: &Config) -> Metrics {
+        let typescript = stream.nodes.iter().any(|n| {
+            n.attrs.get("language").and_then(|v| v.as_str()) == Some("typescript")
+        });
+        let skipped_files = stream.nodes.iter().filter_map(|n| {
+            let reason = n.attrs.get("skipped")?.as_str()?;
+            Some(serde_json::json!({"file": n.attrs.get("path")?, "reason": reason}))
+        }).collect();
         let exclude = &config.exclude;
         let excluded = |path: &str| exclude.iter().any(|p| path.starts_with(p.as_str()));
 
@@ -248,7 +260,10 @@ impl Metrics {
         let mut lines = 0u64;
         let mut files: Vec<(String, u64)> = Vec::new();
         for node in &stream.nodes {
-            if node.kind != NodeKind::File || test_files.contains(node.id.0.as_str()) {
+            if node.kind != NodeKind::File
+                || node.attrs.contains_key("skipped")
+                || test_files.contains(node.id.0.as_str())
+            {
                 continue;
             }
             let path = node.attrs.get("path").and_then(|v| v.as_str()).unwrap_or("");
@@ -287,7 +302,12 @@ impl Metrics {
         }
         let in_product = |sym: &str| -> bool {
             match symbol_file.get(sym) {
-                Some(file) => !test_files.contains(*file) && !excluded(file.trim_start_matches("file:")),
+                // Keep main's Rust exclusions and duplicate locations intact;
+                // source-aware exclusion/location changes apply only to TS.
+                Some(file) => {
+                    !test_files.contains(*file)
+                        && (!typescript || !excluded(file.trim_start_matches("file:")))
+                }
                 None => true,
             }
         };
@@ -401,13 +421,15 @@ impl Metrics {
                 v.iter().skip(1).map(|id| {
                     let what = format!("copy of {}", v[0].trim_start_matches("sym:"));
                     match symbol_location.get(*id) {
-                        Some(edge) => finding(what, edge),
-                        None => about(what, id.trim_start_matches("sym:"), 0),
+                        Some(edge) if typescript => finding(what, edge),
+                        _ => about(what, id.trim_start_matches("sym:"), 0),
                     }
                 })
             })
             .collect();
-        dup.sort_by(|a, b| (&a.file, a.line).cmp(&(&b.file, b.line)));
+        if typescript {
+            dup.sort_by(|a, b| (&a.file, a.line).cmp(&(&b.file, b.line)));
+        }
         density("duplicated-bodies", dup);
 
         // A crate whose signatures are mostly built from other crates' types,
@@ -703,6 +725,7 @@ impl Metrics {
         let mut metrics = Metrics {
             scale,
             lines,
+            skipped_files,
             values,
         };
         metrics.locate(stream);
