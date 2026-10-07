@@ -1,0 +1,791 @@
+{
+  "manifest": {
+    "version": "0.1.24",
+    "abi_version": 1,
+    "modules": {
+      "core": {
+        "file": "core.wasm",
+        "languages": [
+          "rust",
+          "typescript",
+          "javascript",
+          "go",
+          "java",
+          "kotlin",
+          "swift",
+          "zig",
+          "python",
+          "php"
+        ],
+        "extensions": [
+          "rs",
+          "ts",
+          "tsx",
+          "js",
+          "jsx",
+          "mjs",
+          "cjs",
+          "mts",
+          "cts",
+          "go",
+          "java",
+          "kt",
+          "kts",
+          "swift",
+          "zig",
+          "py",
+          "php"
+        ],
+        "version": "0.1.24",
+        "abi_version": 1,
+        "sha256": "eae6457f56fbe22a57848f1dd1616cbcbe9ebc6cbee000dfeb4db28d0ab30256"
+      },
+      "c": {
+        "file": "c.wasm",
+        "languages": [
+          "c",
+          "cpp"
+        ],
+        "extensions": [
+          "c",
+          "h",
+          "cc",
+          "cpp",
+          "cxx",
+          "hpp",
+          "hh",
+          "hxx",
+          "C",
+          "H"
+        ],
+        "version": "0.1.24",
+        "abi_version": 1,
+        "sha256": "b28df608208de757f205f0a96204ca3599ccc3af5aff86732999074bb774777c"
+      },
+      "csharp": {
+        "file": "csharp.wasm",
+        "languages": [
+          "csharp"
+        ],
+        "extensions": [
+          "cs",
+          "csx"
+        ],
+        "version": "0.1.24",
+        "abi_version": 1,
+        "sha256": "fbe8fd760e5b84b67e4ace50c2b7f197f492de84399d4f3f23191199fb034ebd"
+      }
+    }
+  },
+  "cases": {
+    "rust-compat": {
+      "report_sha256": "7d8246ce417d1c2bdb7bc73e3e21a2515536c0e1dc979d603e5bbe49f6f2768e",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 102.33817099999999,
+      "scores": {
+        "containment": 70,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 60,
+        "security": 100
+      },
+      "product_lines": 59,
+      "coverage": {
+        "rust": {
+          "parsed": 2,
+          "skipped": 0
+        }
+      },
+      "rules": [
+        {
+          "language": "rust",
+          "rule": "duplicated-bodies",
+          "findings": 2,
+          "deducted": 10
+        },
+        {
+          "language": "rust",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 30
+        },
+        {
+          "language": "rust",
+          "rule": "result-string-density",
+          "findings": 1,
+          "deducted": 30
+        }
+      ]
+    },
+    "typescript": {
+      "report_sha256": "46345dbc926e97afe28bd90f59402905ea45fa8be862fa1abf4230adc93cc97c",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 24.42208999999997,
+      "scores": {
+        "containment": 100,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 80,
+        "security": 83
+      },
+      "product_lines": 7,
+      "coverage": {
+        "typescript": {
+          "parsed": 2,
+          "skipped": 1
+        }
+      },
+      "rules": [
+        {
+          "language": "typescript",
+          "rule": "dynamic-code",
+          "findings": 1,
+          "deducted": 17
+        },
+        {
+          "language": "typescript",
+          "rule": "swallowed-errors",
+          "findings": 1,
+          "deducted": 10
+        },
+        {
+          "language": "typescript",
+          "rule": "undocumented-suppressions",
+          "findings": 1,
+          "deducted": 10
+        }
+      ]
+    },
+    "go": {
+      "report_sha256": "d4d00e96b8bfe362825f9dd193aa267a9c0a2eae947ec6e1d17c188aa5f54c95",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 12.880440000000021,
+      "scores": {
+        "containment": 70,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 90,
+        "security": 93
+      },
+      "product_lines": 17,
+      "coverage": {
+        "go": {
+          "parsed": 4,
+          "skipped": 0
+        }
+      },
+      "rules": [
+        {
+          "language": "go",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 30
+        },
+        {
+          "language": "go",
+          "rule": "shell-invocation",
+          "findings": 1,
+          "deducted": 7
+        },
+        {
+          "language": "go",
+          "rule": "undocumented-suppressions",
+          "findings": 1,
+          "deducted": 10
+        }
+      ]
+    },
+    "java": {
+      "report_sha256": "d6c90c6b3cfe2c72e95b72da970793c690755da62b96cb8f1f221b575f14c896",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 18.06999400000001,
+      "scores": {
+        "containment": 93,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 100,
+        "security": 85
+      },
+      "product_lines": 1,
+      "coverage": {
+        "java": {
+          "parsed": 2,
+          "skipped": 1
+        }
+      },
+      "rules": [
+        {
+          "language": "java",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 7
+        },
+        {
+          "language": "java",
+          "rule": "nonliteral-process",
+          "findings": 1,
+          "deducted": 15
+        }
+      ]
+    },
+    "kotlin": {
+      "report_sha256": "993c6cc9439083f68c214620ed70585f89d6c49986bdffe046fea9842d1a34d4",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 11.143659000000014,
+      "scores": {
+        "containment": 93,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 100,
+        "security": 85
+      },
+      "product_lines": 1,
+      "coverage": {
+        "kotlin": {
+          "parsed": 2,
+          "skipped": 1
+        }
+      },
+      "rules": [
+        {
+          "language": "kotlin",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 7
+        },
+        {
+          "language": "kotlin",
+          "rule": "nonliteral-process",
+          "findings": 1,
+          "deducted": 15
+        }
+      ]
+    },
+    "swift": {
+      "report_sha256": "774b96287e0211deba36aa1d1a451d16eaab7e64b45d863bc15eb53859633c1f",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 10.791537000000005,
+      "scores": {
+        "containment": 93,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 100,
+        "security": 85
+      },
+      "product_lines": 2,
+      "coverage": {
+        "swift": {
+          "parsed": 1,
+          "skipped": 1
+        }
+      },
+      "rules": [
+        {
+          "language": "swift",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 7
+        },
+        {
+          "language": "swift",
+          "rule": "nonliteral-process",
+          "findings": 1,
+          "deducted": 15
+        }
+      ]
+    },
+    "zig": {
+      "report_sha256": "984891ab79b18bac9af2b89010cf66b0477c5832ef680da6042a2952b84ac724",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 11.239600999999993,
+      "scores": {
+        "containment": 93,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 100,
+        "security": 85
+      },
+      "product_lines": 2,
+      "coverage": {
+        "zig": {
+          "parsed": 1,
+          "skipped": 1
+        }
+      },
+      "rules": [
+        {
+          "language": "zig",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 7
+        },
+        {
+          "language": "zig",
+          "rule": "nonliteral-process",
+          "findings": 1,
+          "deducted": 15
+        }
+      ]
+    },
+    "python": {
+      "report_sha256": "184d46a2466848a2f83167a0b2d96d434af40085e7bddaf96ae2e6745dde2e4a",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 12.869513999999981,
+      "scores": {
+        "containment": 93,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 100,
+        "security": 85
+      },
+      "product_lines": 2,
+      "coverage": {
+        "python": {
+          "parsed": 1,
+          "skipped": 1
+        }
+      },
+      "rules": [
+        {
+          "language": "python",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 7
+        },
+        {
+          "language": "python",
+          "rule": "nonliteral-process",
+          "findings": 1,
+          "deducted": 15
+        }
+      ]
+    },
+    "php": {
+      "report_sha256": "40014fad6fe1a073e09b9a4727ecce91b27c76deb4d2850cfc68c8e781267868",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 10.792605999999978,
+      "scores": {
+        "containment": 93,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 100,
+        "security": 85
+      },
+      "product_lines": 4,
+      "coverage": {
+        "php": {
+          "parsed": 2,
+          "skipped": 1
+        }
+      },
+      "rules": [
+        {
+          "language": "php",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 7
+        },
+        {
+          "language": "php",
+          "rule": "nonliteral-process",
+          "findings": 1,
+          "deducted": 15
+        }
+      ]
+    },
+    "c-cpp": {
+      "report_sha256": "c86a52ed9ac33b218a69741a42d1b0f4f5e7684140d38a57336af06da37c10e6",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 52.40268399999991,
+      "scores": {
+        "containment": 92,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 100,
+        "security": 80
+      },
+      "product_lines": 6,
+      "coverage": {
+        "c": {
+          "parsed": 2,
+          "skipped": 0
+        },
+        "cpp": {
+          "parsed": 1,
+          "skipped": 1
+        }
+      },
+      "rules": [
+        {
+          "language": "c",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 7
+        },
+        {
+          "language": "c",
+          "rule": "shell-argument-unchecked",
+          "findings": 1,
+          "deducted": 30
+        },
+        {
+          "language": "cpp",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 11
+        }
+      ]
+    },
+    "csharp": {
+      "report_sha256": "216f708af40e105ee29424447a297a914f81c67fc4bfd9f111ae84c817fbed2f",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 70.69806500000004,
+      "scores": {
+        "containment": 93,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 100,
+        "security": 85
+      },
+      "product_lines": 1,
+      "coverage": {
+        "csharp": {
+          "parsed": 2,
+          "skipped": 1
+        }
+      },
+      "rules": [
+        {
+          "language": "csharp",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 7
+        },
+        {
+          "language": "csharp",
+          "rule": "nonliteral-process",
+          "findings": 1,
+          "deducted": 15
+        }
+      ]
+    },
+    "heavy-discovery": {
+      "report_sha256": "ac940284924184d16b27b5e165af8331be6c8a4acf5b3edd7c270d356bf2e04c",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 18.666086999999948,
+      "scores": {
+        "containment": 80,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 100,
+        "security": 90
+      },
+      "product_lines": 3,
+      "coverage": {
+        "typescript": {
+          "parsed": 1,
+          "skipped": 0
+        },
+        "python": {
+          "parsed": 1,
+          "skipped": 0
+        }
+      },
+      "rules": [
+        {
+          "language": "python",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 30
+        },
+        {
+          "language": "typescript",
+          "rule": "dynamic-code",
+          "findings": 1,
+          "deducted": 30
+        }
+      ]
+    },
+    "six-language": {
+      "report_sha256": "cb2c3949b45e6a330298a1ec911283e06e2a9ea33b6f72aa72246e89f2fd1488",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 27.104937000000064,
+      "scores": {
+        "containment": 78,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 100,
+        "security": 97
+      },
+      "product_lines": 10,
+      "coverage": {
+        "rust": {
+          "parsed": 1,
+          "skipped": 0
+        },
+        "typescript": {
+          "parsed": 1,
+          "skipped": 0
+        },
+        "go": {
+          "parsed": 1,
+          "skipped": 0
+        },
+        "c": {
+          "parsed": 1,
+          "skipped": 0
+        },
+        "cpp": {
+          "parsed": 1,
+          "skipped": 0
+        },
+        "csharp": {
+          "parsed": 1,
+          "skipped": 0
+        }
+      },
+      "rules": [
+        {
+          "language": "c",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 7
+        },
+        {
+          "language": "cpp",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 30
+        },
+        {
+          "language": "csharp",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 30
+        },
+        {
+          "language": "rust",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 30
+        },
+        {
+          "language": "go",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 30
+        },
+        {
+          "language": "typescript",
+          "rule": "dynamic-code",
+          "findings": 1,
+          "deducted": 30
+        }
+      ]
+    },
+    "header-and-layout": {
+      "report_sha256": "5c209e5f7b93436fdbfacf76741bb9dcfe2bcf0eeb12a81320ca77cae854e363",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 28.236594999999966,
+      "scores": {
+        "containment": 70,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 100,
+        "security": 100
+      },
+      "product_lines": 12,
+      "coverage": {
+        "c": {
+          "parsed": 4,
+          "skipped": 0
+        },
+        "cpp": {
+          "parsed": 2,
+          "skipped": 0
+        },
+        "csharp": {
+          "parsed": 3,
+          "skipped": 0
+        }
+      },
+      "rules": [
+        {
+          "language": "c",
+          "rule": "exit-in-library",
+          "findings": 3,
+          "deducted": 30
+        },
+        {
+          "language": "cpp",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 30
+        },
+        {
+          "language": "csharp",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 30
+        }
+      ]
+    },
+    "redis": {
+      "report_sha256": "aa3933abcf689d78d745f2813752a83e5f765a1e64ca686a74e1d548e8165e2e",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 7012.048663,
+      "scores": {
+        "containment": 98,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 100,
+        "security": 100
+      },
+      "product_lines": 74682,
+      "coverage": {
+        "typescript": {
+          "parsed": 1,
+          "skipped": 0
+        },
+        "python": {
+          "parsed": 50,
+          "skipped": 0
+        },
+        "c": {
+          "parsed": 143,
+          "skipped": 50
+        },
+        "cpp": {
+          "parsed": 82,
+          "skipped": 5
+        }
+      },
+      "rules": [
+        {
+          "language": "c",
+          "rule": "duplicated-bodies",
+          "findings": 1,
+          "deducted": 0
+        },
+        {
+          "language": "c",
+          "rule": "exit-in-library",
+          "findings": 13,
+          "deducted": 2.3
+        },
+        {
+          "language": "c",
+          "rule": "oversized-files",
+          "findings": 13,
+          "deducted": 0
+        },
+        {
+          "language": "python",
+          "rule": "exit-in-library",
+          "findings": 3,
+          "deducted": 21.4
+        },
+        {
+          "language": "python",
+          "rule": "swallowed-errors",
+          "findings": 1,
+          "deducted": 5.3
+        }
+      ],
+      "revision": "e1d873123a15a37c65c876cdf7cb6450a0b5a58b"
+    },
+    "double-conversion": {
+      "report_sha256": "f9a8bb90dc05db5feb9995c5df062cfd435bb8b70bb2348c0134ba42afb9a4bf",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 18963.148892,
+      "scores": {
+        "containment": 100,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 94,
+        "security": 100
+      },
+      "product_lines": 4839,
+      "coverage": {
+        "cpp": {
+          "parsed": 35,
+          "skipped": 5
+        }
+      },
+      "rules": [
+        {
+          "language": "cpp",
+          "rule": "duplicated-bodies",
+          "findings": 1,
+          "deducted": 6.3
+        }
+      ],
+      "revision": "080217fda2b360f4d8466680b17d8900870b4940"
+    },
+    "humanizer": {
+      "report_sha256": "f6db1b340cf477b0e48e052cdcaaa5d13fd2d916bf3a1ecc5be4baf61f243ccc",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 10221.534903,
+      "scores": {
+        "containment": 100,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 90,
+        "security": 100
+      },
+      "product_lines": 70131,
+      "coverage": {
+        "typescript": {
+          "parsed": 30,
+          "skipped": 0
+        },
+        "python": {
+          "parsed": 1,
+          "skipped": 0
+        },
+        "csharp": {
+          "parsed": 728,
+          "skipped": 7
+        }
+      },
+      "rules": [
+        {
+          "language": "csharp",
+          "rule": "duplicated-bodies",
+          "findings": 22,
+          "deducted": 10
+        },
+        {
+          "language": "csharp",
+          "rule": "oversized-files",
+          "findings": 11,
+          "deducted": 0
+        },
+        {
+          "language": "csharp",
+          "rule": "swallowed-errors",
+          "findings": 1,
+          "deducted": 0
+        }
+      ],
+      "revision": "e4da08c5e631975e15bb98ae020aede819d376ca"
+    }
+  }
+}

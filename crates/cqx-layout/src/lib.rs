@@ -19,7 +19,11 @@ impl Default for Layout {
 pub fn is_manifest(name: &str) -> bool {
     matches!(
         name,
-        "pom.xml"
+        "CMakeLists.txt"
+            | "Makefile"
+            | "meson.build"
+            | "configure.ac"
+            | "pom.xml"
             | "build.gradle"
             | "build.gradle.kts"
             | "settings.gradle"
@@ -118,6 +122,42 @@ impl Layout {
                             || p.starts_with("__tests__/")
                     })
             }
+            "c" | "cpp" => {
+                self.relatives(path).any(|p| {
+                    p.split_once('/').is_some_and(|(dir, _)| {
+                        matches!(
+                            dir,
+                            "test"
+                                | "tests"
+                                | "testing"
+                                | "unittest"
+                                | "unittests"
+                                | "fuzz"
+                                | "fuzzing"
+                        )
+                    })
+                }) || name.starts_with("test_")
+                    || name.contains("_test.")
+                    || name.contains("_tests.")
+            }
+            "csharp" => {
+                self.relatives(path).any(|p| {
+                    p.split_once('/').is_some_and(|(dir, _)| {
+                        matches!(
+                            dir.to_ascii_lowercase().as_str(),
+                            "test" | "tests" | "benchmarks"
+                        )
+                    })
+                }) || self.roots.iter().any(|root| {
+                    path.starts_with(root)
+                        && root
+                            .trim_end_matches('/')
+                            .rsplit('/')
+                            .next()
+                            .is_some_and(|name| name.ends_with(".Tests") || name.ends_with(".Test"))
+                }) || name.ends_with("Tests.cs")
+                    || name.ends_with("Test.cs")
+            }
             "rust" => self.relatives(path).any(|p| p.starts_with("tests/")),
             _ => false,
         }
@@ -156,6 +196,13 @@ pub fn excluded_name(language: &str, name: &str) -> bool {
                     | ".wrangler"
                     | ".turbo"
             ),
+            "c" | "cpp" => {
+                matches!(
+                    name,
+                    "deps" | "third_party" | "third-party" | "external" | "out" | "_deps"
+                ) || name.starts_with("cmake-build-")
+            }
+            "csharp" => matches!(name, "obj" | "bin" | "packages"),
             "go" | "rust" => false,
             "" => ["java", "swift", "zig", "python", "php", "typescript"]
                 .iter()
@@ -289,6 +336,58 @@ pub fn broad_directive(language: &str, comment: &str) -> bool {
         .trim();
     let comment = comment.split_once("--").map_or(comment, |(c, _)| c).trim();
     match language {
+        "c" | "cpp" => {
+            if comment.starts_with("NOLINTEND") {
+                return false;
+            }
+            for directive in ["NOLINTNEXTLINE", "NOLINTBEGIN", "NOLINT"] {
+                if let Some(tail) = comment.strip_prefix(directive) {
+                    if !(tail.is_empty() || tail.starts_with(['(', ' '])) {
+                        continue;
+                    }
+                    let codes: Vec<_> = tail
+                        .strip_prefix('(')
+                        .and_then(|s| s.split_once(')'))
+                        .into_iter()
+                        .flat_map(|(s, _)| s.split(','))
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    return broad_suppression(SuppressionScope::Member, &codes);
+                }
+            }
+            if let Some(tail) = comment
+                .strip_prefix("pragma ")
+                .and_then(|s| s.strip_prefix("GCC ").or_else(|| s.strip_prefix("clang ")))
+                .and_then(|s| s.strip_prefix("diagnostic ignored "))
+            {
+                // A directive must name a quoted warning code. Prose or an
+                // incomplete pragma is not an empty (blanket) suppression.
+                if let Some((code, _)) = tail
+                    .trim()
+                    .strip_prefix('"')
+                    .and_then(|s| s.split_once('"'))
+                    .filter(|(code, _)| !code.is_empty())
+                {
+                    return broad_suppression(SuppressionScope::Member, &[code]);
+                }
+            }
+            false
+        }
+        "csharp" => {
+            let Some(tail) = comment.strip_prefix("pragma warning disable") else {
+                return false;
+            };
+            let codes: Vec<_> = tail
+                .split("//")
+                .next()
+                .unwrap_or("")
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .collect();
+            broad_suppression(SuppressionScope::Member, &codes)
+        }
         "python" => {
             if let Some(tail) = comment.strip_prefix("noqa") {
                 if !(tail.is_empty() || tail.starts_with([':', ' ', '#'])) {

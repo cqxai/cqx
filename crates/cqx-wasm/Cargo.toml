@@ -10,14 +10,16 @@ description = "The cqx analysis, callable from a browser."
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["core"]
-core = []
+default = ["core", "c", "csharp"]
+core = ["cqx-analysis/core", "dep:cqx-score", "dep:cqx-store"]
+c = ["cqx-analysis/c"]
+csharp = ["cqx-analysis/csharp"]
 
 [dependencies]
-cqx-analysis = { path = "../cqx-analysis" }
+cqx-analysis = { path = "../cqx-analysis", default-features = false }
 cqx-rust = { path = "../cqx-rust" }
-cqx-score = { path = "../cqx-score" }
-cqx-store = { path = "../cqx-store" }
+cqx-score = { path = "../cqx-score", optional = true }
+cqx-store = { path = "../cqx-store", optional = true }
 cqx-view = { path = "../cqx-view" }
 cqx-vfs = { workspace = true }
 serde_json = { workspace = true }

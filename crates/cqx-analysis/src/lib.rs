@@ -11,20 +11,34 @@ pub fn manifests(vfs: &Vfs) -> Result<Value, String> {
     } else {
         serde_json::json!({ "packages": [] })
     };
-    metadata["typescript_bins"] = serde_json::json!(cqx_ts::entry_files(vfs));
+    #[cfg(feature = "core")]
+    {
+        metadata["typescript_bins"] = serde_json::json!(cqx_ts::entry_files(vfs));
+        metadata["python_entries"] = serde_json::json!(cqx_python::entry_files(vfs));
+        metadata["php"] = serde_json::json!(cqx_php::metadata(vfs));
+        metadata["go_modules"] = serde_json::json!(cqx_go::modules(vfs));
+    }
+    metadata["cpp_headers"] = serde_json::json!(vfs.paths().any(|p| matches!(
+        p.rsplit('.').next(),
+        Some("cc" | "cpp" | "cxx" | "hpp" | "hh" | "hxx" | "C" | "H")
+    )));
     metadata["layout"] = serde_json::json!(cqx_layout::Layout::from_paths(vfs.paths()));
-    metadata["python_entries"] = serde_json::json!(cqx_python::entry_files(vfs));
-    metadata["php"] = serde_json::json!(cqx_php::metadata(vfs));
-    metadata["go_modules"] = serde_json::json!(cqx_go::modules(vfs));
     Ok(metadata)
 }
 
 pub struct Prepared {
+    #[cfg(feature = "core")]
     rust: cqx_rust::extract::Prepared,
+    #[cfg(feature = "core")]
     bins: std::collections::BTreeSet<String>,
+    #[cfg(feature = "core")]
     go: cqx_go::Prepared,
     layout: cqx_layout::Layout,
+    #[cfg(feature = "c")]
+    cpp_headers: bool,
+    #[cfg(feature = "core")]
     python_entries: std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
+    #[cfg(feature = "core")]
     php: cqx_php::Metadata,
 }
 
@@ -34,6 +48,7 @@ pub fn prepare_reporting(
     total: &dyn Fn(u32),
     tick: &dyn Fn(),
 ) -> Result<Prepared, ExtractError> {
+    #[cfg(feature = "core")]
     let bins = metadata["typescript_bins"]
         .as_array()
         .into_iter()
@@ -42,11 +57,16 @@ pub fn prepare_reporting(
         .collect();
     let layout = serde_json::from_value(metadata["layout"].clone())
         .unwrap_or_else(|_| cqx_layout::Layout::from_paths(vfs.paths()));
+    #[cfg(feature = "core")]
     let python_entries =
         serde_json::from_value(metadata["python_entries"].clone()).unwrap_or_default();
+    #[cfg(feature = "core")]
     let php = serde_json::from_value(metadata["php"].clone()).unwrap_or_default();
+    #[cfg(feature = "core")]
     let go_modules = serde_json::from_value(metadata["go_modules"].clone()).unwrap_or_default();
+    #[cfg(feature = "core")]
     let go_files = vfs.paths().filter(|p| cqx_go::is_source(p)).count() as u32;
+    #[cfg(feature = "core")]
     let extra_files = vfs
         .paths()
         .filter(|p| {
@@ -58,27 +78,59 @@ pub fn prepare_reporting(
                 || cqx_php::is_source_in(vfs, p, &php)
         })
         .count() as u32;
+    #[cfg(feature = "core")]
     let ts_files = vfs.paths().filter(|p| cqx_ts::is_source(p)).count() as u32;
+    #[cfg(feature = "c")]
+    let c_files = vfs.paths().filter(|p| cqx_c::is_source(p)).count() as u32;
+    #[cfg(not(feature = "c"))]
+    let c_files = 0;
+    #[cfg(feature = "csharp")]
+    let cs_files = vfs.paths().filter(|p| cqx_csharp::is_source(p)).count() as u32;
+    #[cfg(not(feature = "csharp"))]
+    let cs_files = 0;
+    #[cfg(not(feature = "core"))]
+    {
+        total(c_files + cs_files);
+        let _ = tick;
+    }
+    #[cfg(feature = "c")]
+    let cpp_headers = metadata["cpp_headers"].as_bool().unwrap_or(false);
+    #[cfg(feature = "core")]
     let rust = cqx_rust::extract::prepare_reporting(
         vfs,
         metadata,
-        &|n| total(n + ts_files + go_files + extra_files),
+        &|n| total(n + ts_files + go_files + extra_files + c_files + cs_files),
         tick,
     )?;
+    #[cfg(feature = "core")]
     let go = cqx_go::prepare_with_layout(vfs, go_modules, tick, layout.clone())?;
     Ok(Prepared {
+        #[cfg(feature = "core")]
         rust,
+        #[cfg(feature = "core")]
         bins,
+        #[cfg(feature = "core")]
         go,
         layout,
+        #[cfg(feature = "c")]
+        cpp_headers,
+        #[cfg(feature = "core")]
         python_entries,
+        #[cfg(feature = "core")]
         php,
     })
 }
 
 impl Prepared {
     pub fn gathered(&self) -> cqx_rust::prepass::PackageFacts {
-        self.rust.gathered()
+        #[cfg(feature = "core")]
+        {
+            self.rust.gathered()
+        }
+        #[cfg(not(feature = "core"))]
+        {
+            cqx_rust::prepass::PackageFacts::default()
+        }
     }
     pub fn emit(
         &self,
@@ -95,33 +147,73 @@ impl Prepared {
         mut out: impl std::io::Write,
         tick: &dyn Fn(),
     ) -> Result<Stats, ExtractError> {
+        #[cfg(feature = "core")]
         let mut stats = self.rust.emit(vfs, facts, &mut out)?;
-        let ts = cqx_ts::run_with_layout(vfs, &mut out, &self.bins, tick, &self.layout)?;
-        stats.packages += usize::from(ts.files > 0);
-        stats.files += ts.files;
-        stats.nodes += ts.nodes;
-        stats.edges += ts.edges;
-        let go = self.go.emit(vfs, &mut out)?;
-        stats.packages += go.packages;
-        stats.files += go.files;
-        stats.nodes += go.nodes;
-        stats.edges += go.edges;
-        for extra in [
-            cqx_java::run_with_layout(vfs, &mut out, &self.layout, tick)?,
-            cqx_kotlin::run_with_layout(vfs, &mut out, tick, &self.layout)?,
-            cqx_swift::run_with_layout(vfs, &mut out, tick, &self.layout)?,
-            cqx_zig::run_with_layout(vfs, &mut out, tick, &self.layout)?,
-            cqx_python::run_with_layout(vfs, &mut out, tick, &self.python_entries, &self.layout)?,
-            cqx_php::run_with_layout(vfs, &mut out, tick, &self.php, &self.layout)?,
-        ] {
+        #[cfg(not(feature = "core"))]
+        let mut stats = {
+            let _ = facts;
+            Stats {
+                packages: 0,
+                files: 0,
+                nodes: 0,
+                edges: 0,
+                unparsed: Vec::new(),
+            }
+        };
+        #[cfg(feature = "core")]
+        {
+            let ts = cqx_ts::run_with_layout(vfs, &mut out, &self.bins, tick, &self.layout)?;
+            stats.packages += usize::from(ts.files > 0);
+            stats.files += ts.files;
+            stats.nodes += ts.nodes;
+            stats.edges += ts.edges;
+            let go = self.go.emit(vfs, &mut out)?;
+            stats.packages += go.packages;
+            stats.files += go.files;
+            stats.nodes += go.nodes;
+            stats.edges += go.edges;
+            for extra in [
+                cqx_java::run_with_layout(vfs, &mut out, &self.layout, tick)?,
+                cqx_kotlin::run_with_layout(vfs, &mut out, tick, &self.layout)?,
+                cqx_swift::run_with_layout(vfs, &mut out, tick, &self.layout)?,
+                cqx_zig::run_with_layout(vfs, &mut out, tick, &self.layout)?,
+                cqx_python::run_with_layout(
+                    vfs,
+                    &mut out,
+                    tick,
+                    &self.python_entries,
+                    &self.layout,
+                )?,
+                cqx_php::run_with_layout(vfs, &mut out, tick, &self.php, &self.layout)?,
+            ] {
+                stats.packages += usize::from(extra.files > 0);
+                stats.files += extra.files;
+                stats.nodes += extra.nodes;
+                stats.edges += extra.edges;
+                stats.unparsed.extend(extra.unparsed);
+            }
+            stats.unparsed.extend(ts.unparsed);
+            stats.unparsed.extend(go.unparsed);
+        }
+        #[cfg(feature = "c")]
+        {
+            let extra =
+                cqx_c::run_with_layout(vfs, &mut out, self.cpp_headers, tick, &self.layout)?;
             stats.packages += usize::from(extra.files > 0);
             stats.files += extra.files;
             stats.nodes += extra.nodes;
             stats.edges += extra.edges;
             stats.unparsed.extend(extra.unparsed);
         }
-        stats.unparsed.extend(ts.unparsed);
-        stats.unparsed.extend(go.unparsed);
+        #[cfg(feature = "csharp")]
+        {
+            let extra = cqx_csharp::run_with_layout(vfs, &mut out, tick, &self.layout)?;
+            stats.packages += usize::from(extra.files > 0);
+            stats.files += extra.files;
+            stats.nodes += extra.nodes;
+            stats.edges += extra.edges;
+            stats.unparsed.extend(extra.unparsed);
+        }
         Ok(stats)
     }
 }
@@ -160,7 +252,7 @@ pub const EXTRACT_COMMAND: CommandSpec = CommandSpec {
     owner: "cqx-analysis",
     category: "index",
     summary:
-        "Read Rust, Go, Java, Kotlin, Swift, Zig, Python, PHP, TypeScript and JavaScript and emit facts as newline-delimited JSON",
+        "Read Rust, Go, Java, Kotlin, Swift, Zig, Python, PHP, C, C++, C#, TypeScript and JavaScript and emit facts as newline-delimited JSON",
     // `scan` was an alias here. It is now its own command — the one the front
     // page has always shown — and the registry took the second registration
     // without a word, so `cqx scan` quietly went on emitting facts.

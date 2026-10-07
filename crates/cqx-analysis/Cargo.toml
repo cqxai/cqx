@@ -6,18 +6,26 @@ license.workspace = true
 repository.workspace = true
 description = "Shared language dispatch for cqx snapshots."
 
+[features]
+default = ["core", "c", "csharp"]
+core = ["dep:cqx-go", "dep:cqx-ts", "dep:cqx-java", "dep:cqx-kotlin", "dep:cqx-swift", "dep:cqx-zig", "dep:cqx-python", "dep:cqx-php"]
+c = ["dep:cqx-c"]
+csharp = ["dep:cqx-csharp"]
+
 [dependencies]
+cqx-c = { path = "../cqx-c", optional = true }
+cqx-csharp = { path = "../cqx-csharp", optional = true }
 cqx-layout = { path = "../cqx-layout" }
 cqx-rust = { path = "../cqx-rust" }
-cqx-go = { path = "../cqx-go" }
-cqx-ts = { path = "../cqx-ts" }
+cqx-go = { path = "../cqx-go", optional = true }
+cqx-ts = { path = "../cqx-ts", optional = true }
 cqx-vfs.workspace = true
 serde_json.workspace = true
 deka-cli-core.workspace = true
 
-cqx-java = { path = "../cqx-java" }
-cqx-kotlin = { path = "../cqx-kotlin" }
-cqx-swift = { path = "../cqx-swift" }
-cqx-zig = { path = "../cqx-zig" }
-cqx-python = { path = "../cqx-python" }
-cqx-php = { path = "../cqx-php" }
+cqx-java = { path = "../cqx-java", optional = true }
+cqx-kotlin = { path = "../cqx-kotlin", optional = true }
+cqx-swift = { path = "../cqx-swift", optional = true }
+cqx-zig = { path = "../cqx-zig", optional = true }
+cqx-python = { path = "../cqx-python", optional = true }
+cqx-php = { path = "../cqx-php", optional = true }

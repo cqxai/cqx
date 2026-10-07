@@ -74,7 +74,7 @@ export function createLoader({ manifest, manifestSha256, baseURL, fetchBytes, co
   if (manifest?.abi_version !== ABI_VERSION || typeof manifest.version !== 'string' || !manifest.modules?.core) fail('unsupported manifest version/ABI or missing core');
   for (const [id, entry] of Object.entries(manifest.modules)) {
     const descriptor = MODULES[id];
-    if (!descriptor || entry.version !== manifest.version || entry.abi_version !== ABI_VERSION) fail(`module ${id}: version/ABI mismatch`);
+    if (!descriptor || !entry || entry.version !== manifest.version || entry.abi_version !== ABI_VERSION) fail(`module ${id}: version/ABI mismatch`);
     if (!/^[a-f0-9]{64}$/.test(entry.sha256) || entry.file !== `${id}.wasm`) fail(`module ${id}: invalid file/hash`);
     for (const key of ['extensions', 'languages']) {
       if (JSON.stringify(entry[key]) !== JSON.stringify(descriptor[key])) fail(`module ${id}: invalid ${key} routing`);
@@ -120,7 +120,7 @@ export function createLoader({ manifest, manifestSha256, baseURL, fetchBytes, co
     } catch (error) { fail(`load ${id}: ${error.message}`); }
   }
   return {
-    /** files: iterable [snapshot-relative path, UTF-8 source]. Returns one dataset. */
+    /** files: iterable [snapshot-relative path, UTF-8 source]. Returns {dataset, reportJson} from one core score. */
     async scan(files, { repo = '', label = repo, config = '' } = {}) {
       await verified();
       // Match Vfs normalization, deduplication and ordering before partitioning.
@@ -128,6 +128,7 @@ export function createLoader({ manifest, manifestSha256, baseURL, fetchBytes, co
       for (const [path, source] of files) normalized.set(path.replaceAll('\\', '/').replace(/^(?:\.\/)+/, '').replace(/^\/+/, ''), source);
       const all = [...normalized].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
       const selected = ['core', ...['c', 'csharp'].filter(id => all.some(([path]) => moduleFor(path) === id))];
+      for (const id of selected) if (!manifest.modules[id]) fail(`required module ${id} is missing from manifest`);
       const hosts = new Map();
       for (const id of selected) hosts.set(id, await load(id));
       const core = hosts.get('core');

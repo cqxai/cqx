@@ -112,7 +112,10 @@ fn respond(body: String) -> *mut u8 {
 pub extern "C" fn cqx_module_info() -> *mut u8 {
     respond(
         serde_json::json!({
-            "module": "core", "version": env!("CARGO_PKG_VERSION"), "abi_version": 1
+            "module": if cfg!(all(feature = "core", any(feature = "c", feature = "csharp"))) { "monolith" }
+            else if cfg!(feature = "core") { "core" }
+            else if cfg!(all(feature = "c", feature = "csharp")) { "heavy" }
+            else if cfg!(feature = "c") { "c" } else { "csharp" }, "version": env!("CARGO_PKG_VERSION"), "abi_version": 1
         })
         .to_string(),
     )
@@ -150,6 +153,7 @@ pub extern "C" fn cqx_file_count() -> usize {
 }
 
 /// Extracts the snapshot and returns the fact stream as newline-delimited JSON.
+#[cfg(feature = "core")]
 #[no_mangle]
 pub extern "C" fn cqx_facts() -> *mut u8 {
     let result = SNAPSHOT.with(|s| {
@@ -171,6 +175,7 @@ pub extern "C" fn cqx_facts() -> *mut u8 {
 ///
 /// # Safety
 /// `config` must point to `config_len` bytes of valid UTF-8.
+#[cfg(feature = "core")]
 #[no_mangle]
 pub unsafe extern "C" fn cqx_score(config: *const u8, config_len: usize) -> *mut u8 {
     let config_text = borrow(config, config_len);
@@ -197,6 +202,7 @@ pub unsafe extern "C" fn cqx_score(config: *const u8, config_len: usize) -> *mut
 /// # Safety
 /// Both pointers must reference that many bytes of valid UTF-8. `repo` names
 /// the repository — `<org>/<repo>` — and `config` is a cqx.json, or empty.
+#[cfg(feature = "core")]
 #[no_mangle]
 pub unsafe extern "C" fn cqx_dataset(
     repo: *const u8,
@@ -268,6 +274,7 @@ thread_local! {
     static MERGING: RefCell<cqx_rust::prepass::Shared> =
         RefCell::new(cqx_rust::prepass::Shared::default());
     /// The coordinator's running collection of what the readers wrote.
+    #[cfg(feature = "core")]
     static FOLDING: RefCell<cqx_store::facts::Stream> =
         RefCell::new(cqx_store::facts::Stream::default());
 }
@@ -279,6 +286,7 @@ thread_local! {
 /// reader holding part of the sources would discover fewer targets, and a file
 /// found under a different target is given a different module path. The
 /// manifests are small; it is the sources that are not.
+#[cfg(feature = "core")]
 #[no_mangle]
 pub extern "C" fn cqx_manifests() -> *mut u8 {
     let result = SNAPSHOT.with(|s| cqx_analysis::manifests(&s.borrow()));
@@ -411,6 +419,7 @@ pub extern "C" fn cqx_merge_done() -> *mut u8 {
 }
 
 /// Starts a fresh collection of facts.
+#[cfg(feature = "core")]
 #[no_mangle]
 pub extern "C" fn cqx_fold_reset() {
     FOLDING.with(|f| *f.borrow_mut() = cqx_store::facts::Stream::default());
@@ -423,6 +432,7 @@ pub extern "C" fn cqx_fold_reset() {
 ///
 /// # Safety
 /// `facts` must point to `facts_len` bytes of valid UTF-8.
+#[cfg(feature = "core")]
 #[no_mangle]
 pub unsafe extern "C" fn cqx_fold_add(facts: *const u8, facts_len: usize) -> *mut u8 {
     let text = borrow(facts, facts_len);
@@ -443,6 +453,7 @@ pub unsafe extern "C" fn cqx_fold_add(facts: *const u8, facts_len: usize) -> *mu
 ///
 /// # Safety
 /// Both pointers must reference that many bytes of valid UTF-8.
+#[cfg(feature = "core")]
 #[no_mangle]
 pub unsafe extern "C" fn cqx_fold_done(
     repo: *const u8,
@@ -461,6 +472,7 @@ pub unsafe extern "C" fn cqx_fold_done(
 ///
 /// # Safety
 /// Both pointers must reference that many bytes of valid UTF-8.
+#[cfg(feature = "core")]
 #[no_mangle]
 pub unsafe extern "C" fn cqx_finalize(
     repo: *const u8,
@@ -475,6 +487,7 @@ pub unsafe extern "C" fn cqx_finalize(
     ))
 }
 
+#[cfg(feature = "core")]
 fn finalize(repo: &str, config_text: &str, envelope: bool) -> String {
     let result = FOLDING.with(|f| -> Result<String, String> {
         let mut stream = f.borrow_mut();
@@ -507,6 +520,7 @@ fn finalize(repo: &str, config_text: &str, envelope: bool) -> String {
 }
 
 /// Pass the complete report to dataset consumers, including the language block.
+#[cfg(feature = "core")]
 fn score_report(
     stream: &cqx_store::facts::Stream,
     config: &cqx_score::config::Config,
@@ -517,6 +531,7 @@ fn score_report(
 
 /// Empty host config uses the repository's real cqx.json when supplied in the
 /// snapshot. Explicit text remains the existing ABI's config-file input.
+#[cfg(feature = "core")]
 fn snapshot_config(vfs: &Vfs, text: &str) -> Result<cqx_score::config::Config, String> {
     cqx_score::config::Config::from_text(if text.trim().is_empty() {
         vfs.read("cqx.json")
