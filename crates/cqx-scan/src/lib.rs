@@ -98,6 +98,7 @@ const SHOWN: usize = 8;
 /// the terminal around it. A command is a way to reach a library, not the
 /// place the work should live.
 pub struct Scanned {
+    scoring: cqx_score::Scoring,
     pub report: serde_json::Value,
     pub files: usize,
     pub lines: u64,
@@ -153,7 +154,7 @@ fn run(context: &Context) -> Result<(), String> {
         .args
         .params
         .get("--min-score")
-        .and_then(|s| s.parse::<u64>().ok())
+        .and_then(|s| s.parse::<u32>().ok())
     {
         if let Some(config) = here.report.get_mut("config") {
             config["min_score"] = serde_json::json!(min);
@@ -211,7 +212,11 @@ fn run(context: &Context) -> Result<(), String> {
         print_report(&here, against.as_ref().map(|(r, s)| (r.as_str(), s)));
     }
 
-    gate(context, &here, against.as_ref().map(|(r, s)| (r.as_str(), s)));
+    gate(
+        context,
+        &here,
+        against.as_ref().map(|(r, s)| (r.as_str(), s)),
+    );
     Ok(())
 }
 
@@ -260,6 +265,7 @@ pub fn tree(root: &Path, config_path: Option<&Path>, quote: bool) -> Result<Scan
     });
 
     Ok(Scanned {
+        scoring: cqx_score::evaluate(&config, &metrics),
         lines: metrics.lines,
         files,
         paths,
@@ -349,7 +355,9 @@ fn gate(context: &Context, here: &Scanned, against: Option<(&str, &Scanned)>) {
     if let Some((reference, before)) = against {
         let was: std::collections::BTreeMap<String, u64> = before.scores().into_iter().collect();
         for (category, now) in here.scores() {
-            let Some(then) = was.get(&category) else { continue };
+            let Some(then) = was.get(&category) else {
+                continue;
+            };
             if now < *then {
                 eprintln!(
                     "cqx scan: {category} is {now}, down from {then} on {reference}"
@@ -365,13 +373,11 @@ fn gate(context: &Context, here: &Scanned, against: Option<(&str, &Scanned)>) {
         .report
         .get("config")
         .and_then(|c| c.get("min_score"))
-        .and_then(serde_json::Value::as_u64)
+        .and_then(|v| serde_json::from_value::<cqx_score::config::MinScore>(v.clone()).ok())
     {
-        for (category, value) in here.scores() {
-            if value < min {
-                eprintln!("cqx scan: {category} scored {value}, below the required {min}");
-                refused = true;
-            }
+        for failure in min.failures(&here.scoring) {
+            eprintln!("cqx scan: {failure}");
+            refused = true;
         }
     }
 

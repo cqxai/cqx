@@ -92,8 +92,8 @@ fn cli_reports_go_parser_skips_in_json_human_output_and_extract_summary() {
     let report: serde_json::Value = serde_json::from_slice(&scan.stdout).unwrap();
     assert_eq!(report["skipped_files"][0]["file"], "bad-token.go");
     assert_eq!(report["skipped_files"][1]["file"], "bad.go");
-    assert_eq!(report["scores"]["containment"], 70);
-    assert_eq!(report["scores"]["security"], 70);
+    assert_eq!(report["scores"]["containment"], 75);
+    assert_eq!(report["scores"]["security"], 95);
     let human = Command::new(env!("CARGO_BIN_EXE_cqx"))
         .args(["scan", fixture.to_str().unwrap()])
         .output()

@@ -101,6 +101,41 @@ pub struct RulePatch {
     pub params: BTreeMap<String, f64>,
 }
 
+/// A numeric floor gates the headline; a map gates each named language.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MinScore {
+    Headline(u32),
+    Languages(BTreeMap<String, u32>),
+}
+
+impl MinScore {
+    /// A missing language has no product code to gate.
+    pub fn failures(&self, scoring: &crate::Scoring) -> Vec<String> {
+        let mut failures = Vec::new();
+        let mut check = |prefix: &str, scores: &BTreeMap<String, u32>, min: u32| {
+            for (category, value) in scores {
+                if *value < min {
+                    failures.push(format!(
+                        "{prefix}{category} scored {value}, below the required {min}"
+                    ));
+                }
+            }
+        };
+        match self {
+            Self::Headline(min) => check("", &scoring.scores, *min),
+            Self::Languages(floors) => {
+                for (language, min) in floors {
+                    if let Some(part) = scoring.languages.get(language) {
+                        check(&format!("{language}/"), &part.scores, *min);
+                    }
+                }
+            }
+        }
+        failures
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ConfigFile {
     /// Schema version of this file, so a future change can be detected rather
@@ -109,9 +144,9 @@ pub struct ConfigFile {
     pub version: u32,
     #[serde(default)]
     pub rules: BTreeMap<String, RulePatch>,
-    /// Fail the run when the lowest category score falls below this.
+    /// Fail the run when a headline or named language category falls below its floor.
     #[serde(default)]
-    pub min_score: Option<u32>,
+    pub min_score: Option<MinScore>,
     /// Paths excluded from every metric, as prefixes.
     #[serde(default)]
     pub exclude: Vec<String>,
@@ -121,7 +156,7 @@ pub struct ConfigFile {
 pub struct Config {
     pub rules: BTreeMap<String, Rule>,
     pub origins: BTreeMap<String, Origin>,
-    pub min_score: Option<u32>,
+    pub min_score: Option<MinScore>,
     pub exclude: Vec<String>,
     pub loaded_from: Option<PathBuf>,
 }
@@ -640,12 +675,19 @@ impl Config {
             apply(rule, patch);
             self.origins.insert(canonical.to_string(), Origin::File);
         }
-        self.min_score = file.min_score;
+        self.min_score.clone_from(&file.min_score);
         self.exclude.clone_from(&file.exclude);
         Ok(())
     }
 
     fn validate(&self) -> Result<(), String> {
+        if let Some(MinScore::Languages(floors)) = &self.min_score {
+            for language in floors.keys() {
+                if !self.rules.values().any(|rule| &rule.language == language) {
+                    return Err(format!("min_score: unknown language '{language}'"));
+                }
+            }
+        }
         for (id, rule) in &self.rules {
             if ![
                 "quality",
@@ -752,7 +794,7 @@ impl Config {
             }
         }
         if let Some(raw) = std::env::var_os("CQX_MIN_SCORE") {
-            self.min_score = raw.to_string_lossy().parse().ok();
+            self.min_score = raw.to_string_lossy().parse().ok().map(MinScore::Headline);
         }
         Ok(())
     }

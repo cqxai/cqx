@@ -541,12 +541,26 @@ pub fn dataset(stream: &Stream, score: Value, history: Value, meta: &Meta<'_>) -
 /// Only the one line, trimmed of trailing space. A finding about a whole file
 /// has no line to show and is left alone.
 pub fn quote(report: &mut Value, source: &dyn Fn(&str) -> Option<String>) {
-    let Some(rules) = report.get_mut("rules").and_then(Value::as_array_mut) else {
-        return;
-    };
-    // One file is usually asked for several times over — deka has 134 findings
-    // across far fewer files — so it is read once.
+    // Findings in the headline and language rows use the same operation and
+    // read cache, including when a report travels around multiple readers.
     let mut read: BTreeMap<String, Option<Vec<String>>> = BTreeMap::new();
+    if let Some(rules) = report.get_mut("rules").and_then(Value::as_array_mut) {
+        quote_rules(rules, source, &mut read);
+    }
+    if let Some(languages) = report.get_mut("languages").and_then(Value::as_object_mut) {
+        for language in languages.values_mut() {
+            if let Some(rules) = language.get_mut("rules").and_then(Value::as_array_mut) {
+                quote_rules(rules, source, &mut read);
+            }
+        }
+    }
+}
+
+fn quote_rules(
+    rules: &mut [Value],
+    source: &dyn Fn(&str) -> Option<String>,
+    read: &mut BTreeMap<String, Option<Vec<String>>>,
+) {
     for rule in rules {
         let Some(findings) = rule.get_mut("findings").and_then(Value::as_array_mut) else {
             continue;
