@@ -119,11 +119,16 @@ fn normalise(path: &str) -> String {
     p.trim_start_matches('/').to_string()
 }
 
+/// Shared by snapshot discovery and frontend dispatch.
+pub fn is_typescript_source(path: &str) -> bool {
+    matches!(path.rsplit('.').next(), Some("ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs"))
+}
+
 /// What a source snapshot is worth carrying: the manifests that describe the
 /// workspace, the lockfile that pins it, and the code itself.
 pub fn is_interesting(path: &str) -> bool {
     path.ends_with(".rs")
-        || matches!(path.rsplit('.').next(), Some("ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs"))
+        || is_typescript_source(path)
         || path == "package.json" || path.ends_with("/package.json")
         || path == "cqx.json"
         || path.ends_with("/Cargo.toml")

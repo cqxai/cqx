@@ -18,12 +18,7 @@ pub struct Stats {
     pub edges: usize,
 }
 
-pub fn is_source(path: &str) -> bool {
-    matches!(
-        path.rsplit('.').next(),
-        Some("ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs")
-    )
-}
+pub use cqx_vfs::is_typescript_source as is_source;
 
 fn is_test(path: &str) -> bool {
     path.split('/')
