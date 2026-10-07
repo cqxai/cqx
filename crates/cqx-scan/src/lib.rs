@@ -227,7 +227,7 @@ pub fn tree(root: &Path, config_path: Option<&Path>, quote: bool) -> Result<Scan
     let paths: Vec<String> = snapshot.paths().map(str::to_string).collect();
 
     let mut facts: Vec<u8> = Vec::new();
-    cqx_rust::extract::run(&snapshot, &mut facts).map_err(|e| format!("{e}"))?;
+    cqx_analysis::run(&snapshot, &mut facts).map_err(|e| format!("{e}"))?;
     let text = String::from_utf8(facts).map_err(|e| format!("the extractor emitted: {e}"))?;
     let stream = cqx_store::facts::Stream::from_ndjson(&text);
 

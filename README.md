@@ -69,6 +69,51 @@ corrected two wrong assumptions: large files turn out to be normal in Rust
 measure a project's domain rather than its discipline (tokio and deno carry an
 order of magnitude more than a CLI does).
 
+## TypeScript and JavaScript
+
+`cqx scan` and the browser WASM API analyze `.ts`, `.tsx`, `.js`, `.jsx`,
+`.mjs`, and `.cjs` alongside Rust, producing one score in the original five
+categories: quality, containment, legibility, security, and modularity.
+The frontend uses [Oxc](https://oxc.rs/docs/learn/architecture/parser), a pure
+Rust parser; WASM builds need only Cargo and the Rust target.
+
+TypeScript rule IDs are `typescript/<rule>`. The default rules are
+`undocumented-suppressions`, `swallowed-errors`, `dynamic-code`,
+`exit-in-library`, `duplicated-bodies`, `oversized-files`, and
+`oversized-line-share`. Scope resolution avoids reporting locally shadowed
+global APIs. An explained empty catch is allowed; suppressions need a reason
+(`@ts-ignore: reason` or `eslint-disable rule -- reason`). Process exits are
+allowed in package.json binaries, shebang scripts, bin directories, and
+root/src `main` or `cli` files. Calls through aliases are not inferred.
+
+`dynamic-html` and `any-density` are opt-in review rules: sanitized HTML and
+interop `any` are often legitimate, and syntax alone cannot establish intent.
+They deduct only when enabled in the repository root's real `cqx.json`:
+
+```json
+{
+  "version": 1,
+  "rules": {
+    "typescript/dynamic-html": { "enabled": true },
+    "typescript/any-density": { "enabled": true },
+    "typescript/oversized-files": { "params": { "max_lines": 1500 } }
+  },
+  "min_score": 70,
+  "exclude": ["generated/"]
+}
+```
+
+Each language uses its own product lines for per-10k-line densities (minimum
+500 lines), so adding clean code in another language cannot dilute findings.
+Rule deductions add into the same five category scores. TypeScript thresholds
+reuse the Rust ramps, without claiming independent corpus calibration.
+Test files (`*.test.*`, `*.spec.*`, test/tests/__tests__ directories) are present
+in the graph but excluded from scoring. Invalid syntax fails analysis rather
+than reporting a clean score. Generated build directories and node_modules are
+not scanned. TypeScript rules have no environment-variable overrides.
+Existing unprefixed Rust config keys remain compatible; `rust/<rule>` is also
+accepted in a config file.
+
 ## The model
 
 ### One graph, not several views

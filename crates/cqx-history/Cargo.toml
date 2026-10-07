@@ -7,7 +7,7 @@ repository.workspace = true
 description = "Scores a repository commit by commit."
 
 [dependencies]
-cqx-rust = { path = "../cqx-rust" }
+cqx-analysis = { path = "../cqx-analysis" }
 cqx-schema = { workspace = true }
 cqx-vfs = { workspace = true }
 cqx-score = { path = "../cqx-score" }

@@ -370,9 +370,10 @@ fn explain(config: &Config) {
         }
     }
     println!(
-        "\nOverride any of them with CQX_RULE_<RULE>_{{WEIGHT,FREE,FULL,ENABLED}},\n\
-         for example CQX_RULE_EXIT_IN_LIBRARY_WEIGHT=10. A cqx.json may set the\n\
-         same fields, and need only mention the rules it changes."
+        "\nSet TypeScript rule patches in the repository root's cqx.json.\n\
+         Legacy Rust rules also accept CQX_RULE_<RULE>_{{WEIGHT,FREE,FULL,ENABLED}},\n\
+         for example CQX_RULE_EXIT_IN_LIBRARY_WEIGHT=10. A cqx.json need only\n\
+         mention the rules it changes."
     );
 }
 
@@ -478,7 +479,7 @@ fn build_report(
                 })
                 .unwrap_or_default();
             serde_json::json!({
-                "rule": d.rule, "category": d.category,
+                "rule": d.rule.rsplit('/').next().unwrap_or(&d.rule), "category": d.category,
                 // The language prefixes the name wherever it is shown and
                 // names its page in the docs, so it travels with the rule
                 // rather than being assumed by whoever renders it.

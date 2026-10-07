@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "rules": { "typescript/dynamic-code": { "weight": 17 } },
+  "min_score": 70,
+  "exclude": []
+}

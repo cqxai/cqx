@@ -144,12 +144,19 @@ check('it installs and reports its version',
 
 check('--help is forwarded', /usage: cqx/.test(run('--help').stdout));
 
-// The one that matters. A wrapper that loses this turns every failing gate
-// into a passing build.
+// A controlled healthy tree makes the wrapper's gate independent of this
+// repository's score (and its deliberately unhealthy analysis fixtures).
+const fixture = join(work, 'fixture');
+await mkdir(join(fixture, 'src'), { recursive: true });
+await writeFile(join(fixture, 'Cargo.toml'), '[package]\nname = "healthy"\nversion = "0.1.0"\n');
+await writeFile(join(fixture, 'src', 'lib.rs'), 'pub fn answer() -> u32 { 42 }\n');
+await writeFile(join(fixture, 'src', 'lib.ts'), 'export function answer(): number { return 42; }\n');
+await writeFile(join(fixture, 'cqx.json'), '{"version":1}\n');
+// A wrapper that loses a failure turns every failing gate into a passing build.
 const facts = join(work, 'facts.ndjson');
-check('extract runs', run('extract', root, '--out', facts, '--quiet').status === 0);
-check('the gate fails when it should', run('score', root, '--facts', facts, '--min-score', '101', '--quiet').status === 1);
-check('and passes when it should', run('score', root, '--facts', facts, '--min-score', '50', '--quiet').status === 0);
+check('extract runs', run('extract', fixture, '--out', facts, '--quiet').status === 0);
+check('the gate fails when it should', run('score', fixture, '--facts', facts, '--min-score', '101', '--quiet').status === 1);
+check('and passes when it should', run('score', fixture, '--facts', facts, '--min-score', '100', '--quiet').status === 0);
 
 // An argument that would be mangled by a shell has to arrive intact.
 const odd = run('score', root, '--facts', facts, '--config', 'no such file.json');

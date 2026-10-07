@@ -134,6 +134,103 @@ impl Metrics {
     }
 
     pub fn compute(stream: &Stream, config: &Config) -> Metrics {
+        // Preserve the Rust-only memory profile: large Rust graphs do not need
+        // cloning just because a second frontend is available.
+        if !stream.nodes.iter().any(|n| {
+            n.kind == NodeKind::File
+                && n.attrs.get("language").and_then(|v| v.as_str()) == Some("typescript")
+        }) {
+            return Self::compute_one(stream, config);
+        }
+        let ts_node = |n: &cqx_schema::Node| {
+            n.attrs.get("language").and_then(|v| v.as_str()) == Some("typescript")
+        };
+        let ts_edge = |e: &Edge| e.ev.iter().any(|ev| ev.extractor == "typescript");
+        let rust = Stream {
+            nodes: stream
+                .nodes
+                .iter()
+                .filter(|n| !ts_node(n))
+                .cloned()
+                .collect(),
+            edges: stream
+                .edges
+                .iter()
+                .filter(|e| !ts_edge(e))
+                .cloned()
+                .collect(),
+            ..Stream::default()
+        };
+        let ts = Stream {
+            nodes: stream
+                .nodes
+                .iter()
+                .filter(|n| ts_node(n))
+                .cloned()
+                .collect(),
+            edges: stream
+                .edges
+                .iter()
+                .filter(|e| ts_edge(e))
+                .cloned()
+                .collect(),
+            ..Stream::default()
+        };
+        let mut metrics = Self::compute_one(&rust, config);
+        let mut ts_config = config.clone();
+        for id in [
+            "duplicated-bodies",
+            "oversized-files",
+            "oversized-line-share",
+        ] {
+            if let Some(rule) = config.rules.get(&format!("typescript/{id}")) {
+                ts_config.rules.insert(id.into(), rule.clone());
+            }
+        }
+        let mut ts_metrics = Self::compute_one(&ts, &ts_config);
+        for id in [
+            "duplicated-bodies",
+            "oversized-files",
+            "oversized-line-share",
+        ] {
+            if let Some(value) = ts_metrics.values.remove(id) {
+                metrics.values.insert(format!("typescript/{id}"), value);
+            }
+        }
+        for id in [
+            "undocumented-suppressions",
+            "swallowed-errors",
+            "dynamic-code",
+            "dynamic-html",
+            "exit-in-library",
+            "any-density",
+        ] {
+            let findings: Vec<Finding> = ts
+                .edges
+                .iter()
+                .filter(|e| attr(e, "typescript:rule") == id && is_product(e))
+                .filter(|e| {
+                    !e.ev
+                        .iter()
+                        .any(|ev| config.exclude.iter().any(|p| ev.file.starts_with(p)))
+                })
+                .map(|e| finding(attr(e, "what"), e))
+                .collect();
+            metrics.values.insert(
+                format!("typescript/{id}"),
+                Measure {
+                    value: findings.len() as f64 / ts_metrics.scale,
+                    findings,
+                },
+            );
+        }
+        metrics.lines += ts_metrics.lines;
+        metrics.scale = (metrics.lines as f64 / 10_000.0).max(0.05);
+        metrics.locate(stream);
+        metrics
+    }
+
+    fn compute_one(stream: &Stream, config: &Config) -> Metrics {
         let exclude = &config.exclude;
         let excluded = |path: &str| exclude.iter().any(|p| path.starts_with(p.as_str()));
 
@@ -178,17 +275,19 @@ impl Metrics {
         // placed by the file that holds its symbol, or test helpers count as
         // product code.
         let mut symbol_file: HashMap<&str, &str> = HashMap::new();
+        let mut symbol_location: HashMap<&str, &Edge> = HashMap::new();
         for edge in &stream.edges {
             if edge.kind == EdgeKind::Contains
                 && edge.from.0.starts_with("file:")
                 && edge.to.0.starts_with("sym:")
             {
                 symbol_file.insert(edge.to.0.as_str(), edge.from.0.as_str());
+                symbol_location.insert(edge.to.0.as_str(), edge);
             }
         }
         let in_product = |sym: &str| -> bool {
             match symbol_file.get(sym) {
-                Some(file) => !test_files.contains(*file),
+                Some(file) => !test_files.contains(*file) && !excluded(file.trim_start_matches("file:")),
                 None => true,
             }
         };
@@ -295,19 +394,20 @@ impl Metrics {
                 bodies.entry(hash).or_default().push(node.id.0.as_str());
             }
         }
-        let dup: Vec<Finding> = bodies
+        let mut dup: Vec<Finding> = bodies
             .values()
             .filter(|v| v.len() > 1)
             .flat_map(|v| {
                 v.iter().skip(1).map(|id| {
-                    about(
-                        format!("copy of {}", v[0].trim_start_matches("sym:")),
-                        id.trim_start_matches("sym:"),
-                        0,
-                    )
+                    let what = format!("copy of {}", v[0].trim_start_matches("sym:"));
+                    match symbol_location.get(*id) {
+                        Some(edge) => finding(what, edge),
+                        None => about(what, id.trim_start_matches("sym:"), 0),
+                    }
                 })
             })
             .collect();
+        dup.sort_by(|a, b| (&a.file, a.line).cmp(&(&b.file, b.line)));
         density("duplicated-bodies", dup);
 
         // A crate whose signatures are mostly built from other crates' types,

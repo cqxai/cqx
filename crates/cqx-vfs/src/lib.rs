@@ -123,6 +123,9 @@ fn normalise(path: &str) -> String {
 /// workspace, the lockfile that pins it, and the code itself.
 pub fn is_interesting(path: &str) -> bool {
     path.ends_with(".rs")
+        || matches!(path.rsplit('.').next(), Some("ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs"))
+        || path == "package.json" || path.ends_with("/package.json")
+        || path == "cqx.json"
         || path.ends_with("/Cargo.toml")
         || path == "Cargo.toml"
         || path.ends_with("/Cargo.lock")
@@ -131,7 +134,7 @@ pub fn is_interesting(path: &str) -> bool {
 
 /// Directories that hold build output or history rather than source.
 pub fn is_ignored_dir(name: &str) -> bool {
-    matches!(name, "target" | ".git" | "node_modules") || name.starts_with(".target")
+    matches!(name, "target" | ".git" | "node_modules" | ".next" | "dist" | "build" | "coverage" | ".tmp" | ".open-next" | ".wrangler" | ".turbo") || name.starts_with(".target")
 }
 
 /// Fills a snapshot from a directory on disk.

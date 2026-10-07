@@ -161,7 +161,7 @@ fn run(context: &Context) -> Result<(), String> {
 
             let started = std::time::Instant::now();
             let mut facts = Vec::new();
-            cqx_rust::extract::run(&snapshot, &mut facts).map_err(|e| format!("{sha}: {e}"))?;
+            cqx_analysis::run(&snapshot, &mut facts).map_err(|e| format!("{sha}: {e}"))?;
             let stream = cqx_store::facts::Stream::from_ndjson(&String::from_utf8_lossy(&facts));
             let metrics = cqx_score::metrics::Metrics::compute(&stream, &config);
             let mut report = cqx_score::report_json(&config, &metrics);

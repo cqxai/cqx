@@ -9,7 +9,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn build_registry() -> Registry {
     RegistryBuilder::new()
-        .with(cqx_rust::register)
+        .with(cqx_analysis::register)
         .with(cqx_store::register)
         .with(cqx_score::register)
         .with(cqx_history::register)
@@ -64,7 +64,7 @@ fn main() {
     // Every crate that can fail gets a say. cqx-store was missing from this
     // list, which is why `query` could report an error and exit zero.
     std::process::exit(
-        cqx_rust::exit_code()
+        cqx_analysis::exit_code()
             .max(cqx_score::exit_code())
             .max(cqx_store::exit_code())
             .max(cqx_history::exit_code())

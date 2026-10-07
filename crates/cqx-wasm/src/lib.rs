@@ -146,7 +146,7 @@ pub extern "C" fn cqx_facts() -> *mut u8 {
     let result = SNAPSHOT.with(|s| {
         let vfs = s.borrow();
         let mut out = Vec::new();
-        cqx_rust::extract::run(&vfs, &mut out)
+        cqx_analysis::run(&vfs, &mut out)
             .map(|_| String::from_utf8_lossy(&out).into_owned())
             .map_err(|e| e.to_string())
     });
@@ -158,7 +158,7 @@ pub extern "C" fn cqx_facts() -> *mut u8 {
     })
 }
 
-/// Scores the snapshot. `config` is a cqx.json, or empty for the defaults.
+/// Scores the snapshot. `config` is a cqx.json, or empty to use the snapshot root config/defaults.
 ///
 /// # Safety
 /// `config` must point to `config_len` bytes of valid UTF-8.
@@ -168,15 +168,9 @@ pub unsafe extern "C" fn cqx_score(config: *const u8, config_len: usize) -> *mut
     let result = SNAPSHOT.with(|s| -> Result<String, String> {
         let vfs = s.borrow();
         let mut facts = Vec::new();
-        cqx_rust::extract::run(&vfs, &mut facts).map_err(|e| e.to_string())?;
+        cqx_analysis::run(&vfs, &mut facts).map_err(|e| e.to_string())?;
         let stream = cqx_store::facts::Stream::from_ndjson(&String::from_utf8_lossy(&facts));
-        let config = cqx_score::config::Config::from_text(
-            if config_text.trim().is_empty() {
-                None
-            } else {
-                Some(config_text.as_str())
-            },
-        )?;
+        let config = snapshot_config(&vfs, &config_text)?;
         let metrics = cqx_score::metrics::Metrics::compute(&stream, &config);
         Ok(cqx_score::report_json(&config, &metrics).to_string())
     });
@@ -208,21 +202,17 @@ pub unsafe extern "C" fn cqx_dataset(
         let vfs = s.borrow();
         // The same three phases the sharded path uses, so the one reader can
         // say how far along it is too.
-        let metadata = cqx_rust::manifest::read(&vfs).map_err(|e| e.to_string())?;
-        let prepared = cqx_rust::extract::prepare_reporting(&vfs, metadata, &expect, &tick)
+        let metadata = cqx_analysis::manifests(&vfs).map_err(|e| e.to_string())?;
+        let prepared = cqx_analysis::prepare_reporting(&vfs, metadata, &expect, &tick)
             .map_err(|e| e.to_string())?;
         let mut facts_of = prepared.gathered();
         facts_of.resolve();
         let mut facts = Vec::new();
         prepared
-            .emit(&vfs, &facts_of, &mut facts)
+            .emit_watched(&vfs, &facts_of, &mut facts, &tick)
             .map_err(|e| e.to_string())?;
         let stream = cqx_store::facts::Stream::from_ndjson(&String::from_utf8_lossy(&facts));
-        let config = cqx_score::config::Config::from_text(if config_text.trim().is_empty() {
-            None
-        } else {
-            Some(config_text.as_str())
-        })?;
+        let config = snapshot_config(&vfs, &config_text)?;
         let metrics = cqx_score::metrics::Metrics::compute(&stream, &config);
         let mut report = cqx_score::report_json(&config, &metrics);
         // The snapshot is still here, so each finding can carry the line it
@@ -266,7 +256,7 @@ pub unsafe extern "C" fn cqx_dataset(
 thread_local! {
     /// The trees this reader parsed, held between saying what it found and
     /// being told what everyone else found.
-    static PREPARED: RefCell<Option<cqx_rust::extract::Prepared>> = const { RefCell::new(None) };
+    static PREPARED: RefCell<Option<cqx_analysis::Prepared>> = const { RefCell::new(None) };
     /// The coordinator's running union of what the readers found.
     static MERGING: RefCell<cqx_rust::prepass::Shared> =
         RefCell::new(cqx_rust::prepass::Shared::default());
@@ -284,7 +274,7 @@ thread_local! {
 /// manifests are small; it is the sources that are not.
 #[no_mangle]
 pub extern "C" fn cqx_manifests() -> *mut u8 {
-    let result = SNAPSHOT.with(|s| cqx_rust::manifest::read(&s.borrow()));
+    let result = SNAPSHOT.with(|s| cqx_analysis::manifests(&s.borrow()));
     respond(match result {
         Ok(metadata) => metadata.to_string(),
         Err(e) => serde_json::json!({ "error": e }).to_string(),
@@ -305,7 +295,7 @@ pub unsafe extern "C" fn cqx_gather(metadata: *const u8, metadata_len: usize) ->
     let result = SNAPSHOT.with(|s| -> Result<String, String> {
         let metadata: serde_json::Value =
             serde_json::from_str(&text).map_err(|e| format!("metadata: {e}"))?;
-        let prepared = cqx_rust::extract::prepare_reporting(&s.borrow(), metadata, &expect, &tick)
+        let prepared = cqx_analysis::prepare_reporting(&s.borrow(), metadata, &expect, &tick)
             .map_err(|e| e.to_string())?;
         // Moved, not copied: the facts are of no further use here, and a copy
         // of a large workspace's four maps is what exhausted the address space.
@@ -339,7 +329,7 @@ pub unsafe extern "C" fn cqx_emit(shared: *const u8, shared_len: usize) -> *mut 
             facts.adopt(shared);
             let mut out = Vec::new();
             prepared
-                .emit(&s.borrow(), &facts, &mut out)
+                .emit_watched(&s.borrow(), &facts, &mut out, &tick)
                 .map_err(|e| e.to_string())?;
             Ok(String::from_utf8_lossy(&out).into_owned())
         })
@@ -461,11 +451,7 @@ pub unsafe extern "C" fn cqx_fold_done(
         // manifest. The same node twice says nothing new, and the same
         // containment edge twice multiplies every path through it.
         stream.dedupe();
-        let config = cqx_score::config::Config::from_text(if config_text.trim().is_empty() {
-            None
-        } else {
-            Some(config_text.as_str())
-        })?;
+        let config = SNAPSHOT.with(|s| snapshot_config(&s.borrow(), &config_text))?;
         let metrics = cqx_score::metrics::Metrics::compute(&stream, &config);
         let report = cqx_score::report_json(&config, &metrics);
         let meta = cqx_view::Meta {
@@ -481,5 +467,15 @@ pub unsafe extern "C" fn cqx_fold_done(
     respond(match result {
         Ok(json) => json,
         Err(e) => serde_json::json!({ "error": e }).to_string(),
+    })
+}
+
+/// Empty host config uses the repository's real cqx.json when supplied in the
+/// snapshot. Explicit text remains the existing ABI's config-file input.
+fn snapshot_config(vfs: &Vfs, text: &str) -> Result<cqx_score::config::Config, String> {
+    cqx_score::config::Config::from_text(if text.trim().is_empty() {
+        vfs.read("cqx.json")
+    } else {
+        Some(text)
     })
 }
