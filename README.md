@@ -139,10 +139,13 @@ fields, for example `"go/oversized-files": {"params": {"max_lines": 1500}}`.
 Go rules do not accept environment overrides.
 
 `go.mod` supplies module/package identity, including nested modules and reader
-shards. `_test.go`, explicit tools/tool/testdata trees, and files with an
-exclusive tools/ignore build tag remain in the graph
-but do not affect scores; `cmd/` and `internal/` are product code. Exits are
-allowed only in `package main`. Import aliases are resolved, lexical shadows
+shards. `_test.go`, `testdata/`, `vendor/` (including nested vendor directories),
+files carrying [Go's standard generated-code header](https://pkg.go.dev/cmd/go#hdr-Generate_Go_files_by_processing_source),
+and files with an exclusive tools/ignore build tag remain in the graph but do
+not affect scores. Packages named `tool` or `tools`, `cmd/` and `internal/` are
+product code. `package main` at any path is an entry point and allows
+`log.Fatal`/`os.Exit`; non-main packages under `cmd/` are still libraries.
+Import aliases are resolved, lexical shadows
 are respected, and unknown signatures are not inferred from names. Discarded
 errors are recognized from same-file functions and a narrow set of standard
 library APIs; unresolved methods and cross-file functions remain unknown.
@@ -159,7 +162,9 @@ requires an interpolated `fmt.Sprintf` template whose surrounding structure
 parses as a JSON object. Duplicate bodies
 compare exact token fingerprints (40 tokens minimum), preserving literals.
 
-Parser errors fail analysis rather than reporting a clean score. A known
+Parse/tokenization failures skip only the affected file, name it and its
+diagnostic in `skipped_files` and the human report, and score the remaining
+files without counting skipped lines. A known
 gosyn limitation is compact grouped imports lacking a final semicolon or
 newline before `)`; gofmt-style imports work. All build-tag variants are read
 as source; analysis does not choose a GOOS/GOARCH build or invoke Go tooling.

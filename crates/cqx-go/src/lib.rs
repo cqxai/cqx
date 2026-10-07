@@ -16,6 +16,7 @@ pub struct Stats {
     pub packages: usize,
     pub nodes: usize,
     pub edges: usize,
+    pub unparsed: Vec<String>,
 }
 
 pub fn is_source(path: &str) -> bool {
@@ -47,8 +48,15 @@ pub fn run(vfs: &Vfs, out: impl Write) -> io::Result<Stats> {
 }
 
 pub struct Prepared {
-    files: Vec<(String, File)>,
+    files: Vec<ParsedFile>,
+    skipped: Vec<(String, String)>,
     modules: BTreeMap<String, String>,
+}
+
+struct ParsedFile {
+    path: String,
+    ast: File,
+    tokens: Vec<gosyn::LexicalToken>,
 }
 
 pub fn prepare(
@@ -57,24 +65,47 @@ pub fn prepare(
     tick: &dyn Fn(),
 ) -> io::Result<Prepared> {
     let mut files = Vec::new();
+    let mut skipped = Vec::new();
     for path in vfs.paths().filter(|p| is_source(p)) {
-        let parsed = gosyn::parse_source(vfs.read(path).unwrap_or_default());
+        let source = vfs.read(path).unwrap_or_default();
+        // Validate both stages before emitting any facts for this file. One
+        // unsupported file must not prevent scoring the rest of the snapshot.
+        let parsed = gosyn::parse_source(source).and_then(|ast| {
+            gosyn::tokenize_source(source).map(|tokens| ParsedFile {
+                path: path.into(),
+                ast,
+                tokens,
+            })
+        });
         tick();
-        files.push((
-            path.into(),
-            parsed
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("{path}: {e}")))?,
-        ));
+        match parsed {
+            Ok(file) => files.push(file),
+            Err(error) => skipped.push((path.into(), error.to_string())),
+        }
     }
-    Ok(Prepared { files, modules })
+    Ok(Prepared {
+        files,
+        skipped,
+        modules,
+    })
 }
 
 impl Prepared {
     pub fn emit(&self, vfs: &Vfs, out: impl Write) -> io::Result<Stats> {
         let mut writer = Writer::new(out);
         writer.fact(&Fact::header("go", &vfs.label))?;
+        for (path, reason) in &self.skipped {
+            // The same file-node diagnostic used by TypeScript travels through
+            // CLI, WASM and reader shards, without entering the denominator.
+            writer.node(
+                Node::new(Id::file(path), NodeKind::File)
+                    .attr("path", path.clone())
+                    .attr("language", "go")
+                    .attr("skipped", reason.clone()),
+            )?;
+        }
         let mut packages = std::collections::BTreeSet::new();
-        for (path, ast) in &self.files {
+        for ParsedFile { path, ast, tokens } in &self.files {
             let source = vfs.read(path).unwrap_or_default();
             let dir = path.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
             let module = self
@@ -105,7 +136,8 @@ impl Prepared {
             writer.edge(Edge::new(EdgeKind::Contains, package, directory.clone()))?;
             let file = Id::file(path);
             // cmd/ contains shipped binaries, internal/ contains product libraries.
-            // Test files and explicit tools/testdata trees are excluded from scoring.
+            // Tests, third-party and generated code stay in the graph but are
+            // excluded from scoring. A package named tool/tools is product code.
             let test = ast.comments.iter().any(|c| {
                 c.pos < ast.pkg_name.pos
                     && matches!(
@@ -113,9 +145,8 @@ impl Prepared {
                         "go:build tools" | "go:build ignore" | "+build tools" | "+build ignore"
                     )
             }) || path.ends_with("_test.go")
-                || path
-                    .split('/')
-                    .any(|s| matches!(s, "testdata" | "tools" | "tool"));
+                || path.split('/').any(|s| matches!(s, "testdata" | "vendor"))
+                || generated(source, tokens);
             writer.node(
                 Node::new(file.clone(), NodeKind::File)
                     .attr("path", path.clone())
@@ -124,7 +155,6 @@ impl Prepared {
                     .attr("role", if test { "test" } else { "product" }),
             )?;
             writer.edge(Edge::new(EdgeKind::Contains, directory, file.clone()))?;
-            let tokens = gosyn::tokenize_source(source).map_err(io::Error::other)?;
             let offsets: Vec<usize> = source
                 .char_indices()
                 .map(|(i, _)| i)
@@ -148,7 +178,7 @@ impl Prepared {
                 file,
                 current: None,
                 ast,
-                tokens: &tokens,
+                tokens,
                 scopes: vec![BTreeMap::new()],
                 test,
                 main: ast.pkg_name.name == "main",
@@ -234,8 +264,29 @@ impl Prepared {
             packages: packages.len(),
             nodes: writer.nodes,
             edges: writer.edges,
+            unparsed: self
+                .skipped
+                .iter()
+                .map(|(path, reason)| format!("{path}: {reason}"))
+                .collect(),
         })
     }
+}
+
+/// Go's standard generated-code marker is an exact line comment in the header.
+/// https://pkg.go.dev/cmd/go#hdr-Generate_Go_files_by_processing_source
+fn generated(source: &str, tokens: &[gosyn::LexicalToken]) -> bool {
+    tokens
+        .iter()
+        .take_while(|token| matches!(token.token, Token::Comment(_)))
+        .any(|token| {
+            matches!(&token.token, Token::Comment(text)
+                if text.trim_end_matches('\r')
+                    .strip_prefix("// Code generated ")
+                    .and_then(|text| text.strip_suffix(" DO NOT EDIT."))
+                    .is_some()
+                && (token.start == 0 || source.chars().nth(token.start - 1) == Some('\n')))
+        })
 }
 
 #[derive(Clone)]

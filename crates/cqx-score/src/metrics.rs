@@ -197,6 +197,11 @@ impl Metrics {
         let mut metrics = Self::compute_one(&subset("rust"), config);
         for lang in ["typescript", "go"] {
             let part = subset(lang);
+            // Absent frontends must not add empty rules or config to another
+            // language's report. Skipped files still identify their frontend.
+            if !part.nodes.iter().any(|n| n.kind == NodeKind::File) {
+                continue;
+            }
             let neutral = [
                 "duplicated-bodies",
                 "oversized-files",

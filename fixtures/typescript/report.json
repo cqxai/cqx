@@ -1,0 +1,718 @@
+{
+  "config": {
+    "config_path": null,
+    "exclude": [],
+    "min_score": 70,
+    "rules": {
+      "bare-string-params": {
+        "category": "legibility",
+        "describes": "share of parameters declared as a bare string rather than a domain type",
+        "enabled": true,
+        "free": 0.12,
+        "full": 0.35,
+        "language": "rust",
+        "params": {},
+        "remedy": "Introduce a newtype for the concept. Three interchangeable strings in one signature is an argument swap that still compiles and still runs.",
+        "source": "default",
+        "weight": 20.0
+      },
+      "broad-lint-silencing": {
+        "category": "quality",
+        "describes": "crate-wide allow(clippy::all) or allow(warnings), per 10k lines",
+        "enabled": true,
+        "free": 0.3,
+        "full": 2.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Replace the blanket allow with the specific lints meant, or fix them. A crate-wide allow also silences everything written after it, including code nobody has typed yet.",
+        "source": "default",
+        "weight": 25.0
+      },
+      "crate-type-scatter": {
+        "category": "modularity",
+        "describes": "crates whose signatures are mostly built from three or more other crates' types",
+        "enabled": true,
+        "free": 0.2,
+        "full": 1.5,
+        "language": "rust",
+        "params": {},
+        "remedy": "A crate built mostly from other crates' types, pulled from several of them, usually wants splitting or absorbing. One strong pull is an adapter and perfectly fine.",
+        "source": "default",
+        "weight": 10.0
+      },
+      "default-allow-dispatch": {
+        "category": "security",
+        "describes": "a dispatch that checks in its arms and does nothing in its catch-all, per 10k lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 1.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Match the action exhaustively, with no catch-all, so a new action cannot be added without deciding what it is allowed to do. As written, everything nobody listed is permitted.",
+        "source": "default",
+        "weight": 25.0
+      },
+      "discarded-check": {
+        "category": "security",
+        "describes": "a permission or validation call whose answer is thrown away, per 10k lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 1.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Handle the result. `let _ = enforce_read(path)` reads as enforcement at a glance and performs none — it is worse than no call at all, because a reviewer counts it.",
+        "source": "default",
+        "weight": 30.0
+      },
+      "duplicated-bodies": {
+        "category": "quality",
+        "describes": "function bodies that are exact token copies of another, per 10k lines",
+        "enabled": true,
+        "free": 0.5,
+        "full": 3.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Move the shared body somewhere both callers can reach. The copies are listed below; they were found by exact token match, so they were copied rather than merely similar.",
+        "source": "default",
+        "weight": 10.0
+      },
+      "env-controlled-spawn": {
+        "category": "security",
+        "describes": "spawn targets chosen by an environment variable, per 10k lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 2.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Resolve the program from a known location, or validate it before spawning. As it stands, whoever sets the variable chooses what runs.",
+        "source": "default",
+        "weight": 30.0
+      },
+      "exit-in-library": {
+        "category": "containment",
+        "describes": "process::exit called from a library crate, per 10k lines",
+        "enabled": true,
+        "free": 1.0,
+        "full": 15.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Return an error and let the binary decide the exit code. A library that exits takes that decision away from every caller, including a test harness.",
+        "source": "default",
+        "weight": 30.0
+      },
+      "hand-built-json": {
+        "category": "quality",
+        "describes": "JSON assembled by interpolation rather than serialised, per 10k lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 2.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Serialise with serde. A value interpolated into a format string decides the structure around it, which is the same mistake as building SQL by concatenation.",
+        "source": "default",
+        "weight": 10.0
+      },
+      "oversized-files": {
+        "category": "modularity",
+        "describes": "files longer than max_lines, per 10k lines — a house standard, not a fact",
+        "enabled": true,
+        "free": 3.5,
+        "full": 12.0,
+        "language": "rust",
+        "params": {
+          "max_lines": 1000.0
+        },
+        "remedy": "Split the file, or raise the standard if this is simply how the project is written: cqx config set oversized-files.max_lines N. Measured across ripgrep, tokio and deno, file length tracks habit rather than quality.",
+        "source": "default",
+        "weight": 25.0
+      },
+      "oversized-line-share": {
+        "category": "modularity",
+        "describes": "share of all lines living in files longer than max_lines",
+        "enabled": true,
+        "free": 0.7,
+        "full": 0.95,
+        "language": "rust",
+        "params": {
+          "max_lines": 1000.0
+        },
+        "remedy": "Same standard as oversized-files, measured by weight rather than count: it catches a codebase where most of the code lives in a handful of very large files.",
+        "source": "default",
+        "weight": 15.0
+      },
+      "permission-granting-argument": {
+        "category": "security",
+        "describes": "a subprocess handed a literal argument that relaxes its own checks, per 10k lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 1.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Forward the caller's policy instead of overriding it. A child spawned with the permission checks turned off does not inherit the parent's answer, it discards it.",
+        "source": "default",
+        "weight": 25.0
+      },
+      "result-string-density": {
+        "category": "quality",
+        "describes": "functions returning Result<_, String> instead of a real error type, per 10k lines",
+        "enabled": true,
+        "free": 1.0,
+        "full": 20.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Give the crate an error type and return that. A String error cannot be matched on, so every caller either re-parses the text or swallows it.",
+        "source": "default",
+        "weight": 30.0
+      },
+      "shell-argument-unchecked": {
+        "category": "security",
+        "describes": "a shell handed an argument the extractor could not resolve, per 10k lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 1.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Check every program the script invokes, not only the first word, or refuse anything but a single command. Validating the head of a string and running the whole of it through a shell means `git status; rm -rf ~` passes a check for `git`.",
+        "source": "default",
+        "weight": 30.0
+      },
+      "shell-invocation": {
+        "category": "security",
+        "describes": "spawning a shell, which turns an argument into a command, per 10k lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 1.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Pass the program and its arguments directly rather than through a shell. A shell turns an argument into a command.",
+        "source": "default",
+        "weight": 20.0
+      },
+      "typescript/any-density": {
+        "category": "quality",
+        "describes": "explicit TypeScript any annotations and assertions, per 10k lines",
+        "enabled": false,
+        "free": 1.0,
+        "full": 20.0,
+        "language": "typescript",
+        "params": {},
+        "remedy": "Use unknown and narrow it, or give the value its domain type.",
+        "source": "default",
+        "weight": 10.0
+      },
+      "typescript/duplicated-bodies": {
+        "category": "quality",
+        "describes": "function bodies that are exact token copies of another, per 10k lines",
+        "enabled": true,
+        "free": 0.5,
+        "full": 3.0,
+        "language": "typescript",
+        "params": {},
+        "remedy": "Move the shared body somewhere both callers can reach. The copies are listed below; they were found by exact token match, so they were copied rather than merely similar.",
+        "source": "default",
+        "weight": 10.0
+      },
+      "typescript/dynamic-code": {
+        "category": "security",
+        "describes": "global eval/Function calls and literal-string timers, per 10k lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 1.0,
+        "language": "typescript",
+        "params": {},
+        "remedy": "Use ordinary functions and pass a callback to timers instead of executing strings.",
+        "source": "config",
+        "weight": 17.0
+      },
+      "typescript/dynamic-html": {
+        "category": "security",
+        "describes": "non-literal HTML at raw HTML sinks, per 10k lines",
+        "enabled": false,
+        "free": 0.0,
+        "full": 1.0,
+        "language": "typescript",
+        "params": {},
+        "remedy": "Use textContent or JSX text. Review sanitization if raw HTML is intentional; this syntax rule cannot prove a sanitizer's contract.",
+        "source": "default",
+        "weight": 25.0
+      },
+      "typescript/exit-in-library": {
+        "category": "containment",
+        "describes": "global process.exit outside a bin or explicit entry file, per 10k lines",
+        "enabled": true,
+        "free": 1.0,
+        "full": 15.0,
+        "language": "typescript",
+        "params": {},
+        "remedy": "Return an error and let the entry point choose the process exit code.",
+        "source": "default",
+        "weight": 30.0
+      },
+      "typescript/oversized-files": {
+        "category": "modularity",
+        "describes": "files longer than max_lines, per 10k lines — a house standard, not a fact",
+        "enabled": true,
+        "free": 3.5,
+        "full": 12.0,
+        "language": "typescript",
+        "params": {
+          "max_lines": 1000.0
+        },
+        "remedy": "Split the file, or set typescript/oversized-files.params.max_lines in cqx.json to the project's standard.",
+        "source": "default",
+        "weight": 25.0
+      },
+      "typescript/oversized-line-share": {
+        "category": "modularity",
+        "describes": "share of all lines living in files longer than max_lines",
+        "enabled": true,
+        "free": 0.7,
+        "full": 0.95,
+        "language": "typescript",
+        "params": {
+          "max_lines": 1000.0
+        },
+        "remedy": "Same standard as oversized-files, measured by weight rather than count: it catches a codebase where most of the code lives in a handful of very large files.",
+        "source": "default",
+        "weight": 15.0
+      },
+      "typescript/swallowed-errors": {
+        "category": "quality",
+        "describes": "empty catches without an explanation, per 10k lines",
+        "enabled": true,
+        "free": 1.0,
+        "full": 6.0,
+        "language": "typescript",
+        "params": {},
+        "remedy": "Handle or rethrow the error, or explain in the catch why ignoring it is safe.",
+        "source": "default",
+        "weight": 10.0
+      },
+      "typescript/undocumented-suppressions": {
+        "category": "quality",
+        "describes": "@ts-ignore or eslint-disable comments without a reason, per 10k lines",
+        "enabled": true,
+        "free": 1.0,
+        "full": 6.0,
+        "language": "typescript",
+        "params": {},
+        "remedy": "Add a reason after @ts-ignore, or an ESLint -- description.",
+        "source": "default",
+        "weight": 10.0
+      },
+      "unbounded-send-sync": {
+        "category": "security",
+        "describes": "unsafe impl Send/Sync for a generic type with no thread-safety bound, per 10k lines",
+        "enabled": false,
+        "free": 0.0,
+        "full": 1.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Add the bound the promise depends on: `unsafe impl<T: Send> Sync for Holder<T>`. Without it the type claims every `T` is safe to share, including an `Rc`. This shape accounts for sixteen of sixty-five RustSec advisories sampled — and tokio writes it twenty-three times deliberately, which is why this rule is off until you turn it on: cqx config enable unbounded-send-sync.",
+        "source": "default",
+        "weight": 30.0
+      },
+      "undocumented-suppressions": {
+        "category": "quality",
+        "describes": "crate-level lint suppressions with no reason given, per 10k lines",
+        "enabled": true,
+        "free": 1.0,
+        "full": 6.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Add reason = \"...\" to each suppression. deno documents every one of its crate-level suppressions, which is why theirs read as decisions rather than residue.",
+        "source": "default",
+        "weight": 10.0
+      },
+      "unproven-spawn-targets": {
+        "category": "legibility",
+        "describes": "share of spawn and env targets the extractor could not resolve",
+        "enabled": true,
+        "free": 0.2,
+        "full": 0.8,
+        "language": "rust",
+        "params": {},
+        "remedy": "Where the target comes from a parameter, the caller is deciding it — hoisting the spawn there makes it knowable. Where it comes from the environment, that is the finding rather than a gap.",
+        "source": "default",
+        "weight": 30.0
+      }
+    },
+    "version": 1
+  },
+  "lines": 7,
+  "rules": [
+    {
+      "capped": false,
+      "category": "legibility",
+      "deducted": 0.0,
+      "describes": "share of parameters declared as a bare string rather than a domain type",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Introduce a newtype for the concept. Three interchangeable strings in one signature is an argument swap that still compiles and still runs.",
+      "rule": "bare-string-params",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 20.0
+    },
+    {
+      "capped": false,
+      "category": "quality",
+      "deducted": 0.0,
+      "describes": "crate-wide allow(clippy::all) or allow(warnings), per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Replace the blanket allow with the specific lints meant, or fix them. A crate-wide allow also silences everything written after it, including code nobody has typed yet.",
+      "rule": "broad-lint-silencing",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 25.0
+    },
+    {
+      "capped": false,
+      "category": "modularity",
+      "deducted": 0.0,
+      "describes": "crates whose signatures are mostly built from three or more other crates' types",
+      "findings": [],
+      "language": "rust",
+      "remedy": "A crate built mostly from other crates' types, pulled from several of them, usually wants splitting or absorbing. One strong pull is an adapter and perfectly fine.",
+      "rule": "crate-type-scatter",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 10.0
+    },
+    {
+      "capped": false,
+      "category": "security",
+      "deducted": 0.0,
+      "describes": "a dispatch that checks in its arms and does nothing in its catch-all, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Match the action exhaustively, with no catch-all, so a new action cannot be added without deciding what it is allowed to do. As written, everything nobody listed is permitted.",
+      "rule": "default-allow-dispatch",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 25.0
+    },
+    {
+      "capped": false,
+      "category": "security",
+      "deducted": 0.0,
+      "describes": "a permission or validation call whose answer is thrown away, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Handle the result. `let _ = enforce_read(path)` reads as enforcement at a glance and performs none — it is worse than no call at all, because a reviewer counts it.",
+      "rule": "discarded-check",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 30.0
+    },
+    {
+      "capped": false,
+      "category": "quality",
+      "deducted": 0.0,
+      "describes": "function bodies that are exact token copies of another, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Move the shared body somewhere both callers can reach. The copies are listed below; they were found by exact token match, so they were copied rather than merely similar.",
+      "rule": "duplicated-bodies",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 10.0
+    },
+    {
+      "capped": false,
+      "category": "security",
+      "deducted": 0.0,
+      "describes": "spawn targets chosen by an environment variable, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Resolve the program from a known location, or validate it before spawning. As it stands, whoever sets the variable chooses what runs.",
+      "rule": "env-controlled-spawn",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 30.0
+    },
+    {
+      "capped": false,
+      "category": "containment",
+      "deducted": 0.0,
+      "describes": "process::exit called from a library crate, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Return an error and let the binary decide the exit code. A library that exits takes that decision away from every caller, including a test harness.",
+      "rule": "exit-in-library",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 30.0
+    },
+    {
+      "capped": false,
+      "category": "quality",
+      "deducted": 0.0,
+      "describes": "JSON assembled by interpolation rather than serialised, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Serialise with serde. A value interpolated into a format string decides the structure around it, which is the same mistake as building SQL by concatenation.",
+      "rule": "hand-built-json",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 10.0
+    },
+    {
+      "capped": false,
+      "category": "modularity",
+      "deducted": 0.0,
+      "describes": "files longer than max_lines, per 10k lines — a house standard, not a fact",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Split the file, or raise the standard if this is simply how the project is written: cqx config set oversized-files.max_lines N. Measured across ripgrep, tokio and deno, file length tracks habit rather than quality.",
+      "rule": "oversized-files",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 25.0
+    },
+    {
+      "capped": false,
+      "category": "modularity",
+      "deducted": 0.0,
+      "describes": "share of all lines living in files longer than max_lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Same standard as oversized-files, measured by weight rather than count: it catches a codebase where most of the code lives in a handful of very large files.",
+      "rule": "oversized-line-share",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 15.0
+    },
+    {
+      "capped": false,
+      "category": "security",
+      "deducted": 0.0,
+      "describes": "a subprocess handed a literal argument that relaxes its own checks, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Forward the caller's policy instead of overriding it. A child spawned with the permission checks turned off does not inherit the parent's answer, it discards it.",
+      "rule": "permission-granting-argument",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 25.0
+    },
+    {
+      "capped": false,
+      "category": "quality",
+      "deducted": 0.0,
+      "describes": "functions returning Result<_, String> instead of a real error type, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Give the crate an error type and return that. A String error cannot be matched on, so every caller either re-parses the text or swallows it.",
+      "rule": "result-string-density",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 30.0
+    },
+    {
+      "capped": false,
+      "category": "security",
+      "deducted": 0.0,
+      "describes": "a shell handed an argument the extractor could not resolve, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Check every program the script invokes, not only the first word, or refuse anything but a single command. Validating the head of a string and running the whole of it through a shell means `git status; rm -rf ~` passes a check for `git`.",
+      "rule": "shell-argument-unchecked",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 30.0
+    },
+    {
+      "capped": false,
+      "category": "security",
+      "deducted": 0.0,
+      "describes": "spawning a shell, which turns an argument into a command, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Pass the program and its arguments directly rather than through a shell. A shell turns an argument into a command.",
+      "rule": "shell-invocation",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 20.0
+    },
+    {
+      "capped": false,
+      "category": "quality",
+      "deducted": 0.0,
+      "describes": "function bodies that are exact token copies of another, per 10k lines",
+      "findings": [],
+      "language": "typescript",
+      "remedy": "Move the shared body somewhere both callers can reach. The copies are listed below; they were found by exact token match, so they were copied rather than merely similar.",
+      "rule": "duplicated-bodies",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 10.0
+    },
+    {
+      "capped": true,
+      "category": "security",
+      "deducted": 17.0,
+      "describes": "global eval/Function calls and literal-string timers, per 10k lines",
+      "findings": [
+        {
+          "col": [
+            2,
+            13
+          ],
+          "file": "src/library.tsx",
+          "item": {
+            "from": 1,
+            "kind": "function",
+            "name": "render",
+            "to": 6
+          },
+          "line": 3,
+          "what": "executes dynamically constructed code"
+        }
+      ],
+      "language": "typescript",
+      "remedy": "Use ordinary functions and pass a callback to timers instead of executing strings.",
+      "rule": "dynamic-code",
+      "total_findings": 1,
+      "value": 20.0,
+      "weight": 17.0
+    },
+    {
+      "capped": false,
+      "category": "containment",
+      "deducted": 0.0,
+      "describes": "global process.exit outside a bin or explicit entry file, per 10k lines",
+      "findings": [],
+      "language": "typescript",
+      "remedy": "Return an error and let the entry point choose the process exit code.",
+      "rule": "exit-in-library",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 30.0
+    },
+    {
+      "capped": false,
+      "category": "modularity",
+      "deducted": 0.0,
+      "describes": "files longer than max_lines, per 10k lines — a house standard, not a fact",
+      "findings": [],
+      "language": "typescript",
+      "remedy": "Split the file, or set typescript/oversized-files.params.max_lines in cqx.json to the project's standard.",
+      "rule": "oversized-files",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 25.0
+    },
+    {
+      "capped": false,
+      "category": "modularity",
+      "deducted": 0.0,
+      "describes": "share of all lines living in files longer than max_lines",
+      "findings": [],
+      "language": "typescript",
+      "remedy": "Same standard as oversized-files, measured by weight rather than count: it catches a codebase where most of the code lives in a handful of very large files.",
+      "rule": "oversized-line-share",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 15.0
+    },
+    {
+      "capped": true,
+      "category": "quality",
+      "deducted": 10.0,
+      "describes": "empty catches without an explanation, per 10k lines",
+      "findings": [
+        {
+          "col": [
+            22,
+            30
+          ],
+          "file": "src/library.tsx",
+          "item": {
+            "from": 1,
+            "kind": "function",
+            "name": "render",
+            "to": 6
+          },
+          "line": 4,
+          "what": "empty catch discards the error without an explanation"
+        }
+      ],
+      "language": "typescript",
+      "remedy": "Handle or rethrow the error, or explain in the catch why ignoring it is safe.",
+      "rule": "swallowed-errors",
+      "total_findings": 1,
+      "value": 20.0,
+      "weight": 10.0
+    },
+    {
+      "capped": true,
+      "category": "quality",
+      "deducted": 10.0,
+      "describes": "@ts-ignore or eslint-disable comments without a reason, per 10k lines",
+      "findings": [
+        {
+          "col": [
+            2,
+            15
+          ],
+          "file": "src/library.tsx",
+          "item": {
+            "from": 1,
+            "kind": "function",
+            "name": "render",
+            "to": 6
+          },
+          "line": 2,
+          "what": "suppression has no reason"
+        }
+      ],
+      "language": "typescript",
+      "remedy": "Add a reason after @ts-ignore, or an ESLint -- description.",
+      "rule": "undocumented-suppressions",
+      "total_findings": 1,
+      "value": 20.0,
+      "weight": 10.0
+    },
+    {
+      "capped": false,
+      "category": "quality",
+      "deducted": 0.0,
+      "describes": "crate-level lint suppressions with no reason given, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Add reason = \"...\" to each suppression. deno documents every one of its crate-level suppressions, which is why theirs read as decisions rather than residue.",
+      "rule": "undocumented-suppressions",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 10.0
+    },
+    {
+      "capped": false,
+      "category": "legibility",
+      "deducted": 0.0,
+      "describes": "share of spawn and env targets the extractor could not resolve",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Where the target comes from a parameter, the caller is deciding it — hoisting the spawn there makes it knowable. Where it comes from the environment, that is the finding rather than a gap.",
+      "rule": "unproven-spawn-targets",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 30.0
+    }
+  ],
+  "scores": {
+    "containment": 100,
+    "legibility": 100,
+    "modularity": 100,
+    "quality": 80,
+    "security": 83
+  },
+  "skipped_files": [
+    {
+      "file": "broken.ts",
+      "reason": "Unexpected token"
+    }
+  ]
+}

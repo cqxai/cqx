@@ -78,6 +78,7 @@ impl Prepared {
         stats.nodes += go.nodes;
         stats.edges += go.edges;
         stats.unparsed.extend(ts.unparsed);
+        stats.unparsed.extend(go.unparsed);
         Ok(stats)
     }
 }
