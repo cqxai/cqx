@@ -211,8 +211,6 @@ pub fn excluded_name(language: &str, name: &str) -> bool {
                 "python",
                 "php",
                 "typescript",
-                "c",
-                "csharp",
             ]
             .iter()
             .any(|l| excluded_name(l, name)),

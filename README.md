@@ -712,3 +712,8 @@ shared classifier, with parse coverage unchanged. No weights or ramps changed.
 Split and monolithic **after** reports have identical complete JSON bytes on all
 three corpora, all language fixtures and the Rust/TS/Go/C/C++/C# fixture; complete
 datasets also agree. Existing main goldens and the held C# golden are unchanged.
+
+Directory discovery retains sibling sources under C/C#-specific names such as
+`deps/` and `bin/`; the owning frontend applies its exclusion. Adding a language
+must not remove another language's input before dispatch. Actual directory CLI
+scans reproduce the after score tuples above.

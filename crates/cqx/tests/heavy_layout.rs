@@ -125,3 +125,17 @@ fn heavy_specific_codes_stay_quiet_and_broad_suppressions_fire() {
         assert_eq!(findings(&[(path, source)], language, "undocumented-suppressions"), 1, "{language}");
     }
 }
+
+#[test]
+fn directory_discovery_preserves_sibling_sources_in_heavy_output_names() {
+    let root =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/heavy-discovery");
+    let vfs = cqx_vfs::from_dir(&root).unwrap();
+    assert!(vfs.contains("deps/helper.py"));
+    assert!(vfs.contains("bin/tool.ts"));
+    let files: Vec<_> = vfs.paths().map(|p| (p, vfs.read(p).unwrap())).collect();
+    assert_eq!(findings(&files, "python", "exit-in-library"), 1);
+    assert_eq!(findings(&files, "typescript", "dynamic-code"), 1);
+    assert_eq!(findings(&files, "c", "exit-in-library"), 0);
+    assert_eq!(findings(&files, "csharp", "exit-in-library"), 0);
+}

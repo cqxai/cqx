@@ -120,7 +120,14 @@ fn locally_declared_must_check_returns_fire_only_when_unused() {
 #[test]
 fn undocumented_suppressions_fire_but_explanations_and_ordinary_comments_stay_quiet() {
     for lang in ["c", "cpp"] {
-        assert_eq!(count(lang, "// NOLINT\nvoid f(void) {}\n// NOLINTNEXTLINE\nint value;\n", "undocumented-suppressions"), 2);
+        assert_eq!(
+            count(
+                lang,
+                "// NOLINT\nvoid f(void) {}\n// NOLINTNEXTLINE\nint value;\n",
+                "undocumented-suppressions"
+            ),
+            2
+        );
         assert_eq!(count(lang, "// NOLINT(readability-identifier-naming) -- external C ABI names\nvoid f(void) {}\n// Compatibility with a vendor header requires disabling this warning.\n#pragma clang diagnostic ignored \"-Wconversion\"\n", "undocumented-suppressions"), 0);
         assert_eq!(
             count(
@@ -180,10 +187,7 @@ fn excludes_tests_generated_and_parse_skips_keep_product_denominators() {
                 "tests/lib.c",
                 "#include <stdlib.h>\nvoid f(void) { exit(1); }",
             ),
-            (
-                "generated.c",
-                "// @generated\n#error not parsed",
-            ),
+            ("generated.c", "// @generated\n#error not parsed"),
             ("lib.c", "int ok;"),
             ("broken.c", "void f( { ;"),
         ],

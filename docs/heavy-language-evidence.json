@@ -38,7 +38,7 @@
         ],
         "version": "0.1.24",
         "abi_version": 1,
-        "sha256": "f391e99fd85fa5fcdd19f8b944b3480334d66478c4845f96984205552532ea0d"
+        "sha256": "da05481e1aee41a35c3b882317a49e6cffe72605534747a9f86512501f5bf17f"
       },
       "c": {
         "file": "c.wasm",
@@ -60,7 +60,7 @@
         ],
         "version": "0.1.24",
         "abi_version": 1,
-        "sha256": "392395b4bd51069bbbdf99603cb396ce1e08f0bc96fd5de08d108e70df738df3"
+        "sha256": "6542bae68ad043b91db60aeb84b3bbeab851e8ecc77b8a130927521fb9dffc40"
       },
       "csharp": {
         "file": "csharp.wasm",
@@ -73,7 +73,7 @@
         ],
         "version": "0.1.24",
         "abi_version": 1,
-        "sha256": "c732c81576868a6bcc3f2030228665758fe1888e4890c650048cd0d52248f4b5"
+        "sha256": "bbb78c8e5f6569acb5e7213a246f612aac1211c1bbbe1351652d08f64600b744"
       }
     }
   },
@@ -82,7 +82,7 @@
       "report_sha256": "7d8246ce417d1c2bdb7bc73e3e21a2515536c0e1dc979d603e5bbe49f6f2768e",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 111.61467900000002,
+      "ms": 101.51780499999995,
       "scores": {
         "containment": 70,
         "legibility": 100,
@@ -122,7 +122,7 @@
       "report_sha256": "46345dbc926e97afe28bd90f59402905ea45fa8be862fa1abf4230adc93cc97c",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 24.581636000000003,
+      "ms": 22.51909999999998,
       "scores": {
         "containment": 100,
         "legibility": 100,
@@ -162,7 +162,7 @@
       "report_sha256": "d4d00e96b8bfe362825f9dd193aa267a9c0a2eae947ec6e1d17c188aa5f54c95",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 13.062997999999993,
+      "ms": 13.569465000000037,
       "scores": {
         "containment": 70,
         "legibility": 100,
@@ -202,7 +202,7 @@
       "report_sha256": "d6c90c6b3cfe2c72e95b72da970793c690755da62b96cb8f1f221b575f14c896",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 20.485187999999994,
+      "ms": 19.681389999999965,
       "scores": {
         "containment": 93,
         "legibility": 100,
@@ -236,7 +236,7 @@
       "report_sha256": "993c6cc9439083f68c214620ed70585f89d6c49986bdffe046fea9842d1a34d4",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 10.743213000000026,
+      "ms": 13.371483000000126,
       "scores": {
         "containment": 93,
         "legibility": 100,
@@ -270,7 +270,7 @@
       "report_sha256": "774b96287e0211deba36aa1d1a451d16eaab7e64b45d863bc15eb53859633c1f",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 14.627568999999994,
+      "ms": 12.372389000000112,
       "scores": {
         "containment": 93,
         "legibility": 100,
@@ -304,7 +304,7 @@
       "report_sha256": "984891ab79b18bac9af2b89010cf66b0477c5832ef680da6042a2952b84ac724",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 12.051371000000017,
+      "ms": 11.67313799999988,
       "scores": {
         "containment": 93,
         "legibility": 100,
@@ -338,7 +338,7 @@
       "report_sha256": "184d46a2466848a2f83167a0b2d96d434af40085e7bddaf96ae2e6745dde2e4a",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 10.36004399999996,
+      "ms": 14.690695000000005,
       "scores": {
         "containment": 93,
         "legibility": 100,
@@ -372,7 +372,7 @@
       "report_sha256": "40014fad6fe1a073e09b9a4727ecce91b27c76deb4d2850cfc68c8e781267868",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 11.603023000000007,
+      "ms": 12.030230000000074,
       "scores": {
         "containment": 93,
         "legibility": 100,
@@ -406,7 +406,7 @@
       "report_sha256": "270aac830873604939a333f10d41082da5a690b480ee89d9703113f837ac0a44",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 58.764853000000016,
+      "ms": 52.01610699999992,
       "scores": {
         "containment": 82,
         "legibility": 100,
@@ -450,7 +450,7 @@
       "report_sha256": "216f708af40e105ee29424447a297a914f81c67fc4bfd9f111ae84c817fbed2f",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 77.91125599999998,
+      "ms": 64.67112299999985,
       "scores": {
         "containment": 93,
         "legibility": 100,
@@ -480,11 +480,49 @@
         }
       ]
     },
+    "heavy-discovery": {
+      "report_sha256": "e34df69415f56d3c947338aa1ea4c034d21bcf7b62d3a5f2aa5ca9860a74ad76",
+      "full_report_bytes_identical": true,
+      "full_dataset_equal": true,
+      "ms": 19.129091000000017,
+      "scores": {
+        "containment": 70,
+        "legibility": 100,
+        "modularity": 100,
+        "quality": 100,
+        "security": 70
+      },
+      "product_lines": 3,
+      "coverage": {
+        "typescript": {
+          "parsed": 1,
+          "skipped": 0
+        },
+        "python": {
+          "parsed": 1,
+          "skipped": 0
+        }
+      },
+      "rules": [
+        {
+          "language": "python",
+          "rule": "exit-in-library",
+          "findings": 1,
+          "deducted": 30
+        },
+        {
+          "language": "typescript",
+          "rule": "dynamic-code",
+          "findings": 1,
+          "deducted": 30
+        }
+      ]
+    },
     "six-language": {
       "report_sha256": "dfa3d5c5fb74bc4f7d19c91c3a6d8c8eba976cb6303b6d96a944076237146d66",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 35.64385800000002,
+      "ms": 25.20021299999985,
       "scores": {
         "containment": 0,
         "legibility": 100,
@@ -562,7 +600,7 @@
       "report_sha256": "3dc0a908fe343f9e4af566e38e5b577fe684148545485de37933bbc964022a11",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 27.632565,
+      "ms": 21.472782999999936,
       "scores": {
         "containment": 10,
         "legibility": 100,
@@ -610,7 +648,7 @@
       "report_sha256": "a29c57ee31ccf0b0eae28c914ade5383737d7b96105598922a88d28fce6fafbe",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 7735.690733,
+      "ms": 7503.805956,
       "scores": {
         "containment": 76,
         "legibility": 100,
@@ -728,7 +766,7 @@
       "report_sha256": "f9a8bb90dc05db5feb9995c5df062cfd435bb8b70bb2348c0134ba42afb9a4bf",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 20390.354844000005,
+      "ms": 18885.882666999998,
       "scores": {
         "containment": 100,
         "legibility": 100,
@@ -780,7 +818,7 @@
       "report_sha256": "541c8e23cfe16b9e556147cfcb9e4c4c6be95b897a8c247a86e655ed57fb38ad",
       "full_report_bytes_identical": true,
       "full_dataset_equal": true,
-      "ms": 11403.918279999998,
+      "ms": 9997.444864000005,
       "scores": {
         "containment": 100,
         "legibility": 100,

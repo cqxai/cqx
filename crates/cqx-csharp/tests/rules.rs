@@ -173,10 +173,7 @@ fn duplicate_and_size_rules_fire_with_config_and_quiet_counterexamples() {
 #[test]
 fn a_directive_at_eof_needs_no_source_newline() {
     assert_eq!(
-        count(
-            "#pragma warning disable",
-            "undocumented-suppressions"
-        ),
+        count("#pragma warning disable", "undocumented-suppressions"),
         1
     );
     assert_eq!(

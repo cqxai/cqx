@@ -63,6 +63,7 @@ for (const language of ['rust-compat', 'typescript', 'go', 'java', 'kotlin', 'sw
 assert.deepEqual(loaded, ['core']);
 await parity('c-cpp', await fixture(resolve('fixtures/c-cpp')));
 await parity('csharp', await fixture(resolve('fixtures/csharp')));
+await parity('heavy-discovery', await fixture(resolve('fixtures/heavy-discovery')));
 
 const mixed = [
   ['Cargo.toml', '[package]\nname="mixed"\nversion="0.1.0"\n'],
