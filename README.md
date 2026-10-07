@@ -758,8 +758,11 @@ release environment; dispatch remains build-only.
 The **first modular release** also publishes the complete monolith under the old
 `cqx_wasm.wasm` name, with a `deprecated_artifacts` manifest entry and
 `WASM-DEPRECATION.md`. The next release omits it. `scripts/wasm-compat.mjs` inspects
-the previous GitHub release's actual asset inventory, rather than guessing a
-version number; reruns of the transitional release retain its manifest policy.
+all GitHub release tags and their actual asset inventories, including drafts
+and prereleases. A tag with no lower semantic-version modular release retains
+the monolith; a lower modular tag ends that transition. Higher-version releases
+do not determine an older hotfix's policy. Reruns retain their own published
+manifest policy, even after later releases.
 A failed inventory read fails the build. Historical versioned assets stay at
 their existing URLs. Hosts should adopt the loader before the next release.
 
@@ -770,6 +773,7 @@ prevents mixed or stale cached artifacts from becoming a partial release.
 ```sh
 node scripts/package-wasm.mjs .target/wasm-dist .target/wasm-upload --legacy
 node scripts/test-wasm-package.mjs .target/wasm-dist
+node scripts/test-wasm-compat.mjs
 python3 scripts/prove-wasm-package.py .target/wasm-dist
 ```
 

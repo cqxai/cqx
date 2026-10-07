@@ -9,8 +9,9 @@ import { ABI_VERSION } from './wasm-catalog.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const version = (await readFile(join(root, 'Cargo.toml'), 'utf8')).match(/^version = "([^"]+)"/m)[1];
 export async function packageWasm(source, output, { legacy = false } = {}) {
-  const manifest = JSON.parse(await readFile(join(source, 'manifest.json'), 'utf8'));
-  createLoader({ manifest }); // Shared manifest/routing/version/ABI validation.
+  const manifestBytes = await readFile(join(source, 'manifest.json'));
+  const manifest = JSON.parse(manifestBytes);
+  createLoader({ manifest, manifestSha256: createHash('sha256').update(manifestBytes).digest('hex') }); // Shared manifest/routing/version/ABI validation.
   if (manifest.version !== version) throw Error(`WASM version ${manifest.version} disagrees with source ${version}`);
   if (Object.keys(manifest.modules).sort().join(',') !== 'c,core,csharp') throw Error('release requires core, c and csharp modules');
   const assets = [];

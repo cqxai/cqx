@@ -128,6 +128,7 @@ jobs:
           node scripts/test-loader.mjs .target/wasm-dist
           node scripts/test-modules.mjs .target/wasm-dist
           node scripts/test-wasm-package.mjs .target/wasm-dist
+          node scripts/test-wasm-compat.mjs
 
       - name: Exercise TypeScript and mixed-repo WASM ABI
         run: node scripts/test-typescript-wasm.mjs .target/wasm-dist/cqx_wasm.wasm

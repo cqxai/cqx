@@ -75,8 +75,10 @@ jobs:
         name: Decide the one-release single-file transition
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.v.outputs.tag }}
+          RELEASE_REPO: ${{ github.repository }}
         run: |
-          COMPAT=$(node scripts/wasm-compat.mjs '${{ steps.v.outputs.tag }}' '${{ github.repository }}')
+          COMPAT=$(node scripts/wasm-compat.mjs "$RELEASE_TAG" "$RELEASE_REPO")
           echo "compat=$COMPAT" >> "$GITHUB_OUTPUT"
 
   # ---------------------------------------------------------------------------
@@ -201,6 +203,7 @@ jobs:
           python3 scripts/build-wasm-modules.py
           node scripts/test-modules.mjs .target/wasm-dist
           node scripts/test-wasm-package.mjs .target/wasm-dist
+          node scripts/test-wasm-compat.mjs
       - name: Collect verified modules and transitional compatibility
         run: |
           COMPAT_ARGS=()
