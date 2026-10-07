@@ -174,7 +174,8 @@ as source; analysis does not choose a GOOS/GOARCH build or invoke Go tooling.
 The CLI and browser WASM API also analyze `.java`. The strict pure-Rust
 Rezel Java SE 26 parser emits facts from its decoded AST; a parse or AST-lowering
 failure skips that whole file and reports the reason. No JDK or C compiler is
-needed. Classic, instance and compact-source `main` entry units are recognized.
+needed. Classic, instance and compact-source `main` entry classes are recognized;
+only the class declaring `main` is exempt from the library-exit rule.
 The parser and its pinned Unicode tables are vendored with unchanged source;
 manifest aliases isolate Java Unicode 17 from Rust's existing Unicode 18 tables.
 See [the dependency provenance](vendor/README.md).
@@ -191,11 +192,19 @@ This is neither Java type checking nor taint analysis; indirect calls, aliases,
 and values that become constant through data flow are not resolved. String
 parameter density is omitted because this slice does not establish domain types.
 
-Java test directories and `*Test.java`/`*Tests.java` files are excluded from
-product scoring. `build/`, `target/`, generated-source directories, standard
-`@Generated` annotations, and generated headers are excluded entirely. Empty
-catches with explanatory comments and suppressions with adjacent reasons stay
-quiet. Body duplication ignores comments but preserves token and literal values.
+Maven/Gradle test layouts (`src/test/`, `src/testFixtures/`, `src/androidTest/`,
+`src/integrationTest/`) and project-root `test/`/`tests/` directories are excluded
+from product scoring. Filename prefixes/suffixes alone do not establish test
+code: `TestimonialService.java` and Test-named classes under `src/main` score.
+`build/`, `target/`, `generated-sources/`, `generated/` and `vendor/` exclusions
+are anchored to the repository root or directories containing `pom.xml`,
+`build.gradle(.kts)` or `settings.gradle(.kts)`; Java package directories with
+those names still score. Standard `@Generated` annotations and generated
+headers are excluded entirely. Empty catches with explanatory comments stay
+quiet. Suppressions count only at class scope or when they include `"all"`, and
+an adjacent justification comment keeps those quiet too. Specific method,
+field and local suppressions such as `"unchecked"` or `"rawtypes"` stay quiet.
+Body duplication ignores comments but preserves token and literal values.
 
 
 ## The model

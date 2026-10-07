@@ -12,6 +12,7 @@ pub fn manifests(vfs: &Vfs) -> Result<Value, String> {
         serde_json::json!({ "packages": [] })
     };
     metadata["typescript_bins"] = serde_json::json!(cqx_ts::entry_files(vfs));
+    metadata["java_roots"] = serde_json::json!(cqx_vfs::java_project_roots(vfs));
     metadata["go_modules"] = serde_json::json!(cqx_go::modules(vfs));
     Ok(metadata)
 }
@@ -20,6 +21,7 @@ pub struct Prepared {
     rust: cqx_rust::extract::Prepared,
     bins: std::collections::BTreeSet<String>,
     go: cqx_go::Prepared,
+    java_roots: std::collections::BTreeSet<String>,
 }
 
 pub fn prepare_reporting(
@@ -34,6 +36,8 @@ pub fn prepare_reporting(
         .flatten()
         .filter_map(|v| v.as_str().map(str::to_string))
         .collect();
+    let java_roots = serde_json::from_value(metadata["java_roots"].clone())
+        .unwrap_or_else(|_| cqx_vfs::java_project_roots(vfs));
     let go_modules = serde_json::from_value(metadata["go_modules"].clone()).unwrap_or_default();
     let go_files = vfs.paths().filter(|p| cqx_go::is_source(p)).count() as u32;
     let extra_files = vfs.paths().filter(|p| cqx_java::is_source(p)).count() as u32;
@@ -45,7 +49,12 @@ pub fn prepare_reporting(
         tick,
     )?;
     let go = cqx_go::prepare(vfs, go_modules, tick)?;
-    Ok(Prepared { rust, bins, go })
+    Ok(Prepared {
+        rust,
+        bins,
+        go,
+        java_roots,
+    })
 }
 
 impl Prepared {
@@ -78,7 +87,7 @@ impl Prepared {
         stats.files += go.files;
         stats.nodes += go.nodes;
         stats.edges += go.edges;
-        let extra = cqx_java::run(vfs, &mut out, tick)?;
+        let extra = cqx_java::run_with_roots(vfs, &mut out, &self.java_roots, tick)?;
         stats.packages += usize::from(extra.files > 0);
         stats.files += extra.files;
         stats.nodes += extra.nodes;
@@ -123,7 +132,8 @@ pub const EXTRACT_COMMAND: CommandSpec = CommandSpec {
     name: "extract",
     owner: "cqx-analysis",
     category: "index",
-    summary: "Read Rust, Go, Java, TypeScript and JavaScript and emit facts as newline-delimited JSON",
+    summary:
+        "Read Rust, Go, Java, TypeScript and JavaScript and emit facts as newline-delimited JSON",
     // `scan` was an alias here. It is now its own command — the one the front
     // page has always shown — and the registry took the second registration
     // without a word, so `cqx scan` quietly went on emitting facts.

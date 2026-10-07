@@ -10,7 +10,7 @@
 //! the bytes first and then analysing them keeps the async confined to the part
 //! that genuinely does I/O.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -127,12 +127,40 @@ pub fn is_typescript_source(path: &str) -> bool {
     )
 }
 
+const JAVA_PROJECT_MANIFESTS: &[&str] = &[
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "settings.gradle",
+    "settings.gradle.kts",
+];
+
+pub fn is_java_project_manifest(path: &str) -> bool {
+    JAVA_PROJECT_MANIFESTS.contains(&path.rsplit('/').next().unwrap_or(path))
+}
+
+/// Root prefixes include a trailing slash so sibling package names cannot match.
+pub fn java_project_roots(vfs: &Vfs) -> BTreeSet<String> {
+    std::iter::once(String::new())
+        .chain(
+            vfs.paths()
+                .filter(|p| is_java_project_manifest(p))
+                .map(|p| {
+                    p.rsplit_once('/')
+                        .map(|(dir, _)| format!("{dir}/"))
+                        .unwrap_or_default()
+                }),
+        )
+        .collect()
+}
+
 /// What a source snapshot is worth carrying: the manifests that describe the
 /// workspace, the lockfile that pins it, and the code itself.
 pub fn is_interesting(path: &str) -> bool {
     path.ends_with(".rs")
         || is_typescript_source(path)
         || path.ends_with(".go")
+        || is_java_project_manifest(path)
         || matches!(path.rsplit('.').next(), Some("java"))
         || path == "go.mod"
         || path.ends_with("/go.mod")
@@ -175,6 +203,13 @@ pub fn from_dir(root: &Path) -> std::io::Result<Vfs> {
             !e.file_type().is_dir()
                 || !is_ignored_dir(&e.file_name().to_string_lossy())
                 || e.depth() == 0
+                || (matches!(e.file_name().to_str(), Some("build" | "target"))
+                    && e.path().parent().is_some_and(|parent| {
+                        parent != root
+                            && !JAVA_PROJECT_MANIFESTS
+                                .iter()
+                                .any(|name| parent.join(name).is_file())
+                    }))
         })
         .filter_map(Result::ok)
         .filter(|e| e.file_type().is_file())
@@ -185,7 +220,14 @@ pub fn from_dir(root: &Path) -> std::io::Result<Vfs> {
             .unwrap_or(entry.path())
             .to_string_lossy()
             .replace('\\', "/");
-        if !is_interesting(&rel) {
+        // Preserve existing discovery exclusions for all other languages while
+        // letting Java package directories called build/target reach its parser.
+        let in_ignored_dir = rel
+            .rsplit_once('/')
+            .is_some_and(|(dir, _)| dir.split('/').any(is_ignored_dir));
+        if !is_interesting(&rel)
+            || (in_ignored_dir && !rel.ends_with(".java") && !is_java_project_manifest(&rel))
+        {
             continue;
         }
         // Source that is not valid UTF-8 is not source we can parse.
