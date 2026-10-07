@@ -1,0 +1,10 @@
+[package]
+name="cqx-python-unicode"
+version="1.0.24"
+edition="2021"
+license="(MIT OR Apache-2.0) AND Unicode-3.0"
+repository="https://github.com/dtolnay/unicode-ident"
+[lib]
+name="unicode_ident"
+path="src/lib.rs"
+[workspace]

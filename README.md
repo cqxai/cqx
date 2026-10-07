@@ -436,3 +436,26 @@ external project disagreed:
 Locally the test skips when the checkouts are absent. Setting
 `CQX_REFERENCE_DIR` asserts they are present, so a failed fetch fails the job
 rather than quietly checking nothing.
+
+## Python frontend: scope of the score
+
+Python 3.14 files are parsed by pure-Rust Rezel in CLI and WASM. The score
+measures source effects and containment (bound sys.exit/os._exit), security
+review sites (dynamic shell commands, builtin eval/exec, pickle and yaml.load
+without a bound SafeLoader), broad error discards, unexplained noqa/type: ignore,
+exact body duplication and oversized files. It uses only the original five
+categories and python/<rule> settings in cqx.json. It does **not** measure
+unannotated static types, type safety, string-parameter domains, runtime values
+or taint flow; no type-level rule is ported merely because Python accepts hints.
+A high score is not a guarantee about those unmeasured properties.
+
+Imports/aliases and Python's NFKC identifier normalization bind standard APIs;
+custom/shadowed functions stay quiet. Literal commands, shell=False argv, explicit
+SafeLoader/CSafeLoader, handled or explained catches and suppression reasons stay
+quiet. __main__.py, setup.py and literal console/gui script modules from nested
+pyproject.toml, setup.cfg or setup.py are entry units; __name__ guards exempt their
+positive branch only. Entry metadata travels to sharded readers. Dynamic setup
+metadata is not executed or guessed. Venvs, site-packages, caches, generated/vendor
+sources and tests are excluded from product scores. Parse failures skip/report
+whole files. See vendor/README.md for unchanged parser/private Unicode provenance.
+No extra WASM toolchain is required.

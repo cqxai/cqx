@@ -1,0 +1,19 @@
+[package]
+name="cqx-python"
+version.workspace=true
+edition.workspace=true
+license.workspace=true
+repository.workspace=true
+description="python source analysis for cqx."
+[dependencies]
+cqx-schema.workspace=true
+cqx-vfs.workspace=true
+cqx-source={path="../cqx-source"}
+rezel-common="=0.0.0"
+rezel-lang-python={version="=0.0.0",path="../../vendor/rezel-lang-python"}
+toml.workspace=true
+unicode-normalization="=0.1.24"
+[dev-dependencies]
+cqx-score={path="../cqx-score"}
+cqx-store={path="../cqx-store"}
+serde_json.workspace=true
