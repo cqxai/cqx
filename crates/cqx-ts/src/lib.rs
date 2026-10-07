@@ -16,6 +16,7 @@ pub struct Stats {
     pub files: usize,
     pub nodes: usize,
     pub edges: usize,
+    pub unparsed: Vec<String>,
 }
 
 pub use cqx_vfs::is_typescript_source as is_source;
@@ -26,8 +27,8 @@ fn is_test(path: &str) -> bool {
         || [".test.", ".spec."].iter().any(|s| path.contains(s))
 }
 
-/// Binaries are explicit package.json `bin` entries, shebang scripts, or files
-/// named main/cli in a source root or under bin. `index` is often a library.
+/// Package entries include declared bins and scripts that directly run a source
+/// file with Node, tsx or Bun. `index` by itself is often a library.
 pub fn entry_files(vfs: &Vfs) -> BTreeSet<String> {
     let mut result = BTreeSet::new();
     for path in vfs.paths().filter(|p| p.ends_with("package.json")) {
@@ -43,7 +44,18 @@ pub fn entry_files(vfs: &Vfs) -> BTreeSet<String> {
             serde_json::Value::Object(m) => m.values().filter_map(|v| v.as_str()).collect(),
             _ => Vec::new(),
         };
-        for bin in paths {
+        let scripts = value["scripts"]
+            .as_object()
+            .into_iter()
+            .flat_map(|m| m.values())
+            .filter_map(|v| v.as_str())
+            .filter_map(|command| {
+                let mut words = command.split_whitespace();
+                let runner = words.next()?;
+                let file = words.next()?;
+                (matches!(runner, "node" | "tsx" | "bun") && is_source(file)).then_some(file)
+            });
+        for bin in paths.into_iter().chain(scripts) {
             result.insert(format!("{dir}{}", bin.trim_start_matches("./")));
         }
     }
@@ -72,6 +84,10 @@ pub fn run_with_entries(
     let mut stats = Stats::default();
     for path in vfs.paths().filter(|p| is_source(p)) {
         let source = vfs.read(path).unwrap_or_default();
+        if excluded_source(path, source) {
+            tick();
+            continue;
+        }
         let allocator = Allocator::default();
         let parsed = Parser::new(
             &allocator,
@@ -81,22 +97,20 @@ pub fn run_with_entries(
         .with_config(oxc_parser::config::TokensParserConfig)
         .parse();
         tick();
-        // A syntax error is a failed analysis, never a clean score on an empty tree.
-        if !parsed.diagnostics.is_empty() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("{path}: {}", parsed.diagnostics[0]),
-            ));
+        // A bad file cannot supply trustworthy facts, but must not prevent
+        // scoring the rest of a mixed repository. Carry the diagnostic through
+        // the fact stream so CLI, WASM and sharded reports all expose it.
+        if let Some(diagnostic) = parsed.diagnostics.first() {
+            skipped_file(&mut writer, &mut stats, path, &diagnostic.to_string())?;
+            continue;
         }
         let semantic = SemanticBuilder::new()
             .with_build_nodes(true)
             .with_check_syntax_error(true)
             .build(&parsed.program);
-        if !semantic.diagnostics.is_empty() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("{path}: {}", semantic.diagnostics[0]),
-            ));
+        if let Some(diagnostic) = semantic.diagnostics.first() {
+            skipped_file(&mut writer, &mut stats, path, &diagnostic.to_string())?;
+            continue;
         }
         writer.node(
             Node::new(package.clone(), NodeKind::Package)
@@ -130,7 +144,8 @@ pub fn run_with_entries(
             .unwrap_or("");
         let entry = bins.contains(path)
             || source.starts_with("#!")
-            || path.split('/').any(|s| s == "bin")
+            || path.split('/').any(|s| matches!(s, "bin" | "scripts"))
+            || is_config(path)
             || (matches!(stem, "main" | "cli") && matches!(dir, "" | "src"));
         let mut extractor = Extractor {
             writer: &mut writer,
@@ -138,11 +153,7 @@ pub fn run_with_entries(
             path,
             file,
             semantic: &semantic.semantic,
-            has_with: semantic
-                .semantic
-                .nodes()
-                .iter()
-                .any(|n| matches!(n.kind(), AstKind::WithStatement(_))),
+            with_depth: 0,
             tokens: &parsed.tokens,
             symbols: Vec::new(),
             error: None,
@@ -192,7 +203,7 @@ struct Extractor<'s, 'a, 'w, W: Write> {
     path: &'s str,
     file: Id,
     semantic: &'s Semantic<'a>,
-    has_with: bool,
+    with_depth: usize,
     tokens: &'s [oxc_parser::Token],
     symbols: Vec<Id>,
     error: Option<std::io::Error>,
@@ -241,7 +252,7 @@ impl<W: Write> Extractor<'_, '_, '_, W> {
         self.record(result);
     }
     fn global(&self, expr: &Expression<'_>, name: &str) -> bool {
-        !self.has_with
+        self.with_depth == 0
             && matches!(expr.get_inner_expression(), Expression::Identifier(id) if id.name == name && id.is_global_reference(self.semantic.scoping()))
     }
     fn node_process(&self, expr: &Expression<'_>) -> bool {
@@ -286,7 +297,9 @@ impl<W: Write> Extractor<'_, '_, '_, W> {
         self.record(result);
     }
     fn call(&mut self, callee: &Expression<'_>, arguments: &[Argument<'_>], span: Span) {
-        if self.global(callee, "eval") || self.global(callee, "Function") {
+        if self.global(callee, "eval")
+            || (self.global(callee, "Function") && !constant_arguments(arguments))
+        {
             self.rule(
                 "dynamic-code",
                 EdgeKind::UnsafeAt,
@@ -358,6 +371,13 @@ impl<W: Write> Extractor<'_, '_, '_, W> {
 }
 
 impl<'a, W: Write> Visit<'a> for Extractor<'_, 'a, '_, W> {
+    fn visit_with_statement(&mut self, it: &WithStatement<'a>) {
+        // The object expression is evaluated before entering the dynamic scope.
+        self.visit_expression(&it.object);
+        self.with_depth += 1;
+        self.visit_statement(&it.body);
+        self.with_depth -= 1;
+    }
     fn visit_function(&mut self, it: &Function<'a>, flags: oxc_syntax::scope::ScopeFlags) {
         self.symbol(
             it.id
@@ -399,7 +419,7 @@ impl<'a, W: Write> Visit<'a> for Extractor<'_, 'a, '_, W> {
         walk::walk_call_expression(self, it);
     }
     fn visit_new_expression(&mut self, it: &NewExpression<'a>) {
-        if self.global(&it.callee, "Function") {
+        if self.global(&it.callee, "Function") && !constant_arguments(&it.arguments) {
             self.rule(
                 "dynamic-code",
                 EdgeKind::UnsafeAt,
@@ -474,6 +494,53 @@ impl<'a, W: Write> Visit<'a> for Extractor<'_, 'a, '_, W> {
         self.record(result);
         walk::walk_import_declaration(self, it);
     }
+}
+
+fn constant_arguments(arguments: &[Argument<'_>]) -> bool {
+    arguments.iter().all(|a| {
+        a.as_expression()
+            .is_some_and(|e| matches!(e.get_inner_expression(), Expression::StringLiteral(_)))
+    })
+}
+
+fn is_config(path: &str) -> bool {
+    path.rsplit_once('.').is_some_and(|(stem, ext)| {
+        stem.ends_with(".config") && matches!(ext, "js" | "ts" | "mjs" | "cjs")
+    })
+}
+
+fn excluded_source(path: &str, source: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    let leading = source.trim_start_matches('\u{feff}').trim_start();
+    name.ends_with(".d.ts")
+        || name.ends_with(".min.js")
+        || name.ends_with(".min.mjs")
+        || name.contains(".generated.")
+        || leading.strip_prefix("//").is_some_and(|comment| {
+            comment
+                .trim_start()
+                .strip_prefix("@generated")
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with(char::is_whitespace))
+        })
+        || leading
+            .strip_prefix("/*")
+            .and_then(|c| c.split_once("*/"))
+            .is_some_and(|(banner, _)| banner.trim() == "eslint-disable")
+}
+
+fn skipped_file<W: Write>(
+    writer: &mut Writer<W>,
+    stats: &mut Stats,
+    path: &str,
+    reason: &str,
+) -> std::io::Result<()> {
+    stats.unparsed.push(format!("{path}: {reason}"));
+    writer.node(
+        Node::new(Id::file(path), NodeKind::File)
+            .attr("path", path)
+            .attr("language", "typescript")
+            .attr("skipped", reason),
+    )
 }
 
 fn is_literal_string(expr: &Expression<'_>) -> bool {

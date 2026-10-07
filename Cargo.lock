@@ -127,6 +127,7 @@ dependencies = [
  "cqx-scan",
  "cqx-score",
  "cqx-store",
+ "cqx-vfs",
  "deka-cli-core",
  "serde_json",
 ]

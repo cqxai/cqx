@@ -25,3 +25,4 @@ cqx-mcp = { path = "../cqx-mcp" }
 
 [dev-dependencies]
 serde_json.workspace = true
+cqx-vfs.workspace = true

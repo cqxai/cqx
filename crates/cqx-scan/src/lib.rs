@@ -397,6 +397,9 @@ fn print_report(here: &Scanned, against: Option<(&str, &Scanned)>) {
         here.ms as f64 / 1000.0
     );
 
+    if let Some(skipped) = here.report["skipped_files"].as_array() {
+        cqx_score::print_skipped_files(skipped);
+    }
     let empty = Vec::new();
     let rules = here
         .report

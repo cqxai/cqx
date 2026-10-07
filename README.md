@@ -83,8 +83,11 @@ TypeScript rule IDs are `typescript/<rule>`. The default rules are
 `oversized-line-share`. Scope resolution avoids reporting locally shadowed
 global APIs. An explained empty catch is allowed; suppressions need a reason
 (`@ts-ignore: reason` or `eslint-disable rule -- reason`). Process exits are
-allowed in package.json binaries, shebang scripts, bin directories, and
-root/src `main` or `cli` files. Calls through aliases are not inferred.
+allowed in package.json binaries and scripts that directly run `node file.js`,
+`tsx file.ts`, or `bun file.ts`; shebang scripts; bin/scripts directories;
+`*.config.{js,ts,mjs,cjs}`; and root/src `main` or `cli` files. Literal-only
+`Function` constructors stay quiet. A `with` statement obscures global APIs
+only inside its body. Calls through aliases are not inferred.
 
 `dynamic-html` and `any-density` are opt-in review rules: sanitized HTML and
 interop `any` are often legitimate, and syntax alone cannot establish intent.
@@ -108,9 +111,12 @@ Each language uses its own product lines for per-10k-line densities (minimum
 Rule deductions add into the same five category scores. TypeScript thresholds
 reuse the Rust ramps, without claiming independent corpus calibration.
 Test files (`*.test.*`, `*.spec.*`, test/tests/__tests__ directories) are present
-in the graph but excluded from scoring. Invalid syntax fails analysis rather
-than reporting a clean score. Generated build directories and node_modules are
-not scanned. TypeScript rules have no environment-variable overrides.
+in the graph but excluded from scoring. Files with parser or semantic
+diagnostics are skipped; the report names each file and its reason in
+`skipped_files`, and scores the remaining files. Declaration files (`*.d.ts`),
+minified files (`*.min.js`, `*.min.mjs`), `*.generated.*`, and files with a
+leading `// @generated` or bare `/* eslint-disable */` banner are excluded
+from scoring. Generated build directories and node_modules are not scanned. TypeScript rules have no environment-variable overrides.
 Existing unprefixed Rust config keys remain compatible; `rust/<rule>` is also
 accepted in a config file.
 
