@@ -17,7 +17,7 @@ PIN = json.loads((ROOT / 'scripts/zig-toolchain.json').read_text())
 
 
 def host():
-    arch = {'AMD64': 'x86_64', 'arm64': 'aarch64'}.get(platform.machine(), platform.machine())
+    arch = {'AMD64': 'x86_64', 'arm64': 'aarch64', 'ARM64': 'aarch64'}.get(platform.machine(), platform.machine())
     system = {'Darwin': 'macos', 'Linux': 'linux', 'Windows': 'windows'}.get(platform.system())
     key = f'{arch}-{system}'
     if key not in PIN['hosts']:

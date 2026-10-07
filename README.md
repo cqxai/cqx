@@ -655,7 +655,7 @@ modules and their manifest entries.
 Zig **0.15.2** is a deliberate pinned build dependency for tree-sitter's C grammar
 sources. It includes its own compiler; a separate system LLVM installation is
 never required. Native Rust linking still uses the host's ordinary linker/SDK.
-Python 3.11+ bootstraps checksum-verified official archives into `.target/zig`;
+Python 3.12+ bootstraps checksum-verified official archives into `.target/zig`;
 `scripts/zig-toolchain.json` records the version and SHA-256 for Intel/ARM macOS,
 Linux and Windows. The pin comes from https://ziglang.org/download/index.json.
 The cc-rs adapter translates `--target=wasm32-unknown-unknown` to Zig's
