@@ -36,11 +36,12 @@ pub fn prepare_reporting(
         .collect();
     let go_modules = serde_json::from_value(metadata["go_modules"].clone()).unwrap_or_default();
     let go_files = vfs.paths().filter(|p| cqx_go::is_source(p)).count() as u32;
+    let extra_files = vfs.paths().filter(|p| cqx_kotlin::is_source(p)).count() as u32;
     let ts_files = vfs.paths().filter(|p| cqx_ts::is_source(p)).count() as u32;
     let rust = cqx_rust::extract::prepare_reporting(
         vfs,
         metadata,
-        &|n| total(n + ts_files + go_files),
+        &|n| total(n + ts_files + go_files + extra_files),
         tick,
     )?;
     let go = cqx_go::prepare(vfs, go_modules, tick)?;
@@ -77,6 +78,12 @@ impl Prepared {
         stats.files += go.files;
         stats.nodes += go.nodes;
         stats.edges += go.edges;
+        let extra = cqx_kotlin::run(vfs,&mut out,tick)?;
+        stats.packages += usize::from(extra.files>0);
+        stats.files += extra.files;
+        stats.nodes += extra.nodes;
+        stats.edges += extra.edges;
+        stats.unparsed.extend(extra.unparsed);
         stats.unparsed.extend(ts.unparsed);
         stats.unparsed.extend(go.unparsed);
         Ok(stats)
@@ -116,7 +123,7 @@ pub const EXTRACT_COMMAND: CommandSpec = CommandSpec {
     name: "extract",
     owner: "cqx-analysis",
     category: "index",
-    summary: "Read Rust, Go, TypeScript and JavaScript and emit facts as newline-delimited JSON",
+    summary: "Read Rust, Go, Kotlin, TypeScript and JavaScript and emit facts as newline-delimited JSON",
     // `scan` was an alias here. It is now its own command — the one the front
     // page has always shown — and the registry took the second registration
     // without a word, so `cqx scan` quietly went on emitting facts.

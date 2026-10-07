@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["crates/cqx", "crates/cqx-rust", "crates/cqx-ts", "crates/cqx-go", "crates/cqx-analysis", "crates/cqx-scan", "crates/cqx-mcp", "crates/cqx-view", "crates/cqx-schema", "crates/cqx-history", "crates/cqx-score", "crates/cqx-store", "crates/cqx-vfs", "crates/cqx-wasm"]
-exclude = ["fixtures"]
+members = ["crates/cqx", "crates/cqx-rust", "crates/cqx-ts", "crates/cqx-go", "crates/cqx-kotlin", "crates/cqx-source", "crates/cqx-analysis", "crates/cqx-scan", "crates/cqx-mcp", "crates/cqx-view", "crates/cqx-schema", "crates/cqx-history", "crates/cqx-score", "crates/cqx-store", "crates/cqx-vfs", "crates/cqx-wasm"]
+exclude = ["fixtures", "vendor/rezel-lang-kotlin", "vendor/kotlin-unicode"]
 
 [workspace.package]
 version = "0.1.24"

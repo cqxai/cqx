@@ -1,0 +1,678 @@
+{
+  "config": {
+    "config_path": null,
+    "exclude": [],
+    "min_score": null,
+    "rules": {
+      "bare-string-params": {
+        "category": "legibility",
+        "describes": "share of parameters declared as a bare string rather than a domain type",
+        "enabled": true,
+        "free": 0.12,
+        "full": 0.35,
+        "language": "rust",
+        "params": {},
+        "remedy": "Introduce a newtype for the concept. Three interchangeable strings in one signature is an argument swap that still compiles and still runs.",
+        "source": "default",
+        "weight": 20.0
+      },
+      "broad-lint-silencing": {
+        "category": "quality",
+        "describes": "crate-wide allow(clippy::all) or allow(warnings), per 10k lines",
+        "enabled": true,
+        "free": 0.3,
+        "full": 2.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Replace the blanket allow with the specific lints meant, or fix them. A crate-wide allow also silences everything written after it, including code nobody has typed yet.",
+        "source": "default",
+        "weight": 25.0
+      },
+      "crate-type-scatter": {
+        "category": "modularity",
+        "describes": "crates whose signatures are mostly built from three or more other crates' types",
+        "enabled": true,
+        "free": 0.2,
+        "full": 1.5,
+        "language": "rust",
+        "params": {},
+        "remedy": "A crate built mostly from other crates' types, pulled from several of them, usually wants splitting or absorbing. One strong pull is an adapter and perfectly fine.",
+        "source": "default",
+        "weight": 10.0
+      },
+      "default-allow-dispatch": {
+        "category": "security",
+        "describes": "a dispatch that checks in its arms and does nothing in its catch-all, per 10k lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 1.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Match the action exhaustively, with no catch-all, so a new action cannot be added without deciding what it is allowed to do. As written, everything nobody listed is permitted.",
+        "source": "default",
+        "weight": 25.0
+      },
+      "discarded-check": {
+        "category": "security",
+        "describes": "a permission or validation call whose answer is thrown away, per 10k lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 1.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Handle the result. `let _ = enforce_read(path)` reads as enforcement at a glance and performs none — it is worse than no call at all, because a reviewer counts it.",
+        "source": "default",
+        "weight": 30.0
+      },
+      "duplicated-bodies": {
+        "category": "quality",
+        "describes": "function bodies that are exact token copies of another, per 10k lines",
+        "enabled": true,
+        "free": 0.5,
+        "full": 3.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Move the shared body somewhere both callers can reach. The copies are listed below; they were found by exact token match, so they were copied rather than merely similar.",
+        "source": "default",
+        "weight": 10.0
+      },
+      "env-controlled-spawn": {
+        "category": "security",
+        "describes": "spawn targets chosen by an environment variable, per 10k lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 2.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Resolve the program from a known location, or validate it before spawning. As it stands, whoever sets the variable chooses what runs.",
+        "source": "default",
+        "weight": 30.0
+      },
+      "exit-in-library": {
+        "category": "containment",
+        "describes": "process::exit called from a library crate, per 10k lines",
+        "enabled": true,
+        "free": 1.0,
+        "full": 15.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Return an error and let the binary decide the exit code. A library that exits takes that decision away from every caller, including a test harness.",
+        "source": "default",
+        "weight": 30.0
+      },
+      "hand-built-json": {
+        "category": "quality",
+        "describes": "JSON assembled by interpolation rather than serialised, per 10k lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 2.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Serialise with serde. A value interpolated into a format string decides the structure around it, which is the same mistake as building SQL by concatenation.",
+        "source": "default",
+        "weight": 10.0
+      },
+      "kotlin/duplicated-bodies": {
+        "category": "quality",
+        "describes": "kotlin syntax findings for duplicated-bodies, using the existing ramp",
+        "enabled": true,
+        "free": 0.5,
+        "full": 3.0,
+        "language": "kotlin",
+        "params": {},
+        "remedy": "Review duplicated-bodies; configure kotlin/duplicated-bodies only in cqx.json.",
+        "source": "default",
+        "weight": 10.0
+      },
+      "kotlin/exit-in-library": {
+        "category": "containment",
+        "describes": "kotlin syntax findings for exit-in-library, using the existing ramp",
+        "enabled": true,
+        "free": 1.0,
+        "full": 15.0,
+        "language": "kotlin",
+        "params": {},
+        "remedy": "Review exit-in-library; configure kotlin/exit-in-library only in cqx.json.",
+        "source": "config",
+        "weight": 7.0
+      },
+      "kotlin/nonliteral-process": {
+        "category": "security",
+        "describes": "non-literal executable or command at standard process APIs per 10k product lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 6.0,
+        "language": "kotlin",
+        "params": {},
+        "remedy": "Use a literal executable and separate arguments; review dynamic command input.",
+        "source": "default",
+        "weight": 15.0
+      },
+      "kotlin/oversized-files": {
+        "category": "modularity",
+        "describes": "kotlin syntax findings for oversized-files, using the existing ramp",
+        "enabled": true,
+        "free": 3.5,
+        "full": 12.0,
+        "language": "kotlin",
+        "params": {
+          "max_lines": 1000.0
+        },
+        "remedy": "Review oversized-files; configure kotlin/oversized-files only in cqx.json.",
+        "source": "default",
+        "weight": 25.0
+      },
+      "kotlin/oversized-line-share": {
+        "category": "modularity",
+        "describes": "kotlin syntax findings for oversized-line-share, using the existing ramp",
+        "enabled": true,
+        "free": 0.7,
+        "full": 0.95,
+        "language": "kotlin",
+        "params": {
+          "max_lines": 1000.0
+        },
+        "remedy": "Review oversized-line-share; configure kotlin/oversized-line-share only in cqx.json.",
+        "source": "default",
+        "weight": 15.0
+      },
+      "kotlin/swallowed-errors": {
+        "category": "quality",
+        "describes": "unexplained empty catches per 10k product lines",
+        "enabled": true,
+        "free": 1.0,
+        "full": 6.0,
+        "language": "kotlin",
+        "params": {},
+        "remedy": "Handle the error or explain why ignoring it is safe.",
+        "source": "default",
+        "weight": 10.0
+      },
+      "kotlin/undocumented-suppressions": {
+        "category": "quality",
+        "describes": "kotlin syntax findings for undocumented-suppressions, using the existing ramp",
+        "enabled": true,
+        "free": 1.0,
+        "full": 6.0,
+        "language": "kotlin",
+        "params": {},
+        "remedy": "Review undocumented-suppressions; configure kotlin/undocumented-suppressions only in cqx.json.",
+        "source": "default",
+        "weight": 10.0
+      },
+      "oversized-files": {
+        "category": "modularity",
+        "describes": "files longer than max_lines, per 10k lines — a house standard, not a fact",
+        "enabled": true,
+        "free": 3.5,
+        "full": 12.0,
+        "language": "rust",
+        "params": {
+          "max_lines": 1000.0
+        },
+        "remedy": "Split the file, or raise the standard if this is simply how the project is written: cqx config set oversized-files.max_lines N. Measured across ripgrep, tokio and deno, file length tracks habit rather than quality.",
+        "source": "default",
+        "weight": 25.0
+      },
+      "oversized-line-share": {
+        "category": "modularity",
+        "describes": "share of all lines living in files longer than max_lines",
+        "enabled": true,
+        "free": 0.7,
+        "full": 0.95,
+        "language": "rust",
+        "params": {
+          "max_lines": 1000.0
+        },
+        "remedy": "Same standard as oversized-files, measured by weight rather than count: it catches a codebase where most of the code lives in a handful of very large files.",
+        "source": "default",
+        "weight": 15.0
+      },
+      "permission-granting-argument": {
+        "category": "security",
+        "describes": "a subprocess handed a literal argument that relaxes its own checks, per 10k lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 1.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Forward the caller's policy instead of overriding it. A child spawned with the permission checks turned off does not inherit the parent's answer, it discards it.",
+        "source": "default",
+        "weight": 25.0
+      },
+      "result-string-density": {
+        "category": "quality",
+        "describes": "functions returning Result<_, String> instead of a real error type, per 10k lines",
+        "enabled": true,
+        "free": 1.0,
+        "full": 20.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Give the crate an error type and return that. A String error cannot be matched on, so every caller either re-parses the text or swallows it.",
+        "source": "default",
+        "weight": 30.0
+      },
+      "shell-argument-unchecked": {
+        "category": "security",
+        "describes": "a shell handed an argument the extractor could not resolve, per 10k lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 1.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Check every program the script invokes, not only the first word, or refuse anything but a single command. Validating the head of a string and running the whole of it through a shell means `git status; rm -rf ~` passes a check for `git`.",
+        "source": "default",
+        "weight": 30.0
+      },
+      "shell-invocation": {
+        "category": "security",
+        "describes": "spawning a shell, which turns an argument into a command, per 10k lines",
+        "enabled": true,
+        "free": 0.0,
+        "full": 1.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Pass the program and its arguments directly rather than through a shell. A shell turns an argument into a command.",
+        "source": "default",
+        "weight": 20.0
+      },
+      "unbounded-send-sync": {
+        "category": "security",
+        "describes": "unsafe impl Send/Sync for a generic type with no thread-safety bound, per 10k lines",
+        "enabled": false,
+        "free": 0.0,
+        "full": 1.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Add the bound the promise depends on: `unsafe impl<T: Send> Sync for Holder<T>`. Without it the type claims every `T` is safe to share, including an `Rc`. This shape accounts for sixteen of sixty-five RustSec advisories sampled — and tokio writes it twenty-three times deliberately, which is why this rule is off until you turn it on: cqx config enable unbounded-send-sync.",
+        "source": "default",
+        "weight": 30.0
+      },
+      "undocumented-suppressions": {
+        "category": "quality",
+        "describes": "crate-level lint suppressions with no reason given, per 10k lines",
+        "enabled": true,
+        "free": 1.0,
+        "full": 6.0,
+        "language": "rust",
+        "params": {},
+        "remedy": "Add reason = \"...\" to each suppression. deno documents every one of its crate-level suppressions, which is why theirs read as decisions rather than residue.",
+        "source": "default",
+        "weight": 10.0
+      },
+      "unproven-spawn-targets": {
+        "category": "legibility",
+        "describes": "share of spawn and env targets the extractor could not resolve",
+        "enabled": true,
+        "free": 0.2,
+        "full": 0.8,
+        "language": "rust",
+        "params": {},
+        "remedy": "Where the target comes from a parameter, the caller is deciding it — hoisting the spawn there makes it knowable. Where it comes from the environment, that is the finding rather than a gap.",
+        "source": "default",
+        "weight": 30.0
+      }
+    },
+    "version": 1
+  },
+  "lines": 1,
+  "rules": [
+    {
+      "capped": false,
+      "category": "legibility",
+      "deducted": 0.0,
+      "describes": "share of parameters declared as a bare string rather than a domain type",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Introduce a newtype for the concept. Three interchangeable strings in one signature is an argument swap that still compiles and still runs.",
+      "rule": "bare-string-params",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 20.0
+    },
+    {
+      "capped": false,
+      "category": "quality",
+      "deducted": 0.0,
+      "describes": "crate-wide allow(clippy::all) or allow(warnings), per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Replace the blanket allow with the specific lints meant, or fix them. A crate-wide allow also silences everything written after it, including code nobody has typed yet.",
+      "rule": "broad-lint-silencing",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 25.0
+    },
+    {
+      "capped": false,
+      "category": "modularity",
+      "deducted": 0.0,
+      "describes": "crates whose signatures are mostly built from three or more other crates' types",
+      "findings": [],
+      "language": "rust",
+      "remedy": "A crate built mostly from other crates' types, pulled from several of them, usually wants splitting or absorbing. One strong pull is an adapter and perfectly fine.",
+      "rule": "crate-type-scatter",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 10.0
+    },
+    {
+      "capped": false,
+      "category": "security",
+      "deducted": 0.0,
+      "describes": "a dispatch that checks in its arms and does nothing in its catch-all, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Match the action exhaustively, with no catch-all, so a new action cannot be added without deciding what it is allowed to do. As written, everything nobody listed is permitted.",
+      "rule": "default-allow-dispatch",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 25.0
+    },
+    {
+      "capped": false,
+      "category": "security",
+      "deducted": 0.0,
+      "describes": "a permission or validation call whose answer is thrown away, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Handle the result. `let _ = enforce_read(path)` reads as enforcement at a glance and performs none — it is worse than no call at all, because a reviewer counts it.",
+      "rule": "discarded-check",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 30.0
+    },
+    {
+      "capped": false,
+      "category": "quality",
+      "deducted": 0.0,
+      "describes": "function bodies that are exact token copies of another, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Move the shared body somewhere both callers can reach. The copies are listed below; they were found by exact token match, so they were copied rather than merely similar.",
+      "rule": "duplicated-bodies",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 10.0
+    },
+    {
+      "capped": false,
+      "category": "security",
+      "deducted": 0.0,
+      "describes": "spawn targets chosen by an environment variable, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Resolve the program from a known location, or validate it before spawning. As it stands, whoever sets the variable chooses what runs.",
+      "rule": "env-controlled-spawn",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 30.0
+    },
+    {
+      "capped": false,
+      "category": "containment",
+      "deducted": 0.0,
+      "describes": "process::exit called from a library crate, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Return an error and let the binary decide the exit code. A library that exits takes that decision away from every caller, including a test harness.",
+      "rule": "exit-in-library",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 30.0
+    },
+    {
+      "capped": false,
+      "category": "quality",
+      "deducted": 0.0,
+      "describes": "JSON assembled by interpolation rather than serialised, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Serialise with serde. A value interpolated into a format string decides the structure around it, which is the same mistake as building SQL by concatenation.",
+      "rule": "hand-built-json",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 10.0
+    },
+    {
+      "capped": false,
+      "category": "quality",
+      "deducted": 0.0,
+      "describes": "kotlin syntax findings for duplicated-bodies, using the existing ramp",
+      "findings": [],
+      "language": "kotlin",
+      "remedy": "Review duplicated-bodies; configure kotlin/duplicated-bodies only in cqx.json.",
+      "rule": "duplicated-bodies",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 10.0
+    },
+    {
+      "capped": true,
+      "category": "containment",
+      "deducted": 7.0,
+      "describes": "kotlin syntax findings for exit-in-library, using the existing ramp",
+      "findings": [
+        {
+          "col": [
+            23,
+            51
+          ],
+          "file": "src/Library.kt",
+          "item": {
+            "from": 1,
+            "kind": "function",
+            "name": "stop",
+            "to": 1
+          },
+          "line": 1,
+          "what": "exitProcess outside a main entry translation unit"
+        }
+      ],
+      "language": "kotlin",
+      "remedy": "Review exit-in-library; configure kotlin/exit-in-library only in cqx.json.",
+      "rule": "exit-in-library",
+      "total_findings": 1,
+      "value": 20.0,
+      "weight": 7.0
+    },
+    {
+      "capped": true,
+      "category": "security",
+      "deducted": 15.0,
+      "describes": "non-literal executable or command at standard process APIs per 10k product lines",
+      "findings": [
+        {
+          "col": [
+            52,
+            84
+          ],
+          "file": "src/Library.kt",
+          "item": {
+            "from": 1,
+            "kind": "function",
+            "name": "stop",
+            "to": 1
+          },
+          "line": 1,
+          "what": "Runtime.exec command is non-literal; review its source"
+        }
+      ],
+      "language": "kotlin",
+      "remedy": "Use a literal executable and separate arguments; review dynamic command input.",
+      "rule": "nonliteral-process",
+      "total_findings": 1,
+      "value": 20.0,
+      "weight": 15.0
+    },
+    {
+      "capped": false,
+      "category": "modularity",
+      "deducted": 0.0,
+      "describes": "kotlin syntax findings for oversized-files, using the existing ramp",
+      "findings": [],
+      "language": "kotlin",
+      "remedy": "Review oversized-files; configure kotlin/oversized-files only in cqx.json.",
+      "rule": "oversized-files",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 25.0
+    },
+    {
+      "capped": false,
+      "category": "modularity",
+      "deducted": 0.0,
+      "describes": "kotlin syntax findings for oversized-line-share, using the existing ramp",
+      "findings": [],
+      "language": "kotlin",
+      "remedy": "Review oversized-line-share; configure kotlin/oversized-line-share only in cqx.json.",
+      "rule": "oversized-line-share",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 15.0
+    },
+    {
+      "capped": false,
+      "category": "quality",
+      "deducted": 0.0,
+      "describes": "unexplained empty catches per 10k product lines",
+      "findings": [],
+      "language": "kotlin",
+      "remedy": "Handle the error or explain why ignoring it is safe.",
+      "rule": "swallowed-errors",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 10.0
+    },
+    {
+      "capped": false,
+      "category": "quality",
+      "deducted": 0.0,
+      "describes": "kotlin syntax findings for undocumented-suppressions, using the existing ramp",
+      "findings": [],
+      "language": "kotlin",
+      "remedy": "Review undocumented-suppressions; configure kotlin/undocumented-suppressions only in cqx.json.",
+      "rule": "undocumented-suppressions",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 10.0
+    },
+    {
+      "capped": false,
+      "category": "modularity",
+      "deducted": 0.0,
+      "describes": "files longer than max_lines, per 10k lines — a house standard, not a fact",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Split the file, or raise the standard if this is simply how the project is written: cqx config set oversized-files.max_lines N. Measured across ripgrep, tokio and deno, file length tracks habit rather than quality.",
+      "rule": "oversized-files",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 25.0
+    },
+    {
+      "capped": false,
+      "category": "modularity",
+      "deducted": 0.0,
+      "describes": "share of all lines living in files longer than max_lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Same standard as oversized-files, measured by weight rather than count: it catches a codebase where most of the code lives in a handful of very large files.",
+      "rule": "oversized-line-share",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 15.0
+    },
+    {
+      "capped": false,
+      "category": "security",
+      "deducted": 0.0,
+      "describes": "a subprocess handed a literal argument that relaxes its own checks, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Forward the caller's policy instead of overriding it. A child spawned with the permission checks turned off does not inherit the parent's answer, it discards it.",
+      "rule": "permission-granting-argument",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 25.0
+    },
+    {
+      "capped": false,
+      "category": "quality",
+      "deducted": 0.0,
+      "describes": "functions returning Result<_, String> instead of a real error type, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Give the crate an error type and return that. A String error cannot be matched on, so every caller either re-parses the text or swallows it.",
+      "rule": "result-string-density",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 30.0
+    },
+    {
+      "capped": false,
+      "category": "security",
+      "deducted": 0.0,
+      "describes": "a shell handed an argument the extractor could not resolve, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Check every program the script invokes, not only the first word, or refuse anything but a single command. Validating the head of a string and running the whole of it through a shell means `git status; rm -rf ~` passes a check for `git`.",
+      "rule": "shell-argument-unchecked",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 30.0
+    },
+    {
+      "capped": false,
+      "category": "security",
+      "deducted": 0.0,
+      "describes": "spawning a shell, which turns an argument into a command, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Pass the program and its arguments directly rather than through a shell. A shell turns an argument into a command.",
+      "rule": "shell-invocation",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 20.0
+    },
+    {
+      "capped": false,
+      "category": "quality",
+      "deducted": 0.0,
+      "describes": "crate-level lint suppressions with no reason given, per 10k lines",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Add reason = \"...\" to each suppression. deno documents every one of its crate-level suppressions, which is why theirs read as decisions rather than residue.",
+      "rule": "undocumented-suppressions",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 10.0
+    },
+    {
+      "capped": false,
+      "category": "legibility",
+      "deducted": 0.0,
+      "describes": "share of spawn and env targets the extractor could not resolve",
+      "findings": [],
+      "language": "rust",
+      "remedy": "Where the target comes from a parameter, the caller is deciding it — hoisting the spawn there makes it knowable. Where it comes from the environment, that is the finding rather than a gap.",
+      "rule": "unproven-spawn-targets",
+      "total_findings": 0,
+      "value": 0.0,
+      "weight": 30.0
+    }
+  ],
+  "scores": {
+    "containment": 93,
+    "legibility": 100,
+    "modularity": 100,
+    "quality": 100,
+    "security": 85
+  },
+  "skipped_files": [
+    {
+      "file": "src/Broken.kt",
+      "reason": "no parse at byte 12"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+[package]
+name="cqx-kotlin"
+version.workspace=true
+edition.workspace=true
+license.workspace=true
+repository.workspace=true
+description="kotlin source analysis for cqx."
+[dependencies]
+cqx-schema.workspace=true
+cqx-vfs.workspace=true
+cqx-source={path="../cqx-source"}
+rezel-common="=0.0.0"
+rezel-lang-kotlin={version="=0.0.0",path="../../vendor/rezel-lang-kotlin"}
+[dev-dependencies]
+cqx-score={path="../cqx-score"}
+cqx-store={path="../cqx-store"}
+serde_json.workspace=true

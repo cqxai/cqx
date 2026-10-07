@@ -1,0 +1,1968 @@
+language = "KotlinLanguage"
+kind = "KotlinKind"
+language_path = "crate::generated::LANGUAGE"
+coverage = "partial"
+
+[[node]]
+name = "KotlinFile"
+kind = "KotlinFile"
+
+[[node.field]]
+name = "file_annotations"
+type = "KotlinFileAnnotation"
+cardinality = "many"
+selector = { node = "FileAnnotation" }
+
+[[node.field]]
+name = "package_header"
+type = "KotlinPackageHeader"
+cardinality = "optional"
+selector = { node = "PackageHeader" }
+
+[[node.field]]
+name = "import_list"
+type = "KotlinImportList"
+cardinality = "optional"
+selector = { node = "ImportList" }
+
+[[node.field]]
+name = "declarations"
+type = "KotlinDeclaration"
+cardinality = "many"
+selector = { union = "KotlinDeclaration" }
+
+[[node]]
+name = "KotlinPackageHeader"
+kind = "PackageHeader"
+
+[[node.field]]
+name = "package_token"
+cardinality = "one"
+selector = { token = "package" }
+
+[[node.field]]
+name = "name"
+type = "KotlinQualifiedIdentifier"
+cardinality = "one"
+selector = { node = "QualifiedIdentifier" }
+
+[[node]]
+name = "KotlinFileAnnotation"
+kind = "FileAnnotation"
+
+[[node.field]]
+name = "annotation"
+type = "KotlinUnescapedAnnotation"
+cardinality = "one"
+selector = { node = "UnescapedAnnotation" }
+
+[[node]]
+name = "KotlinQualifiedIdentifier"
+kind = "QualifiedIdentifier"
+
+[[node.field]]
+name = "segments"
+type = "KotlinIdentifier"
+cardinality = "many"
+selector = { node = "Identifier" }
+
+[[node]]
+name = "KotlinImportList"
+kind = "ImportList"
+
+[[node.field]]
+name = "headers"
+type = "KotlinImportHeader"
+cardinality = "many"
+selector = { node = "ImportHeader" }
+
+[[node]]
+name = "KotlinImportHeader"
+kind = "ImportHeader"
+
+[[node.field]]
+name = "path"
+type = "KotlinImportPath"
+cardinality = "one"
+selector = { node = "ImportPath" }
+
+[[node.field]]
+name = "alias"
+type = "KotlinImportAlias"
+cardinality = "optional"
+selector = { node = "ImportAlias" }
+
+[[node]]
+name = "KotlinImportPath"
+kind = "ImportPath"
+
+[[node.field]]
+name = "segments"
+type = "KotlinIdentifier"
+cardinality = "many"
+selector = { node = "Identifier" }
+
+[[node]]
+name = "KotlinImportAlias"
+kind = "ImportAlias"
+
+[[node.field]]
+name = "as_token"
+cardinality = "one"
+selector = { token = "as" }
+
+[[node.field]]
+name = "name"
+type = "KotlinDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node]]
+name = "KotlinIdentifier"
+kind = "Identifier"
+
+[[node]]
+name = "KotlinDefinition"
+kind = "Definition"
+
+[[node]]
+name = "KotlinFunctionDeclaration"
+kind = "FunctionDeclaration"
+
+[[node.field]]
+name = "modifiers"
+type = "KotlinModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "fun_token"
+cardinality = "one"
+selector = { token = "fun" }
+
+[[node.field]]
+name = "type_parameters"
+type = "KotlinTypeParameters"
+cardinality = "optional"
+selector = { node = "TypeParameters" }
+
+[[node.field]]
+name = "direct_name"
+type = "KotlinDefinition"
+cardinality = "optional"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "qualified_receiver"
+type = "KotlinQualifiedReceiverName"
+cardinality = "optional"
+selector = { node = "QualifiedReceiverName" }
+
+[[node.field]]
+name = "parameters"
+type = "KotlinFunctionValueParameters"
+cardinality = "one"
+selector = { node = "FunctionValueParameters" }
+
+[[node.field]]
+name = "return_type"
+type = "KotlinTypeAnnotation"
+cardinality = "optional"
+selector = { node = "TypeAnnotation" }
+
+[[node.field]]
+name = "type_constraints"
+type = "KotlinTypeConstraints"
+cardinality = "optional"
+selector = { node = "TypeConstraints" }
+
+[[node.field]]
+name = "body"
+type = "KotlinFunctionBody"
+cardinality = "optional"
+selector = { node = "FunctionBody" }
+
+[[node]]
+name = "KotlinPropertyDeclaration"
+kind = "PropertyDeclaration"
+
+[[node.field]]
+name = "val_token"
+cardinality = "optional"
+selector = { token = "val" }
+
+[[node.field]]
+name = "var_token"
+cardinality = "optional"
+selector = { token = "var" }
+
+[[node.field]]
+name = "modifiers"
+type = "KotlinModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "type_parameters"
+type = "KotlinTypeParameters"
+cardinality = "optional"
+selector = { node = "TypeParameters" }
+
+[[node.field]]
+name = "variable"
+type = "KotlinVariableDeclaration"
+cardinality = "optional"
+selector = { node = "VariableDeclaration" }
+
+[[node.field]]
+name = "destructuring"
+type = "KotlinMultiVariableDeclaration"
+cardinality = "optional"
+selector = { node = "MultiVariableDeclaration" }
+
+[[node.field]]
+name = "qualified_receiver"
+type = "KotlinQualifiedReceiverName"
+cardinality = "optional"
+selector = { node = "QualifiedReceiverName" }
+
+[[node.field]]
+name = "receiver_type"
+type = "KotlinTypeAnnotation"
+cardinality = "optional"
+selector = { node = "TypeAnnotation" }
+
+[[node.field]]
+name = "type_constraints"
+type = "KotlinTypeConstraints"
+cardinality = "optional"
+selector = { node = "TypeConstraints" }
+
+[[node.field]]
+name = "initializer"
+type = "KotlinPropertyInitializer"
+cardinality = "optional"
+selector = { node = "PropertyInitializer" }
+
+[[node.field]]
+name = "delegate"
+type = "KotlinPropertyDelegate"
+cardinality = "optional"
+selector = { node = "PropertyDelegate" }
+
+[[node.field]]
+name = "getter"
+type = "KotlinGetter"
+cardinality = "optional"
+selector = { node = "Getter" }
+
+[[node.field]]
+name = "setter"
+type = "KotlinSetter"
+cardinality = "optional"
+selector = { node = "Setter" }
+
+[[node]]
+name = "KotlinTypeAliasDeclaration"
+kind = "TypeAliasDeclaration"
+
+[[node.field]]
+name = "modifiers"
+type = "KotlinModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "typealias_token"
+cardinality = "one"
+selector = { token = "typealias" }
+
+[[node.field]]
+name = "name"
+type = "KotlinDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "type_parameters"
+type = "KotlinTypeParameters"
+cardinality = "optional"
+selector = { node = "TypeParameters" }
+
+[[node.field]]
+name = "aliased_type"
+type = "KotlinType"
+cardinality = "one"
+selector = { union = "KotlinType" }
+
+[[node]]
+name = "KotlinClassDeclaration"
+kind = "ClassDeclaration"
+
+[[node.field]]
+name = "class_token"
+cardinality = "optional"
+selector = { token = "class" }
+
+[[node.field]]
+name = "interface_token"
+cardinality = "optional"
+selector = { token = "interface" }
+
+[[node.field]]
+name = "fun_token"
+cardinality = "optional"
+selector = { token = "fun" }
+
+[[node.field]]
+name = "modifiers"
+type = "KotlinModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "name"
+type = "KotlinDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "type_parameters"
+type = "KotlinTypeParameters"
+cardinality = "optional"
+selector = { node = "TypeParameters" }
+
+[[node.field]]
+name = "primary_constructor"
+type = "KotlinPrimaryConstructor"
+cardinality = "optional"
+selector = { node = "PrimaryConstructor" }
+
+[[node.field]]
+name = "delegation_specifiers"
+type = "KotlinDelegationSpecifiers"
+cardinality = "optional"
+selector = { node = "DelegationSpecifiers" }
+
+[[node.field]]
+name = "type_constraints"
+type = "KotlinTypeConstraints"
+cardinality = "optional"
+selector = { node = "TypeConstraints" }
+
+[[node.field]]
+name = "body"
+type = "KotlinClassBodyValue"
+cardinality = "optional"
+selector = { union = "KotlinClassBodyValue" }
+
+[[node]]
+name = "KotlinObjectDeclaration"
+kind = "ObjectDeclaration"
+
+[[node.field]]
+name = "modifiers"
+type = "KotlinModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "object_token"
+cardinality = "one"
+selector = { token = "object" }
+
+[[node.field]]
+name = "name"
+type = "KotlinDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "delegation_specifiers"
+type = "KotlinDelegationSpecifiers"
+cardinality = "optional"
+selector = { node = "DelegationSpecifiers" }
+
+[[node.field]]
+name = "body"
+type = "KotlinClassBody"
+cardinality = "optional"
+selector = { node = "ClassBody" }
+
+[[node]]
+name = "KotlinModifiers"
+kind = "Modifiers"
+
+[[node.field]]
+name = "entries"
+type = "KotlinModifierEntry"
+cardinality = "many"
+selector = { node = "ModifierEntry" }
+
+[[node]]
+name = "KotlinModifier"
+kind = "Modifier"
+
+[[node]]
+name = "KotlinModifierEntry"
+kind = "ModifierEntry"
+
+[[node.field]]
+name = "value"
+type = "KotlinModifierValue"
+cardinality = "one"
+selector = { union = "KotlinModifierValue" }
+
+[[node]]
+name = "KotlinAnnotation"
+kind = "AnnotationEntry"
+
+[[node]]
+name = "KotlinAnnotationUseSiteTarget"
+kind = "AnnotationUseSiteTarget"
+
+[[node]]
+name = "KotlinUnescapedAnnotation"
+kind = "UnescapedAnnotation"
+
+[[node]]
+name = "KotlinContextDeclarationModifier"
+kind = "ContextDeclarationModifier"
+
+[[node]]
+name = "KotlinParameterModifier"
+kind = "ParameterModifier"
+
+[[node]]
+name = "KotlinFunctionValueParameters"
+kind = "FunctionValueParameters"
+
+[[node.field]]
+name = "parameters"
+type = "KotlinFunctionValueParameter"
+cardinality = "many"
+selector = { node = "FunctionValueParameter" }
+
+[[node]]
+name = "KotlinFunctionValueParameter"
+kind = "FunctionValueParameter"
+
+[[node.field]]
+name = "parameter"
+type = "KotlinParameter"
+cardinality = "one"
+selector = { node = "Parameter" }
+
+[[node.field]]
+name = "initializer"
+type = "KotlinPropertyInitializer"
+cardinality = "optional"
+selector = { node = "PropertyInitializer" }
+
+[[node]]
+name = "KotlinTypeAnnotation"
+kind = "TypeAnnotation"
+
+[[node.field]]
+name = "ty"
+type = "KotlinType"
+cardinality = "one"
+selector = { union = "KotlinType" }
+
+[[node]]
+name = "KotlinPropertyInitializer"
+kind = "PropertyInitializer"
+
+[[node.field]]
+name = "value"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinParameter"
+kind = "Parameter"
+
+[[node.field]]
+name = "name"
+type = "KotlinDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "type_annotation"
+type = "KotlinTypeAnnotation"
+cardinality = "optional"
+selector = { node = "TypeAnnotation" }
+
+[[node]]
+name = "KotlinQualifiedReceiverName"
+kind = "QualifiedReceiverName"
+
+[[node]]
+name = "KotlinClassParameters"
+kind = "ClassParameters"
+
+[[node.field]]
+name = "parameters"
+type = "KotlinClassParameter"
+cardinality = "many"
+selector = { node = "ClassParameter" }
+
+[[node]]
+name = "KotlinClassParameter"
+kind = "ClassParameter"
+
+[[node.field]]
+name = "modifiers"
+type = "KotlinModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "val_token"
+cardinality = "optional"
+selector = { token = "val" }
+
+[[node.field]]
+name = "var_token"
+cardinality = "optional"
+selector = { token = "var" }
+
+[[node.field]]
+name = "variable"
+type = "KotlinVariableDeclaration"
+cardinality = "one"
+selector = { node = "VariableDeclaration" }
+
+[[node.field]]
+name = "initializer"
+type = "KotlinPropertyInitializer"
+cardinality = "optional"
+selector = { node = "PropertyInitializer" }
+
+[[node]]
+name = "KotlinPrimaryConstructor"
+kind = "PrimaryConstructor"
+
+[[node.field]]
+name = "modifiers"
+type = "KotlinModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "parameters"
+type = "KotlinClassParameters"
+cardinality = "one"
+selector = { node = "ClassParameters" }
+
+[[node]]
+name = "KotlinClassBody"
+kind = "ClassBody"
+
+[[node.field]]
+name = "members"
+type = "KotlinClassMemberDeclarations"
+cardinality = "one"
+selector = { node = "ClassMemberDeclarations" }
+
+[[node]]
+name = "KotlinEnumClassBody"
+kind = "EnumClassBody"
+
+[[node]]
+name = "KotlinClassMemberDeclarations"
+kind = "ClassMemberDeclarations"
+
+[[node]]
+name = "KotlinDelegationSpecifiers"
+kind = "DelegationSpecifiers"
+
+[[node.field]]
+name = "specifiers"
+type = "KotlinDelegationSpecifier"
+cardinality = "many"
+selector = { node = "DelegationSpecifier" }
+
+[[node]]
+name = "KotlinDelegationSpecifier"
+kind = "DelegationSpecifier"
+
+[[node]]
+name = "KotlinPropertyDelegate"
+kind = "PropertyDelegate"
+
+[[node.field]]
+name = "expression"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinGetter"
+kind = "Getter"
+
+[[node]]
+name = "KotlinSetter"
+kind = "Setter"
+
+[[node]]
+name = "KotlinUserType"
+kind = "UserType"
+
+[[node.field]]
+name = "segments"
+type = "KotlinSimpleUserType"
+cardinality = "many"
+selector = { node = "SimpleUserType" }
+
+[[node]]
+name = "KotlinAnnotatedType"
+kind = "AnnotatedType"
+
+[[node.field]]
+name = "modifiers"
+type = "KotlinTypeModifiers"
+cardinality = "one"
+selector = { node = "TypeModifiers" }
+
+[[node.field]]
+name = "ty"
+type = "KotlinType"
+cardinality = "one"
+selector = { union = "KotlinType" }
+
+[[node]]
+name = "KotlinTypeModifiers"
+kind = "TypeModifiers"
+
+[[node.field]]
+name = "annotations"
+type = "KotlinAnnotation"
+cardinality = "many"
+selector = { node = "AnnotationEntry" }
+
+[[node]]
+name = "KotlinDefinitelyNonNullableType"
+kind = "DefinitelyNonNullableType"
+
+[[node.field]]
+name = "left"
+type = "KotlinDefinitelyNonNullableOperand"
+cardinality = "one"
+occurrence = 0
+selector = { union = "KotlinDefinitelyNonNullableOperand" }
+
+[[node.field]]
+name = "modifiers"
+type = "KotlinTypeModifiers"
+cardinality = "optional"
+selector = { node = "TypeModifiers" }
+
+[[node.field]]
+name = "right"
+type = "KotlinDefinitelyNonNullableOperand"
+cardinality = "one"
+occurrence = 1
+selector = { union = "KotlinDefinitelyNonNullableOperand" }
+
+[[node]]
+name = "KotlinSimpleUserType"
+kind = "SimpleUserType"
+
+[[node.field]]
+name = "name"
+type = "KotlinTypeName"
+cardinality = "one"
+selector = { node = "TypeName" }
+
+[[node.field]]
+name = "arguments"
+type = "KotlinTypeArguments"
+cardinality = "optional"
+selector = { node = "TypeArguments" }
+
+[[node]]
+name = "KotlinDynamicType"
+kind = "DynamicType"
+
+[[node]]
+name = "KotlinNullableType"
+kind = "NullableType"
+
+[[node.field]]
+name = "ty"
+type = "KotlinNullableBaseType"
+cardinality = "one"
+selector = { union = "KotlinNullableBaseType" }
+
+[[node]]
+name = "KotlinParenthesizedType"
+kind = "ParenthesizedType"
+
+[[node.field]]
+name = "ty"
+type = "KotlinType"
+cardinality = "one"
+selector = { union = "KotlinType" }
+
+[[node]]
+name = "KotlinReceiverType"
+kind = "ReceiverType"
+
+[[node.field]]
+name = "ty"
+type = "KotlinReceiverBaseType"
+cardinality = "one"
+selector = { union = "KotlinReceiverBaseType" }
+
+[[node]]
+name = "KotlinFunctionType"
+kind = "FunctionType"
+
+[[node.field]]
+name = "context_parameters"
+type = "KotlinContextParameters"
+cardinality = "optional"
+selector = { node = "ContextParameters" }
+
+[[node.field]]
+name = "receiver"
+type = "KotlinReceiverType"
+cardinality = "optional"
+selector = { node = "ReceiverType" }
+
+[[node.field]]
+name = "parameters"
+type = "KotlinFunctionTypeParameters"
+cardinality = "optional"
+selector = { node = "FunctionTypeParameters" }
+
+[[node]]
+name = "KotlinContextParameters"
+kind = "ContextParameters"
+
+[[node.field]]
+name = "types"
+type = "KotlinType"
+cardinality = "many"
+selector = { union = "KotlinType" }
+
+[[node]]
+name = "KotlinFunctionTypeParameters"
+kind = "FunctionTypeParameters"
+
+[[node.field]]
+name = "parameters"
+type = "KotlinFunctionTypeParameter"
+cardinality = "many"
+selector = { node = "FunctionTypeParameter" }
+
+[[node]]
+name = "KotlinFunctionTypeParameter"
+kind = "FunctionTypeParameter"
+
+[[node.field]]
+name = "value"
+type = "KotlinFunctionTypeParameterValue"
+cardinality = "one"
+selector = { union = "KotlinFunctionTypeParameterValue" }
+
+[[node]]
+name = "KotlinTypeArguments"
+kind = "TypeArguments"
+
+[[node.field]]
+name = "projections"
+type = "KotlinTypeProjection"
+cardinality = "many"
+selector = { node = "TypeProjection" }
+
+[[node]]
+name = "KotlinTypeProjection"
+kind = "TypeProjection"
+
+[[node.field]]
+name = "variance"
+type = "KotlinVarianceModifier"
+cardinality = "optional"
+selector = { node = "VarianceModifier" }
+
+[[node.field]]
+name = "ty"
+type = "KotlinType"
+cardinality = "optional"
+selector = { union = "KotlinType" }
+
+[[node]]
+name = "KotlinVarianceModifier"
+kind = "VarianceModifier"
+
+[[node]]
+name = "KotlinTypeParameters"
+kind = "TypeParameters"
+
+[[node.field]]
+name = "parameters"
+type = "KotlinTypeParameter"
+cardinality = "many"
+selector = { node = "TypeParameter" }
+
+[[node]]
+name = "KotlinTypeParameter"
+kind = "TypeParameter"
+
+[[node.field]]
+name = "modifiers"
+type = "KotlinModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "variance"
+type = "KotlinVarianceModifier"
+cardinality = "optional"
+selector = { node = "VarianceModifier" }
+
+[[node.field]]
+name = "name"
+type = "KotlinDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "bound"
+type = "KotlinTypeAnnotation"
+cardinality = "optional"
+selector = { node = "TypeAnnotation" }
+
+[[node]]
+name = "KotlinTypeConstraints"
+kind = "TypeConstraints"
+
+[[node.field]]
+name = "constraints"
+type = "KotlinTypeConstraint"
+cardinality = "many"
+selector = { node = "TypeConstraint" }
+
+[[node]]
+name = "KotlinTypeConstraint"
+kind = "TypeConstraint"
+
+[[node.field]]
+name = "name"
+type = "KotlinDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "ty"
+type = "KotlinType"
+cardinality = "one"
+selector = { union = "KotlinType" }
+
+[[node]]
+name = "KotlinTypeName"
+kind = "TypeName"
+
+[[node]]
+name = "KotlinFunctionBody"
+kind = "FunctionBody"
+
+[[node.field]]
+name = "value"
+type = "KotlinFunctionBodyValue"
+cardinality = "one"
+selector = { union = "KotlinFunctionBodyValue" }
+
+[[node]]
+name = "KotlinBlock"
+kind = "Block"
+
+[[node.field]]
+name = "statements"
+type = "KotlinStatements"
+cardinality = "one"
+selector = { node = "Statements" }
+
+[[node]]
+name = "KotlinStatements"
+kind = "Statements"
+
+[[node.field]]
+name = "items"
+type = "KotlinStatement"
+cardinality = "many"
+selector = { union = "KotlinStatement" }
+
+[[node]]
+name = "KotlinVariableDeclaration"
+kind = "VariableDeclaration"
+
+[[node.field]]
+name = "name"
+type = "KotlinDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "type_annotation"
+type = "KotlinTypeAnnotation"
+cardinality = "optional"
+selector = { node = "TypeAnnotation" }
+
+[[node]]
+name = "KotlinMultiVariableDeclaration"
+kind = "MultiVariableDeclaration"
+
+[[node.field]]
+name = "variables"
+type = "KotlinVariableDeclaration"
+cardinality = "many"
+selector = { node = "VariableDeclaration" }
+
+[[node]]
+name = "KotlinForStatement"
+kind = "ForStatement"
+
+[[node.field]]
+name = "variable"
+type = "KotlinForVariable"
+cardinality = "one"
+selector = { union = "KotlinForVariable" }
+
+[[node.field]]
+name = "iterable"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node.field]]
+name = "body"
+type = "KotlinControlStructureBody"
+cardinality = "optional"
+selector = { node = "ControlStructureBody" }
+
+[[node]]
+name = "KotlinLoopStatement"
+kind = "LoopStatement"
+
+[[node.field]]
+name = "value"
+type = "KotlinLoop"
+cardinality = "one"
+selector = { union = "KotlinLoop" }
+
+[[node]]
+name = "KotlinWhileStatement"
+kind = "WhileStatement"
+
+[[node.field]]
+name = "condition"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node.field]]
+name = "body"
+type = "KotlinControlStructureBody"
+cardinality = "optional"
+selector = { node = "ControlStructureBody" }
+
+[[node]]
+name = "KotlinDoWhileStatement"
+kind = "DoWhileStatement"
+
+[[node.field]]
+name = "body"
+type = "KotlinControlStructureBody"
+cardinality = "optional"
+selector = { node = "ControlStructureBody" }
+
+[[node.field]]
+name = "condition"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinControlStructureBody"
+kind = "ControlStructureBody"
+
+[[node.field]]
+name = "value"
+type = "KotlinControlBody"
+cardinality = "optional"
+selector = { union = "KotlinControlBody" }
+
+[[node]]
+name = "KotlinAssignmentStatement"
+kind = "AssignmentStatement"
+
+[[node.field]]
+name = "target"
+type = "KotlinExpression"
+cardinality = "one"
+occurrence = 0
+selector = { union = "KotlinExpression" }
+
+[[node.field]]
+name = "operator"
+type = "KotlinAssignOp"
+cardinality = "one"
+selector = { node = "AssignOp" }
+
+[[node.field]]
+name = "value"
+type = "KotlinExpression"
+cardinality = "one"
+occurrence = 1
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinAssignOp"
+kind = "AssignOp"
+
+[[node]]
+name = "KotlinExpressionStatement"
+kind = "ExpressionStatement"
+
+[[node.field]]
+name = "expression"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinLiteralConstant"
+kind = "LiteralConstant"
+
+[[node.field]]
+name = "value"
+type = "KotlinLiteralValue"
+cardinality = "one"
+selector = { union = "KotlinLiteralValue" }
+
+[[node]]
+name = "KotlinIntegerLiteral"
+kind = "IntegerLiteral"
+
+[[node]]
+name = "KotlinBooleanLiteral"
+kind = "BooleanLiteral"
+
+[[node]]
+name = "KotlinNullLiteral"
+kind = "NullLiteral"
+
+[[node]]
+name = "KotlinRealLiteral"
+kind = "RealLiteral"
+
+[[node]]
+name = "KotlinCharacterLiteral"
+kind = "CharacterLiteral"
+
+[[node]]
+name = "KotlinStringLiteral"
+kind = "StringLiteral"
+
+[[node.field]]
+name = "parts"
+type = "KotlinStringPart"
+cardinality = "many"
+selector = { union = "KotlinStringPart" }
+
+[[node]]
+name = "KotlinStringContent"
+kind = "StringContent"
+
+[[node]]
+name = "KotlinInterpolatedExpression"
+kind = "InterpolatedExpression"
+
+[[node.field]]
+name = "expression"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinInterpolatedIdentifier"
+kind = "InterpolatedIdentifier"
+
+[[node]]
+name = "KotlinNameExpression"
+kind = "NameExpression"
+
+[[node.field]]
+name = "name"
+type = "KotlinIdentifier"
+cardinality = "one"
+selector = { node = "Identifier" }
+
+[[node]]
+name = "KotlinAnnotatedExpression"
+kind = "AnnotatedExpression"
+
+[[node.field]]
+name = "annotation"
+type = "KotlinAnnotation"
+cardinality = "one"
+selector = { node = "AnnotationEntry" }
+
+[[node.field]]
+name = "expression"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinThisExpression"
+kind = "ThisExpression"
+
+[[node]]
+name = "KotlinSuperExpression"
+kind = "SuperExpression"
+
+[[node]]
+name = "KotlinParenthesizedExpression"
+kind = "ParenthesizedExpression"
+
+[[node.field]]
+name = "expression"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinLambdaLiteral"
+kind = "LambdaLiteral"
+
+[[node.field]]
+name = "parameters"
+type = "KotlinLambdaParameters"
+cardinality = "optional"
+selector = { node = "LambdaParameters" }
+
+[[node.field]]
+name = "statements"
+type = "KotlinStatements"
+cardinality = "one"
+selector = { node = "Statements" }
+
+[[node]]
+name = "KotlinLambdaParameters"
+kind = "LambdaParameters"
+
+[[node.field]]
+name = "parameters"
+type = "KotlinLambdaParameter"
+cardinality = "many"
+selector = { node = "LambdaParameter" }
+
+[[node]]
+name = "KotlinLambdaParameter"
+kind = "LambdaParameter"
+
+[[node.field]]
+name = "target"
+type = "KotlinLambdaParameterTarget"
+cardinality = "one"
+selector = { union = "KotlinLambdaParameterTarget" }
+
+[[node.field]]
+name = "ty"
+type = "KotlinType"
+cardinality = "optional"
+selector = { union = "KotlinType" }
+
+[[node]]
+name = "KotlinAnonymousFunction"
+kind = "AnonymousFunction"
+
+[[node.field]]
+name = "receiver"
+type = "KotlinReceiverType"
+cardinality = "optional"
+selector = { node = "ReceiverType" }
+
+[[node.field]]
+name = "parameters"
+type = "KotlinFunctionValueParameters"
+cardinality = "one"
+selector = { node = "FunctionValueParameters" }
+
+[[node.field]]
+name = "return_type"
+type = "KotlinTypeAnnotation"
+cardinality = "optional"
+selector = { node = "TypeAnnotation" }
+
+[[node.field]]
+name = "body"
+type = "KotlinFunctionBody"
+cardinality = "one"
+selector = { node = "FunctionBody" }
+
+[[node]]
+name = "KotlinIfExpression"
+kind = "IfExpression"
+
+[[node.field]]
+name = "condition"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node.field]]
+name = "then_body"
+type = "KotlinControlStructureBody"
+cardinality = "one"
+occurrence = 0
+selector = { node = "ControlStructureBody" }
+
+[[node.field]]
+name = "else_body"
+type = "KotlinControlStructureBody"
+cardinality = "optional"
+occurrence = 1
+selector = { node = "ControlStructureBody" }
+
+[[node]]
+name = "KotlinInfixExpression"
+kind = "InfixExpression"
+
+[[node.field]]
+name = "left"
+type = "KotlinExpression"
+cardinality = "one"
+occurrence = 0
+selector = { union = "KotlinExpression" }
+
+[[node.field]]
+name = "operator"
+type = "KotlinIdentifier"
+cardinality = "one"
+selector = { node = "Identifier" }
+
+[[node.field]]
+name = "right"
+type = "KotlinExpression"
+cardinality = "one"
+occurrence = 1
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinBinaryExpression"
+kind = "BinaryExpression"
+
+[[node.field]]
+name = "left"
+type = "KotlinExpression"
+cardinality = "one"
+occurrence = 0
+selector = { union = "KotlinExpression" }
+
+[[node.field]]
+name = "operator"
+type = "KotlinBinaryOperator"
+cardinality = "optional"
+selector = { union = "KotlinBinaryOperator" }
+
+[[node.field]]
+name = "right"
+type = "KotlinExpression"
+cardinality = "one"
+occurrence = 1
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinArithOp"
+kind = "ArithOp"
+
+[[node]]
+name = "KotlinEqualityOp"
+kind = "EqualityOp"
+
+[[node]]
+name = "KotlinCompareOp"
+kind = "CompareOp"
+
+[[node]]
+name = "KotlinPrefixOp"
+kind = "PrefixOp"
+
+[[node]]
+name = "KotlinUnaryExpression"
+kind = "UnaryExpression"
+
+[[node.field]]
+name = "operator"
+type = "KotlinPrefixOp"
+cardinality = "one"
+selector = { node = "PrefixOp" }
+
+[[node.field]]
+name = "operand"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinCallExpression"
+kind = "CallExpression"
+
+[[node.field]]
+name = "receiver"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node.field]]
+name = "suffix"
+type = "KotlinCallSuffix"
+cardinality = "one"
+selector = { node = "CallSuffix" }
+
+[[node]]
+name = "KotlinCallSuffix"
+kind = "CallSuffix"
+
+[[node.field]]
+name = "arguments"
+type = "KotlinValueArguments"
+cardinality = "optional"
+selector = { node = "ValueArguments" }
+
+[[node.field]]
+name = "trailing_lambda"
+type = "KotlinTrailingLambda"
+cardinality = "optional"
+selector = { union = "KotlinTrailingLambda" }
+
+[[node]]
+name = "KotlinAnnotatedLambda"
+kind = "AnnotatedLambda"
+
+[[node]]
+name = "KotlinIndexExpression"
+kind = "IndexExpression"
+
+[[node]]
+name = "KotlinMemberExpression"
+kind = "MemberExpression"
+
+[[node.field]]
+name = "receiver"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node.field]]
+name = "member"
+type = "KotlinIdentifier"
+cardinality = "optional"
+selector = { node = "Identifier" }
+
+[[node]]
+name = "KotlinCallableReference"
+kind = "CallableReference"
+
+[[node.field]]
+name = "receiver"
+type = "KotlinExpression"
+cardinality = "optional"
+selector = { union = "KotlinExpression" }
+
+[[node.field]]
+name = "type_arguments"
+type = "KotlinTypeArguments"
+cardinality = "optional"
+selector = { node = "TypeArguments" }
+
+[[node.field]]
+name = "member"
+type = "KotlinIdentifier"
+cardinality = "optional"
+selector = { node = "Identifier" }
+
+[[node]]
+name = "KotlinObjectLiteral"
+kind = "ObjectLiteral"
+
+[[node.field]]
+name = "delegation_specifiers"
+type = "KotlinDelegationSpecifiers"
+cardinality = "optional"
+selector = { node = "DelegationSpecifiers" }
+
+[[node.field]]
+name = "body"
+type = "KotlinClassBody"
+cardinality = "one"
+selector = { node = "ClassBody" }
+
+[[node]]
+name = "KotlinNotNullExpression"
+kind = "NotNullExpression"
+
+[[node.field]]
+name = "receiver"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinPostfixUpdateExpression"
+kind = "PostfixUpdateExpression"
+
+[[node.field]]
+name = "receiver"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinTypeCheckExpression"
+kind = "TypeCheckExpression"
+
+[[node.field]]
+name = "operand"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node.field]]
+name = "operator"
+type = "KotlinTypeCheckOp"
+cardinality = "one"
+selector = { node = "TypeCheckOp" }
+
+[[node.field]]
+name = "ty"
+type = "KotlinType"
+cardinality = "one"
+selector = { union = "KotlinType" }
+
+[[node]]
+name = "KotlinTypeCheckOp"
+kind = "TypeCheckOp"
+
+[[node]]
+name = "KotlinContainmentExpression"
+kind = "ContainmentExpression"
+
+[[node.field]]
+name = "left"
+type = "KotlinExpression"
+cardinality = "one"
+occurrence = 0
+selector = { union = "KotlinExpression" }
+
+[[node.field]]
+name = "operator"
+type = "KotlinContainmentOp"
+cardinality = "one"
+selector = { node = "ContainmentOp" }
+
+[[node.field]]
+name = "right"
+type = "KotlinExpression"
+cardinality = "one"
+occurrence = 1
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinContainmentOp"
+kind = "ContainmentOp"
+
+[[node]]
+name = "KotlinCastExpression"
+kind = "CastExpression"
+
+[[node.field]]
+name = "operand"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node.field]]
+name = "operator"
+type = "KotlinCastOp"
+cardinality = "one"
+selector = { node = "CastOp" }
+
+[[node.field]]
+name = "ty"
+type = "KotlinType"
+cardinality = "one"
+selector = { union = "KotlinType" }
+
+[[node]]
+name = "KotlinCastOp"
+kind = "CastOp"
+
+[[node]]
+name = "KotlinRangeExpression"
+kind = "RangeExpression"
+
+[[node.field]]
+name = "left"
+type = "KotlinExpression"
+cardinality = "one"
+occurrence = 0
+selector = { union = "KotlinExpression" }
+
+[[node.field]]
+name = "right"
+type = "KotlinExpression"
+cardinality = "one"
+occurrence = 1
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinReturnExpression"
+kind = "ReturnExpression"
+
+[[node.field]]
+name = "value"
+type = "KotlinExpression"
+cardinality = "optional"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinThrowExpression"
+kind = "ThrowExpression"
+
+[[node.field]]
+name = "value"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinBreakExpression"
+kind = "BreakExpression"
+
+[[node]]
+name = "KotlinContinueExpression"
+kind = "ContinueExpression"
+
+[[node]]
+name = "KotlinWhenExpression"
+kind = "WhenExpression"
+
+[[node.field]]
+name = "subject"
+type = "KotlinWhenSubject"
+cardinality = "optional"
+selector = { node = "WhenSubject" }
+
+[[node.field]]
+name = "entries"
+type = "KotlinWhenEntries"
+cardinality = "one"
+selector = { node = "WhenEntries" }
+
+[[node]]
+name = "KotlinWhenSubject"
+kind = "WhenSubject"
+
+[[node.field]]
+name = "annotations"
+type = "KotlinAnnotation"
+cardinality = "many"
+selector = { node = "AnnotationEntry" }
+
+[[node.field]]
+name = "variable"
+type = "KotlinVariableDeclaration"
+cardinality = "optional"
+selector = { node = "VariableDeclaration" }
+
+[[node.field]]
+name = "expression"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinWhenEntries"
+kind = "WhenEntries"
+
+[[node.field]]
+name = "items"
+type = "KotlinWhenEntry"
+cardinality = "many"
+selector = { node = "WhenEntry" }
+
+[[node]]
+name = "KotlinWhenEntry"
+kind = "WhenEntry"
+
+[[node.field]]
+name = "conditions"
+type = "KotlinWhenConditions"
+cardinality = "optional"
+selector = { node = "WhenConditions" }
+
+[[node.field]]
+name = "body"
+type = "KotlinControlStructureBody"
+cardinality = "one"
+selector = { node = "ControlStructureBody" }
+
+[[node]]
+name = "KotlinWhenConditions"
+kind = "WhenConditions"
+
+[[node.field]]
+name = "items"
+type = "KotlinWhenCondition"
+cardinality = "many"
+selector = { node = "WhenCondition" }
+
+[[node.field]]
+name = "guard"
+type = "KotlinWhenGuard"
+cardinality = "optional"
+selector = { node = "WhenGuard" }
+
+[[node]]
+name = "KotlinWhenCondition"
+kind = "WhenCondition"
+
+[[node.field]]
+name = "value"
+type = "KotlinWhenConditionValue"
+cardinality = "one"
+selector = { union = "KotlinWhenConditionValue" }
+
+[[node]]
+name = "KotlinWhenGuard"
+kind = "WhenGuard"
+
+[[node.field]]
+name = "condition"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinWhenRangeCondition"
+kind = "WhenRangeCondition"
+
+[[node.field]]
+name = "expression"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinWhenTypeCondition"
+kind = "WhenTypeCondition"
+
+[[node.field]]
+name = "ty"
+type = "KotlinType"
+cardinality = "one"
+selector = { union = "KotlinType" }
+
+[[node]]
+name = "KotlinTryExpression"
+kind = "TryExpression"
+
+[[node.field]]
+name = "block"
+type = "KotlinBlock"
+cardinality = "one"
+selector = { node = "Block" }
+
+[[node.field]]
+name = "catches"
+type = "KotlinCatchClause"
+cardinality = "many"
+selector = { node = "CatchClause" }
+
+[[node.field]]
+name = "finally_clause"
+type = "KotlinFinallyClause"
+cardinality = "optional"
+selector = { node = "FinallyClause" }
+
+[[node]]
+name = "KotlinCatchClause"
+kind = "CatchClause"
+
+[[node.field]]
+name = "annotations"
+type = "KotlinAnnotation"
+cardinality = "many"
+selector = { node = "AnnotationEntry" }
+
+[[node.field]]
+name = "parameter"
+type = "KotlinDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "ty"
+type = "KotlinType"
+cardinality = "one"
+selector = { union = "KotlinType" }
+
+[[node.field]]
+name = "block"
+type = "KotlinBlock"
+cardinality = "one"
+selector = { node = "Block" }
+
+[[node]]
+name = "KotlinFinallyClause"
+kind = "FinallyClause"
+
+[[node.field]]
+name = "block"
+type = "KotlinBlock"
+cardinality = "one"
+selector = { node = "Block" }
+
+[[node]]
+name = "KotlinCollectionLiteral"
+kind = "CollectionLiteral"
+
+[[node.field]]
+name = "elements"
+type = "KotlinExpression"
+cardinality = "many"
+selector = { union = "KotlinExpression" }
+
+[[node]]
+name = "KotlinValueArguments"
+kind = "ValueArguments"
+
+[[node.field]]
+name = "arguments"
+type = "KotlinValueArgument"
+cardinality = "many"
+selector = { node = "ValueArgument" }
+
+[[node]]
+name = "KotlinValueArgument"
+kind = "ValueArgument"
+
+[[node.field]]
+name = "name"
+type = "KotlinIdentifier"
+cardinality = "optional"
+selector = { node = "Identifier" }
+
+[[node.field]]
+name = "expression"
+type = "KotlinExpression"
+cardinality = "one"
+selector = { union = "KotlinExpression" }
+
+[[union]]
+name = "KotlinExpression"
+variants = [
+	{ name = "Annotated", type = "KotlinAnnotatedExpression" },
+	{ name = "Literal", type = "KotlinLiteralConstant" },
+	{ name = "String", type = "KotlinStringLiteral" },
+	{ name = "Name", type = "KotlinNameExpression" },
+	{ name = "This", type = "KotlinThisExpression" },
+	{ name = "Super", type = "KotlinSuperExpression" },
+	{ name = "Parenthesized", type = "KotlinParenthesizedExpression" },
+	{ name = "Lambda", type = "KotlinLambdaLiteral" },
+	{ name = "AnonymousFunction", type = "KotlinAnonymousFunction" },
+	{ name = "If", type = "KotlinIfExpression" },
+	{ name = "Call", type = "KotlinCallExpression" },
+	{ name = "Index", type = "KotlinIndexExpression" },
+	{ name = "Member", type = "KotlinMemberExpression" },
+	{ name = "CallableReference", type = "KotlinCallableReference" },
+	{ name = "Object", type = "KotlinObjectLiteral" },
+	{ name = "NotNull", type = "KotlinNotNullExpression" },
+	{ name = "PostfixUpdate", type = "KotlinPostfixUpdateExpression" },
+	{ name = "Return", type = "KotlinReturnExpression" },
+	{ name = "Throw", type = "KotlinThrowExpression" },
+	{ name = "Break", type = "KotlinBreakExpression" },
+	{ name = "Continue", type = "KotlinContinueExpression" },
+	{ name = "When", type = "KotlinWhenExpression" },
+	{ name = "Try", type = "KotlinTryExpression" },
+	{ name = "Collection", type = "KotlinCollectionLiteral" },
+	{ name = "Unary", type = "KotlinUnaryExpression" },
+	{ name = "Infix", type = "KotlinInfixExpression" },
+	{ name = "TypeCheck", type = "KotlinTypeCheckExpression" },
+	{ name = "Containment", type = "KotlinContainmentExpression" },
+	{ name = "Cast", type = "KotlinCastExpression" },
+	{ name = "Range", type = "KotlinRangeExpression" },
+	{ name = "Binary", type = "KotlinBinaryExpression" },
+]
+
+[[union]]
+name = "KotlinStatement"
+variants = [
+	{ name = "Class", type = "KotlinClassDeclaration" },
+	{ name = "Object", type = "KotlinObjectDeclaration" },
+	{ name = "Function", type = "KotlinFunctionDeclaration" },
+	{ name = "Property", type = "KotlinPropertyDeclaration" },
+	{ name = "TypeAlias", type = "KotlinTypeAliasDeclaration" },
+	{ name = "Loop", type = "KotlinLoopStatement" },
+	{ name = "Assignment", type = "KotlinAssignmentStatement" },
+	{ name = "Expression", type = "KotlinExpressionStatement" },
+]
+
+[[union]]
+name = "KotlinDeclaration"
+variants = [
+	{ name = "Class", type = "KotlinClassDeclaration" },
+	{ name = "Object", type = "KotlinObjectDeclaration" },
+	{ name = "Function", type = "KotlinFunctionDeclaration" },
+	{ name = "Property", type = "KotlinPropertyDeclaration" },
+	{ name = "TypeAlias", type = "KotlinTypeAliasDeclaration" },
+]
+
+[[union]]
+name = "KotlinType"
+variants = [
+	{ name = "Annotated", type = "KotlinAnnotatedType" },
+	{ name = "Function", type = "KotlinFunctionType" },
+	{ name = "DefinitelyNonNullable", type = "KotlinDefinitelyNonNullableType" },
+	{ name = "Nullable", type = "KotlinNullableType" },
+	{ name = "Parenthesized", type = "KotlinParenthesizedType" },
+	{ name = "Receiver", type = "KotlinReceiverType" },
+	{ name = "Dynamic", type = "KotlinDynamicType" },
+	{ name = "User", type = "KotlinUserType" },
+]
+
+[[union]]
+name = "KotlinFunctionBodyValue"
+variants = [
+	{ name = "Block", type = "KotlinBlock" },
+	{ name = "Expression", type = "KotlinExpression" },
+]
+
+[[union]]
+name = "KotlinModifierValue"
+variants = [
+	{ name = "Annotation", type = "KotlinAnnotation" },
+	{ name = "Modifier", type = "KotlinModifier" },
+	{ name = "Context", type = "KotlinContextDeclarationModifier" },
+]
+
+[[union]]
+name = "KotlinClassBodyValue"
+variants = [
+	{ name = "Class", type = "KotlinClassBody" },
+	{ name = "Enum", type = "KotlinEnumClassBody" },
+]
+
+[[union]]
+name = "KotlinLoop"
+variants = [
+	{ name = "For", type = "KotlinForStatement" },
+	{ name = "While", type = "KotlinWhileStatement" },
+	{ name = "DoWhile", type = "KotlinDoWhileStatement" },
+]
+
+[[union]]
+name = "KotlinForVariable"
+variants = [
+	{ name = "Definition", type = "KotlinDefinition" },
+	{ name = "Destructuring", type = "KotlinMultiVariableDeclaration" },
+]
+
+[[union]]
+name = "KotlinControlBody"
+variants = [
+	{ name = "Block", type = "KotlinBlock" },
+	{ name = "Function", type = "KotlinFunctionDeclaration" },
+	{ name = "TypeAlias", type = "KotlinTypeAliasDeclaration" },
+	{ name = "Loop", type = "KotlinLoopStatement" },
+	{ name = "Assignment", type = "KotlinAssignmentStatement" },
+	{ name = "Expression", type = "KotlinExpressionStatement" },
+]
+
+[[union]]
+name = "KotlinWhenConditionValue"
+variants = [
+	{ name = "Range", type = "KotlinWhenRangeCondition" },
+	{ name = "Type", type = "KotlinWhenTypeCondition" },
+	{ name = "Expression", type = "KotlinExpression" },
+]
+
+[[union]]
+name = "KotlinLiteralValue"
+variants = [
+	{ name = "Boolean", type = "KotlinBooleanLiteral" },
+	{ name = "Null", type = "KotlinNullLiteral" },
+	{ name = "Integer", type = "KotlinIntegerLiteral" },
+	{ name = "Real", type = "KotlinRealLiteral" },
+	{ name = "Character", type = "KotlinCharacterLiteral" },
+	{ name = "String", type = "KotlinStringLiteral" },
+]
+
+[[union]]
+name = "KotlinLambdaParameterTarget"
+variants = [
+	{ name = "Variable", type = "KotlinVariableDeclaration" },
+	{ name = "Destructuring", type = "KotlinMultiVariableDeclaration" },
+]
+
+[[union]]
+name = "KotlinTrailingLambda"
+variants = [
+	{ name = "Lambda", type = "KotlinLambdaLiteral" },
+	{ name = "Annotated", type = "KotlinAnnotatedLambda" },
+]
+
+[[union]]
+name = "KotlinBinaryOperator"
+variants = [
+	{ name = "Arithmetic", type = "KotlinArithOp" },
+	{ name = "Comparison", type = "KotlinCompareOp" },
+	{ name = "Equality", type = "KotlinEqualityOp" },
+]
+
+[[union]]
+name = "KotlinNullableBaseType"
+variants = [
+	{ name = "Dynamic", type = "KotlinDynamicType" },
+	{ name = "User", type = "KotlinUserType" },
+	{ name = "Parenthesized", type = "KotlinParenthesizedType" },
+]
+
+[[union]]
+name = "KotlinReceiverBaseType"
+variants = [
+	{ name = "Parenthesized", type = "KotlinParenthesizedType" },
+	{ name = "Nullable", type = "KotlinNullableType" },
+	{ name = "Dynamic", type = "KotlinDynamicType" },
+	{ name = "User", type = "KotlinUserType" },
+]
+
+[[union]]
+name = "KotlinDefinitelyNonNullableOperand"
+variants = [
+	{ name = "User", type = "KotlinUserType" },
+	{ name = "Parenthesized", type = "KotlinParenthesizedType" },
+]
+
+[[union]]
+name = "KotlinFunctionTypeParameterValue"
+variants = [
+	{ name = "Parameter", type = "KotlinFunctionValueParameter" },
+	{ name = "Type", type = "KotlinType" },
+]
+
+[[union]]
+name = "KotlinStringPart"
+variants = [
+	{ name = "Content", type = "KotlinStringContent" },
+	{ name = "Expression", type = "KotlinInterpolatedExpression" },
+	{ name = "Identifier", type = "KotlinInterpolatedIdentifier" },
+]

@@ -169,6 +169,32 @@ gosyn limitation is compact grouped imports lacking a final semicolon or
 newline before `)`; gofmt-style imports work. All build-tag variants are read
 as source; analysis does not choose a GOOS/GOARCH build or invoke Go tooling.
 
+## Kotlin
+
+CLI and browser scans analyze `.kt` and `.kts` with the strict pure-Rust Rezel
+Kotlin 2.4 parser. Rules are kotlin/exit-in-library, nonliteral-process,
+swallowed-errors, undocumented-suppressions, exact duplicated bodies and file
+size/share. They use the original five categories and existing ramps, with
+Kotlin's product-line denominator. Calibration is only cqx.json; defaults have
+no independent Kotlin calibration. There is no domain-type or taint analysis.
+
+Imports and aliases bind kotlin.system.exitProcess. Runtime.getRuntime().exec
+is recognized conservatively; local declarations/custom imports shadow APIs.
+Literal commands/argv with dynamic ordinary arguments stay quiet, while string
+interpolation is non-literal. Top-level main and @JvmStatic main entry units are
+recognized. Test source sets/filenames and benchmark paths do not score as
+product code; generated/build/Gradle-cache/vendor sources are excluded.
+Explained empty catches and suppressions with adjacent reasons stay quiet.
+
+Every parse failure skips/reports the whole file and removes its score lines.
+The current parser supports declaration files but not many Gradle DSL scripts;
+those `.kts` failures are visible in skipped_files. Some valid multiline infix
+expressions also exceed this parser's coverage. Script files that parse are
+entry units. No JVM, Kotlin compiler or extra wasm toolchain is needed. Parser
+and pinned Unicode sources are vendored unchanged with manifest-only isolation
+of Kotlin Unicode 17 from Rust Unicode 18; see [provenance](vendor/README.md).
+
+
 ## The model
 
 ### One graph, not several views

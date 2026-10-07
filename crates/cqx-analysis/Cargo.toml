@@ -13,3 +13,5 @@ cqx-ts = { path = "../cqx-ts" }
 cqx-vfs.workspace = true
 serde_json.workspace = true
 deka-cli-core.workspace = true
+
+cqx-kotlin={path="../cqx-kotlin"}
