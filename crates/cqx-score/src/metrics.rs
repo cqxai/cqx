@@ -1,6 +1,6 @@
 //! Turning a fact stream into the numbers the rules are scored against.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use cqx_schema::{Edge, EdgeKind, NodeKind};
 use cqx_store::facts::Stream;
@@ -157,6 +157,8 @@ pub struct Metrics {
     /// Product lines, in units of ten thousand — the denominator for densities.
     pub scale: f64,
     pub lines: u64,
+    /// Actual product lines per language; the density floor is not a weight.
+    pub language_lines: BTreeMap<String, u64>,
     pub skipped_files: Vec<serde_json::Value>,
     values: HashMap<String, Measure>,
 }
@@ -174,7 +176,9 @@ impl Metrics {
             .iter()
             .any(|n| n.kind == NodeKind::File && frontend_language(n) != "rust")
         {
-            return Self::compute_one(stream, config);
+            let mut metrics = Self::compute_one(stream, config);
+            metrics.language_lines.insert("rust".into(), metrics.lines);
+            return metrics;
         }
         let languages = config.frontend_languages();
         let subset = |lang: &str| Stream {
@@ -201,6 +205,7 @@ impl Metrics {
             ..Stream::default()
         };
         let mut metrics = Self::compute_one(&subset("rust"), config);
+        metrics.language_lines.insert("rust".into(), metrics.lines);
         for lang in languages.iter().copied() {
             let part = subset(lang);
             // Absent frontends must not add empty rules or config to another
@@ -251,6 +256,9 @@ impl Metrics {
             }
             metrics.skipped_files.extend(part_metrics.skipped_files);
             metrics.lines += part_metrics.lines;
+            metrics
+                .language_lines
+                .insert(lang.into(), part_metrics.lines);
         }
         metrics
             .skipped_files
@@ -803,6 +811,7 @@ impl Metrics {
             scale,
             lines,
             skipped_files,
+            language_lines: BTreeMap::new(),
             values,
         };
         metrics.locate(stream);

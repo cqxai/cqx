@@ -42,13 +42,17 @@ const files = [
 ];
 snapshot(files);
 const report = JSON.parse(call('cqx_score',''));
-assert.equal(report.scores.containment,33);
-assert.equal(report.scores.security,55);
+assert.equal(report.scores.containment,85);
+assert.equal(report.scores.security,89);
 assert.equal(report.rules.find(r=>r.language==='python'&&r.rule==='exit-in-library').total_findings,1);
 assert.equal(report.skipped_files[0].file,'broken.py');
+assert.equal(report.languages.rust.scores.containment, 70);
+assert.equal(report.languages.typescript.scores.security, 70);
+assert.equal(report.languages.python.scores.containment, 93);
+assert.equal(report.languages.python.scores.security, 85);
 const dataset=JSON.parse(call('cqx_dataset','fixture',''));
 assert.equal(expected,7); assert.equal(parsed,expected);
-assert.deepEqual(dataset.score.scores,report.scores);
+assert.deepEqual(dataset.score, JSON.parse(call('cqx_quote', JSON.stringify(report))));
 const metadata=call('cqx_manifests');api.cqx_merge_reset();
 const slices=[files.slice(0,4),files.slice(4,8),files.slice(8)];
 for(const files of slices){snapshot(files);call('cqx_merge_add',call('cqx_gather',metadata));}
@@ -57,5 +61,6 @@ for(const files of slices){snapshot(files);call('cqx_gather',metadata);call('cqx
 const folded=JSON.parse(call('cqx_fold_done','fixture',files.at(-1)[1]));
 assert.deepEqual(folded.score.scores,report.scores);
 assert.deepEqual(folded.score.rules,report.rules);
+assert.deepEqual(folded.score.languages, report.languages);
 assert.deepEqual(folded.score.skipped_files,report.skipped_files);
 console.log('Python WASM parsing, mixed scores, config, entrypoints, progress, skips and sharding: passed');

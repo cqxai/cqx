@@ -13,7 +13,7 @@ pub mod ratchet;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use config::{Config, Origin};
+use config::{Config, MinScore, Origin};
 use deka_cli_core::{CommandSpec, Context, FlagSpec, ParamSpec, Registry, SubcommandSpec};
 use metrics::Metrics;
 
@@ -106,7 +106,25 @@ fn deduction(value: f64, free: f64, full: f64, weight: f64) -> f64 {
     (weight * fraction * 10.0).round() / 10.0
 }
 
+/// One language, scored using only its own rules and product lines.
+pub struct LanguageScore {
+    pub lines: u64,
+    pub scores: BTreeMap<String, u32>,
+}
+
+/// Shared by native gates, history, and the browser report.
+pub struct Scoring {
+    pub scores: BTreeMap<String, u32>,
+    pub deductions: Vec<Deduction>,
+    pub languages: BTreeMap<String, LanguageScore>,
+}
+
 pub fn score(config: &Config, m: &Metrics) -> (BTreeMap<String, u32>, Vec<Deduction>) {
+    let scored = evaluate(config, m);
+    (scored.scores, scored.deductions)
+}
+
+pub fn evaluate(config: &Config, m: &Metrics) -> Scoring {
     let mut deductions = Vec::new();
     let mut totals: BTreeMap<String, f64> = BTreeMap::new();
     for (id, rule) in &config.rules {
@@ -126,11 +144,67 @@ pub fn score(config: &Config, m: &Metrics) -> (BTreeMap<String, u32>, Vec<Deduct
             capped: taken >= rule.weight && rule.weight > 0.0,
         });
     }
-    let scores = totals
-        .into_iter()
-        .map(|(cat, lost)| (cat, (100.0 - lost).max(0.0).round() as u32))
+    let scores = category_scores(totals);
+    // Round and clamp each language exactly as the single-language scorer does,
+    // then weight those category scores by actual lines, never the density floor.
+    let languages: BTreeMap<String, LanguageScore> = m
+        .language_lines
+        .iter()
+        .filter(|(_, lines)| **lines > 0)
+        .map(|(language, lines)| {
+            let mut lost: BTreeMap<String, f64> = config
+                .rules
+                .values()
+                .map(|rule| (rule.category.clone(), 0.0))
+                .collect();
+            for d in &deductions {
+                if config.rules[&d.rule].language == *language {
+                    *lost.entry(d.category.clone()).or_default() += d.taken;
+                }
+            }
+            let scores = category_scores(lost);
+            (
+                language.clone(),
+                LanguageScore {
+                    lines: *lines,
+                    scores,
+                },
+            )
+        })
         .collect();
-    (scores, deductions)
+    let scores = if languages.len() == 1 {
+        languages.values().next().unwrap().scores.clone()
+    } else if languages.len() > 1 {
+        let lines: u64 = languages.values().map(|part| part.lines).sum();
+        config
+            .rules
+            .values()
+            .map(|rule| rule.category.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .map(|category| {
+                let weighted: f64 = languages
+                    .values()
+                    .map(|part| f64::from(part.scores[&category]) * part.lines as f64)
+                    .sum();
+                (category, (weighted / lines as f64).round() as u32)
+            })
+            .collect()
+    } else {
+        scores
+    };
+    Scoring {
+        scores,
+        deductions,
+        languages,
+    }
+}
+
+fn category_scores(totals: BTreeMap<String, f64>) -> BTreeMap<String, u32> {
+    totals
+        .into_iter()
+        .map(|(category, lost)| (category, (100.0 - lost).max(0.0).round() as u32))
+        .collect()
 }
 
 fn cmd_score(context: &Context) {
@@ -155,7 +229,7 @@ fn cmd_score(context: &Context) {
         .get("--min-score")
         .and_then(|s| s.parse().ok())
     {
-        config.min_score = Some(v);
+        config.min_score = Some(MinScore::Headline(v));
     }
 
     if context
@@ -177,20 +251,18 @@ fn cmd_score(context: &Context) {
         }
     };
     let m = Metrics::compute(&stream, &config);
-    let (scores, deductions) = score(&config, &m);
+    let scoring = evaluate(&config, &m);
 
     if context.args.flags.get("--json").copied().unwrap_or(false) {
-        print_json(&config, &scores, &deductions, &m);
+        print_json(&config, &scoring, &m);
     } else {
-        print_report(&config, &scores, &deductions, &m);
+        print_report(&config, &scoring.scores, &scoring.deductions, &m);
     }
 
-    if let Some(min) = config.min_score {
-        if let Some((cat, worst)) = scores.iter().min_by_key(|(_, v)| **v) {
-            if *worst < min {
-                eprintln!("\ncqx: {cat} scored {worst}, below the required {min}");
-                FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
-            }
+    if let Some(min) = &config.min_score {
+        for failure in min.failures(&scoring) {
+            eprintln!("\ncqx: {failure}");
+            FAILED.store(true, std::sync::atomic::Ordering::Relaxed);
         }
     }
 }
@@ -463,17 +535,12 @@ fn print_report(
 /// Separate from printing it, because a browser wants the value and a terminal
 /// wants the text, and neither should have to go through the other.
 pub fn report_json(config: &Config, m: &Metrics) -> serde_json::Value {
-    let (scores, deductions) = score(config, m);
-    build_report(config, &scores, &deductions, m)
+    build_report(config, &evaluate(config, m), m)
 }
 
-fn build_report(
-    config: &Config,
-    scores: &BTreeMap<String, u32>,
-    deductions: &[Deduction],
-    m: &Metrics,
-) -> serde_json::Value {
-    let rules: Vec<serde_json::Value> = deductions
+fn build_report(config: &Config, scoring: &Scoring, m: &Metrics) -> serde_json::Value {
+    let rules: Vec<serde_json::Value> = scoring
+        .deductions
         .iter()
         .map(|d| {
             // The findings travel with the number. A score a reader cannot open
@@ -541,25 +608,41 @@ fn build_report(
     }
     let mut report = serde_json::json!({
         "lines": m.lines,
-        "scores": scores,
+        "scores": scoring.scores,
         "rules": rules,
         "config": config_json(&shown_config),
     });
+    // Keep every single-language golden byte-identical. A mixed report adds
+    // only this block; top-level rule rows remain the original unweighted data.
+    if scoring.languages.len() > 1 {
+        let languages: serde_json::Map<String, serde_json::Value> = scoring
+            .languages
+            .iter()
+            .map(|(language, part)| {
+                let rules: Vec<_> = report["rules"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter(|rule| rule["language"].as_str() == Some(language.as_str()))
+                    .cloned()
+                    .collect();
+                (
+                    language.clone(),
+                    serde_json::json!({"lines": part.lines, "scores": part.scores, "rules": rules}),
+                )
+            })
+            .collect();
+        report["languages"] = serde_json::Value::Object(languages);
+    }
     if !m.skipped_files.is_empty() {
         report["skipped_files"] = serde_json::json!(m.skipped_files);
     }
     report
 }
 
-fn print_json(
-    config: &Config,
-    scores: &BTreeMap<String, u32>,
-    deductions: &[Deduction],
-    m: &Metrics,
-) {
+fn print_json(config: &Config, scoring: &Scoring, m: &Metrics) {
     println!(
         "{}",
-        serde_json::to_string_pretty(&build_report(config, scores, deductions, m))
-            .unwrap_or_default()
+        serde_json::to_string_pretty(&build_report(config, scoring, m)).unwrap_or_default()
     );
 }

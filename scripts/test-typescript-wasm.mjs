@@ -49,12 +49,16 @@ assert.match(facts, /typescript:rule/);
 assert.match(facts, /"extractor":"rust"/);
 const scored = JSON.parse(call('cqx_score', ''));
 assert.deepEqual(Object.keys(scored.scores).sort(), ['containment', 'legibility', 'modularity', 'quality', 'security']);
-assert.equal(scored.scores.security, 83);
-assert.equal(scored.scores.containment, 70);
+assert.equal(scored.scores.security, 85);
+assert.equal(scored.scores.containment, 96);
+assert.equal(scored.languages.rust.lines, 1);
+assert.equal(scored.languages.typescript.lines, 6);
+assert.equal(scored.languages.rust.scores.containment, 70);
+assert.equal(scored.languages.typescript.scores.security, 83);
 const dataset = JSON.parse(call('cqx_dataset', 'cqxai/fixture', ''));
 assert.equal(expected, 7); // One Rust file plus six TS/JS source files.
 assert.equal(parsed, expected);
-assert.deepEqual(dataset.score.scores, scored.scores);
+assert.deepEqual(dataset.score, JSON.parse(call('cqx_quote', JSON.stringify(scored))));
 
 // The shard's bin declaration is supplied through the full snapshot metadata,
 // even if its package.json was allocated to another reader.
@@ -75,7 +79,7 @@ for (const files of slices) {
   assert.equal(JSON.parse(call('cqx_fold_add', emitted)).error, undefined);
 }
 const folded = JSON.parse(call('cqx_fold_done', 'cqxai/fixture', config));
-assert.deepEqual(folded.score.scores, scored.scores);
+assert.deepEqual(folded.score, scored);
 
 snapshot([...rust, ...ts, ['broken.ts', 'const = ;'], ['redeclaration.ts', 'let value; let value;']]);
 const partial = JSON.parse(call('cqx_score', ''));
@@ -152,3 +156,41 @@ snapshot([
 ]);
 assert.equal(JSON.parse(call('cqx_score', '')).scores.containment, 70);
 console.log('Standalone JS/TS extensions, imported shards, nested tsx/bun, bounded bin paths: passed');
+
+// The >500-line Tauri-shaped fixture exercises the exact headline and passes
+// the complete JSON through the single-reader and coordinator paths to gild.
+const mixedFiles = await Promise.all([
+  'src-tauri/Cargo.toml', 'src-tauri/src/lib.rs', 'src/library.ts', 'src/product.ts',
+].map(async path => [path, await readFile(new URL(`../fixtures/mixed/${path}`, import.meta.url), 'utf8')]));
+const languageConfig = JSON.stringify({ min_score: { rust: 70, typescript: 70 } });
+snapshot([...mixedFiles, ['cqx.json', languageConfig]]);
+const mixedReport = JSON.parse(call('cqx_score', ''));
+assert.deepEqual(mixedReport.scores, { containment: 70, legibility: 100, modularity: 100, quality: 100, security: 73 });
+assert.equal(mixedReport.languages.rust.lines, 600);
+assert.equal(mixedReport.languages.typescript.lines, 1200);
+assert.deepEqual(mixedReport.config.min_score, { rust: 70, typescript: 70 });
+const mixedDataset = JSON.parse(call('cqx_dataset', 'fixture', ''));
+assert.deepEqual(mixedDataset.score, JSON.parse(call('cqx_quote', JSON.stringify(mixedReport))));
+const mixedMeta = call('cqx_manifests');
+const mixedShards = [mixedFiles.slice(0, 2), mixedFiles.slice(2)];
+api.cqx_merge_reset();
+for (const files of mixedShards) {
+  snapshot(files);
+  call('cqx_merge_add', call('cqx_gather', mixedMeta));
+}
+const mixedShared = call('cqx_merge_done');
+api.cqx_fold_reset();
+for (const files of mixedShards) {
+  snapshot(files);
+  call('cqx_gather', mixedMeta);
+  call('cqx_fold_add', call('cqx_emit', mixedShared));
+}
+const mixedFolded = JSON.parse(call('cqx_fold_done', 'fixture', languageConfig));
+assert.deepEqual(mixedFolded.score, mixedReport);
+let quoted = { ...mixedFolded.score, extension: { preserved: true } };
+for (const files of mixedShards) {
+  snapshot(files);
+  quoted = JSON.parse(call('cqx_quote', JSON.stringify(quoted)));
+}
+assert.deepEqual(quoted, { ...mixedDataset.score, extension: { preserved: true } });
+console.log('Tauri-shaped mixed fixture, weighted headline, per-language JSON/config and full gild dataset passthrough: passed');
