@@ -1,0 +1,14 @@
+[package]
+name = "cqx-analysis"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Shared language dispatch for cqx snapshots."
+
+[dependencies]
+cqx-rust = { path = "../cqx-rust" }
+cqx-ts = { path = "../cqx-ts" }
+cqx-vfs.workspace = true
+serde_json.workspace = true
+deka-cli-core.workspace = true

@@ -258,7 +258,7 @@ fn run(context: &Context) -> Result<(), String> {
             let file = std::fs::File::create(&facts_path).map_err(|e| format!("{e}"))?;
             let snapshot = cqx_vfs::from_dir(&scratch)
                 .map_err(|e| format!("{sha}: {e}"))?;
-            let stats = cqx_rust::extract::run(&snapshot, std::io::BufWriter::new(file))
+            let stats = cqx_analysis::run(&snapshot, std::io::BufWriter::new(file))
                 .map_err(|e| format!("{sha}: {e}"))?;
             let _ = stats;
             let stream = cqx_store::facts::Stream::load(&facts_path)

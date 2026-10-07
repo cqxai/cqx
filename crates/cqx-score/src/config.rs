@@ -195,6 +195,49 @@ pub fn defaults() -> BTreeMap<String, Rule> {
         .unwrap()
         .params
         .insert("max_lines".into(), 1000.0);
+    // TypeScript shares the Rust ramps; no category or configuration surface
+    // is added. Neutral metrics are run on each language's product code.
+    for id in [
+        "duplicated-bodies",
+        "oversized-files",
+        "oversized-line-share",
+        "undocumented-suppressions",
+        "exit-in-library",
+    ] {
+        let mut rule = rules[id].clone();
+        rule.language = "typescript".into();
+        rules.insert(format!("typescript/{id}"), rule);
+    }
+    for (id, category, weight, free, full, describes, remedy) in [
+        ("swallowed-errors", "quality", 10.0, 1.0, 6.0, "empty catches without an explanation, per 10k lines", "Handle or rethrow the error, or explain in the catch why ignoring it is safe."),
+        ("dynamic-code", "security", 30.0, 0.0, 1.0, "global eval/Function calls and literal-string timers, per 10k lines", "Use ordinary functions and pass a callback to timers instead of executing strings."),
+        ("dynamic-html", "security", 25.0, 0.0, 1.0, "non-literal HTML at raw HTML sinks, per 10k lines", "Use textContent or JSX text. Review sanitization if raw HTML is intentional; this syntax rule cannot prove a sanitizer's contract."),
+        ("any-density", "quality", 10.0, 1.0, 20.0, "explicit TypeScript any annotations and assertions, per 10k lines", "Use unknown and narrow it, or give the value its domain type."),
+    ] {
+        rules.insert(format!("typescript/{id}"), Rule { category: category.into(), language: "typescript".into(), describes: describes.into(), remedy: remedy.into(), weight, free, full, enabled: true, params: BTreeMap::new() });
+    }
+    rules.get_mut("typescript/oversized-files").unwrap().remedy = "Split the file, or set typescript/oversized-files.params.max_lines in cqx.json to the project's standard.".into();
+    // Dynamic HTML and any can be deliberate (sanitizers, interop). Surface
+    // them only when the repository opts in, rather than deducting for intent
+    // the AST cannot establish.
+    rules.get_mut("typescript/dynamic-html").unwrap().enabled = false;
+    rules.get_mut("typescript/any-density").unwrap().enabled = false;
+    for (id, describes, remedy) in [
+        (
+            "undocumented-suppressions",
+            "@ts-ignore or eslint-disable comments without a reason, per 10k lines",
+            "Add a reason after @ts-ignore, or an ESLint -- description.",
+        ),
+        (
+            "exit-in-library",
+            "global process.exit outside a bin or explicit entry file, per 10k lines",
+            "Return an error and let the entry point choose the process exit code.",
+        ),
+    ] {
+        let rule = rules.get_mut(&format!("typescript/{id}")).unwrap();
+        rule.describes = describes.into();
+        rule.remedy = remedy.into();
+    }
     rules
 }
 
@@ -227,13 +270,14 @@ impl Config {
             ));
         }
         for (id, patch) in &file.rules {
-            let Some(rule) = self.rules.get_mut(id) else {
+            let canonical = id.strip_prefix("rust/").unwrap_or(id);
+            let Some(rule) = self.rules.get_mut(canonical) else {
                 return Err(format!(
                     "{source}: no rule named '{id}'. Run `cqx score --explain` for the list."
                 ));
             };
             apply(rule, patch);
-            self.origins.insert(id.clone(), Origin::File);
+            self.origins.insert(canonical.to_string(), Origin::File);
         }
         self.min_score = file.min_score;
         self.exclude.clone_from(&file.exclude);
@@ -242,6 +286,17 @@ impl Config {
 
     fn validate(&self) -> Result<(), String> {
         for (id, rule) in &self.rules {
+            if ![
+                "quality",
+                "containment",
+                "legibility",
+                "security",
+                "modularity",
+            ]
+            .contains(&rule.category.as_str())
+            {
+                return Err(format!("rule '{id}': unknown category '{}'", rule.category));
+            }
             if rule.full <= rule.free {
                 return Err(format!(
                     "rule '{id}': full ({}) must be greater than free ({})",
@@ -292,6 +347,9 @@ impl Config {
     /// a no-op — which is the correct behaviour rather than a special case.
     fn apply_env(&mut self) -> Result<(), String> {
         for (id, rule) in self.rules.iter_mut() {
+            if rule.language == "typescript" {
+                continue;
+            }
             let key = id.to_uppercase().replace('-', "_");
             let mut touched = false;
             for (suffix, field) in [("WEIGHT", 0), ("FREE", 1), ("FULL", 2)] {

@@ -119,10 +119,18 @@ fn normalise(path: &str) -> String {
     p.trim_start_matches('/').to_string()
 }
 
+/// Shared by snapshot discovery and frontend dispatch.
+pub fn is_typescript_source(path: &str) -> bool {
+    matches!(path.rsplit('.').next(), Some("ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs"))
+}
+
 /// What a source snapshot is worth carrying: the manifests that describe the
 /// workspace, the lockfile that pins it, and the code itself.
 pub fn is_interesting(path: &str) -> bool {
     path.ends_with(".rs")
+        || is_typescript_source(path)
+        || path == "package.json" || path.ends_with("/package.json")
+        || path == "cqx.json"
         || path.ends_with("/Cargo.toml")
         || path == "Cargo.toml"
         || path.ends_with("/Cargo.lock")
@@ -131,7 +139,7 @@ pub fn is_interesting(path: &str) -> bool {
 
 /// Directories that hold build output or history rather than source.
 pub fn is_ignored_dir(name: &str) -> bool {
-    matches!(name, "target" | ".git" | "node_modules") || name.starts_with(".target")
+    matches!(name, "target" | ".git" | "node_modules" | ".next" | "dist" | "build" | "coverage" | ".tmp" | ".open-next" | ".wrangler" | ".turbo") || name.starts_with(".target")
 }
 
 /// Fills a snapshot from a directory on disk.
