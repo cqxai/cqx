@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """Exercise actual compiler/target adaptation and cache corruption refusal."""
+from contextlib import contextmanager
+import hashlib
+import zipfile
 import importlib.util
 import os
 import pathlib
@@ -44,3 +47,33 @@ with tempfile.TemporaryDirectory(dir=ROOT / '.tmp') as temporary:
     else:
         raise AssertionError('corrupt Zig archive accepted')
 print('Actual Zig WASM answer=42; reverted target adapter fails; corrupt cache refused')
+
+# Use an unresolved staging spelling, as on hosts with symlinked temp roots.
+with tempfile.TemporaryDirectory(dir=ROOT / '.tmp') as temporary:
+    cache = pathlib.Path(temporary)
+    archive = cache / 'safe.zip'
+    with zipfile.ZipFile(archive, 'w') as bundle:
+        bundle.writestr('safe/zig', 'test compiler')
+    pin = {'url': 'https://example.invalid/safe.zip', 'sha256': hashlib.sha256(archive.read_bytes()).hexdigest()}
+    original_temporary = tempfile.TemporaryDirectory
+
+    @contextmanager
+    def unresolved_staging(**kwargs):
+        with original_temporary(**kwargs) as staging:
+            yield str(pathlib.Path(staging).relative_to(ROOT))
+
+    with patch.dict(toolchain.PIN['hosts'], {'test': pin}), patch.object(toolchain, 'host', return_value='test'), patch.object(toolchain.tempfile, 'TemporaryDirectory', unresolved_staging), patch.object(toolchain.subprocess, 'check_output', return_value=toolchain.PIN['version']):
+        installed = toolchain.install(cache)
+        assert installed.read_text() == 'test compiler'
+        installed.unlink()
+        with zipfile.ZipFile(archive, 'w') as bundle:
+            bundle.writestr('../escape', 'unsafe')
+        pin['sha256'] = hashlib.sha256(archive.read_bytes()).hexdigest()
+        try:
+            toolchain.install(cache)
+        except RuntimeError as error:
+            assert 'unsafe path' in str(error)
+        else:
+            raise AssertionError('traversal ZIP accepted')
+        assert not (cache.parent / 'escape').exists()
+print('Unresolved staging accepts safe ZIP and refuses traversal')

@@ -41,8 +41,8 @@ const files = [
 ];
 snapshot(files);
 const report = JSON.parse(call('cqx_score', ''));
-assert.equal(report.scores.containment, 3); // Rust 30 + Go 30 + C 7 + C++ 30.
-assert.equal(report.scores.security, 70);
+assert.equal(report.scores.containment, 78); // Weighted independent language scores over 10 product lines.
+assert.equal(report.scores.security, 97);
 assert.equal(report.skipped_files[0].file, 'broken.cpp');
 assert.equal(report.rules.find(r => r.language === 'c' && r.rule === 'exit-in-library').total_findings, 1);
 assert.equal(report.rules.find(r => r.language === 'cpp' && r.rule === 'exit-in-library').total_findings, 1);

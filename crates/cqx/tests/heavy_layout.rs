@@ -139,3 +139,87 @@ fn directory_discovery_preserves_sibling_sources_in_heavy_output_names() {
     assert_eq!(findings(&files, "c", "exit-in-library"), 0);
     assert_eq!(findings(&files, "csharp", "exit-in-library"), 0);
 }
+
+#[test]
+fn heavy_c_output_names_are_excluded_only_at_project_roots() {
+    for (language, extension, source) in [
+        ("c", "c", "#include <stdlib.h>\nvoid f(void){exit(1);}"),
+        ("cpp", "cpp", "#include <cstdlib>\nvoid f(){std::exit(1);}"),
+    ] {
+        for marker in ["CMakeLists.txt", "Makefile", "meson.build", "configure.ac"] {
+            for root in ["", "nested/"] {
+                for directory in ["out", "external", "deps"] {
+                    let marker = format!("{root}{marker}");
+                    let product = format!("{root}src/{directory}/Library.{extension}");
+                    let excluded = format!("{root}{directory}/Library.{extension}");
+                    assert_eq!(
+                        findings(
+                            &[(&marker, ""), (&product, source), (&excluded, source)],
+                            language,
+                            "exit-in-library"
+                        ),
+                        1,
+                        "{product}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn heavy_diagnostic_prose_without_a_quoted_code_is_not_a_suppression() {
+    for (language, path) in [("c", "Library.c"), ("cpp", "Library.cpp")] {
+        for source in [
+            "// diagnostic ignored means the compiler skips a check.\nint x;",
+            "// The phrase diagnostic ignored is documentation, not a directive.\nint x;",
+            "// diagnostic ignored \"all\" is prose.\nint x;",
+            "#pragma clang diagnostic ignored\nint x;",
+            "#pragma GCC diagnostic ignored \"-Wconversion\"\nint x;",
+        ] {
+            assert_eq!(
+                findings(&[(path, source)], language, "undocumented-suppressions"),
+                0,
+                "{source}"
+            );
+        }
+        assert_eq!(
+            findings(
+                &[(path, "#pragma clang diagnostic ignored \"*\"\nint x;")],
+                language,
+                "undocumented-suppressions"
+            ),
+            1
+        );
+    }
+}
+
+#[test]
+fn heavy_dot_tests_roots_require_a_project_marker_and_exact_suffix() {
+    let source = "class L { void F(){Environment.Exit(1);} }";
+    for suffix in ["Tests", "Test"] {
+        let root = format!("nested/Library.{suffix}");
+        let marker = format!("{root}/Library.csproj");
+        let path = format!("{root}/Support/Library.cs");
+        assert_eq!(
+            findings(
+                &[(&marker, ""), (&path, source)],
+                "csharp",
+                "exit-in-library"
+            ),
+            0
+        );
+        assert_eq!(findings(&[(&path, source)], "csharp", "exit-in-library"), 1);
+    }
+    assert_eq!(
+        findings(
+            &[
+                ("nested/Library.TestsExtra/Library.csproj", ""),
+                ("nested/Library.TestsExtra/Support/Library.cs", source)
+            ],
+            "csharp",
+            "exit-in-library"
+        ),
+        1
+    );
+}

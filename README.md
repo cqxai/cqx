@@ -108,8 +108,27 @@ They deduct only when enabled in the repository root's real `cqx.json`:
 
 Each language uses its own product lines for per-10k-line densities (minimum
 500 lines), so adding clean code in another language cannot dilute findings.
-Rule deductions add into the same five category scores. TypeScript thresholds
-reuse the Rust ramps, without claiming independent corpus calibration.
+Each language gets its own five category scores. For each category, the
+headline is the line-weighted average of those scores, rounded to the nearest
+integer. The 500-line density floor stays in effect for small languages;
+headline weights use their actual product lines. TypeScript thresholds reuse
+the Rust ramps, without claiming independent corpus calibration.
+
+Mixed reports add `languages: { <language>: { lines, scores, rules } }`.
+Top-level `scores` hold the weighted headline and top-level `rules` retain all
+findings and their original deductions. Single-language report JSON stays
+byte-identical, with no added block. A numeric `min_score` gates every headline
+category. To gate languages independently, use, for example:
+
+```json
+{ "version": 1, "min_score": { "rust": 95, "typescript": 85 } }
+```
+
+Every category of each named language must meet its floor. A language with no
+product lines emits a stderr warning in `scan` and `score`; `--strict` makes
+that unevaluable floor fail the command. `--min-score N` overrides either form with a
+headline floor. Changing between headline and language floors cannot be proven
+to tighten the standard, so `--tighten-only` refuses that change.
 Test files (`*.test.*`, `*.spec.*`, test/tests/__tests__ directories) are present
 in the graph but excluded from scoring. Files with parser or semantic
 diagnostics are skipped; the report names each file and its reason in
@@ -615,7 +634,7 @@ stay quiet. No extra WASM toolchain is required.
 
 ## Modular browser/Worker host
 
-`scripts/cqx-loader.mjs` exposes `createLoader({manifest, baseURL, fetchBytes?,
+`scripts/cqx-loader.mjs` exposes `createLoader({manifest, manifestSha256, baseURL, fetchBytes?,
 compiledModules?, onProgress?})`. Keep one loader per immutable release manifest;
 its compiled-module cache is keyed by version, ABI and SHA-256. Every scan gets
 fresh instances. `await loader.scan(files, {repo, label?, config?})` accepts an
@@ -625,14 +644,28 @@ floating-point spelling). Empty config uses the root `cqx.json`. Module facts en
 core engine before scoring; language scores are never combined.
 
 ```js
-import { createLoader } from './scripts/cqx-loader.mjs';
+import { createLoader, verifyManifest } from './scripts/cqx-loader.mjs';
 const baseURL = 'https://your-versioned-wasm-host/v0.1.24/';
-const manifest = await (await fetch(new URL('manifest.json', baseURL))).json();
-const loader = createLoader({ manifest, baseURL });
+const releaseURL = 'https://github.com/cqxai/cqx/releases/download/v0.1.24/';
+// Check response.ok for both requests in your host's fetch/error adapter.
+const checksums = await (await fetch(new URL('SHA256SUMS', releaseURL))).text();
+const bytes = new Uint8Array(await (await fetch(new URL('manifest.json', baseURL))).arrayBuffer());
+const trusted = await verifyManifest(bytes, checksums);
+const loader = createLoader({ ...trusted, baseURL });
 const {dataset, reportJson} = await loader.scan([['src/lib.ts', 'export function f() {}']], {
   repo: 'org/repo',
 });
 ```
+
+The trust anchor is the immutable GitHub release's `SHA256SUMS`, retrieved over
+HTTPS independently of the WASM CDN, or its manifest SHA-256 pinned in the host's
+build. Do not obtain the pin from the module origin. `verifyManifest` verifies raw
+manifest bytes; the loader also checks the generated manifest serialization against
+that pin before any scan or module fetch. A CDN replacement of both the manifest
+and module therefore fails. This trusts the GitHub release publisher and HTTPS;
+it is integrity verification, not a signature or protection from a compromised
+release account. Hosts whose browsers cannot fetch GitHub assets directly should
+embed the checksum at build/deploy time (Workers do the same).
 
 Browser/Node hosts verify downloaded bytes before compilation. Workers that
 cannot compile bytes at runtime pass trusted deployment bindings as
@@ -692,31 +725,26 @@ NOLINT/diagnostic/CS warning codes stay quiet; broad unexplained suppression
 still fires. Calibration remains in `cqx.json`, using the existing ramps.
 
 Pinned corpus evidence and full-report hashes are in `docs/heavy-language-evidence.json`.
-Before uses the original held frontend commits inside the current engine and
-all pure-Rust frontends; after uses shared layout. Both read the identical pinned
-snapshot. Thus Redis now includes Python findings absent from the older
-three-language experiment; the before/after comparison does not attribute them
-to the C port. Scores are containment / legibility / modularity / quality / security:
+Scores below are containment / legibility / modularity / quality / security.
+Each headline weights independent language scores by actual product lines.
 
-| Repository | Before | After | Coverage parsed/skipped |
-| --- | --- | --- | --- |
-| Redis | 79/100/100/95/100 | 76/100/100/95/100 | C 143/50, C++ 82/5 |
-| double-conversion | 100/100/100/94/100 | 100/100/100/94/100 | C++ 35/5 |
-| Humanizer | 100/100/100/90/100 | 100/100/100/90/100 | C# 728/7 |
+| Repository | Scores | Coverage parsed/skipped |
+| --- | --- | --- |
+| Redis | 98/100/100/100/100 | C 143/50, C++ 82/5 |
+| double-conversion | 100/100/100/94/100 | C++ 35/5 |
+| Humanizer | 100/100/100/90/100 | C# 728/7 |
 
-Redis C library termination findings grow 5→13 after scoping main exemptions to
-the declaration (2.3 deducted); narrow C suppressions drop 2→0. Humanizer keeps
-22 duplicate findings (10 deducted), 11 oversized files and one empty catch;
-narrow warning suppressions drop 2→0. Product lines grow 69,408→70,131 under the
-shared classifier, with parse coverage unchanged. No weights or ramps changed.
-Split and monolithic **after** reports have identical complete JSON bytes on all
-three corpora, all language fixtures and the Rust/TS/Go/C/C++/C# fixture; complete
-datasets also agree. Existing main goldens and the held C# golden are unchanged.
+Split and monolithic reports have identical complete JSON bytes on all three
+pinned corpora, all language fixtures and the Rust/TS/Go/C/C++/C# fixture;
+complete datasets also agree. Existing main goldens and the C# golden are
+unchanged. The corpus evidence records all frontend coverage and full hashes.
+C/C++ `out`, `external`, and `deps` exclusions are relative to the project root
+or a recognized build-system marker; source such as `src/external/` is scored.
 
 Directory discovery retains sibling sources under C/C#-specific names such as
 `deps/` and `bin/`; the owning frontend applies its exclusion. Adding a language
 must not remove another language's input before dispatch. Actual directory CLI
-scans reproduce the after score tuples above.
+scans reproduce the score tuples above.
 
 ## WASM release artifacts and single-file transition
 

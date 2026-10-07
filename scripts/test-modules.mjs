@@ -17,8 +17,10 @@ if (beforePath) {
   before = connect(instance);
 }
 const manifest = JSON.parse(await readFile(join(directory, 'manifest.json')));
+const pin = value => createHash('sha256').update(JSON.stringify(value, null, 2) + '\n').digest('hex');
+const manifestSha256 = pin(manifest);
 const loaded = [];
-const loader = createLoader({ manifest, fetchBytes: async (file, id) => {
+const loader = createLoader({ manifest, manifestSha256, fetchBytes: async (file, id) => {
   loaded.push(id); return readFile(join(directory, file));
 } });
 const { instance } = await WebAssembly.instantiate(await readFile(join(directory, 'cqx_wasm.wasm')), { cqx: { parsing_total() {}, parsed_one() {} } });
@@ -76,8 +78,8 @@ const mixed = [
   ['cqx.json', '{"rules":{"c/exit-in-library":{"weight":7}}}'],
 ];
 const combined = await parity('six-language', mixed);
-assert.equal(combined.dataset.score.scores.containment, 0);
-assert.equal(combined.dataset.score.scores.security, 70);
+assert.equal(combined.dataset.score.scores.containment, 78);
+assert.equal(combined.dataset.score.scores.security, 97);
 assert.deepEqual(loaded, ['core', 'c', 'csharp']);
 // Selective metadata: no manifests are supplied to language readers. .h keeps
 // the coordinator dialect even when its shard contains no .cpp translation unit.
@@ -86,17 +88,23 @@ await parity('header-and-layout', [
   ['nested/include/lib.h', '#include <cstdlib>\nnamespace lib { void stop(){std::exit(1);} }'],
   ['nested/src/domain/build/lib.c', '#include <stdlib.h>\nvoid f(){exit(1);}'],
   ['nested/build/lib.c', 'invalid'],
+  ['nested/src/external/keep.c', '#include <stdlib.h>\nvoid keep(){exit(1);}'],
+  ['nested/src/deps/keep.c', '#include <stdlib.h>\nvoid keep(){exit(1);}'],
+  ['nested/src/out/keep.c', '// diagnostic ignored is prose\nint x;'],
+  ['nested/external/ignore.c', 'invalid'], ['nested/deps/ignore.c', 'invalid'], ['nested/out/ignore.c', 'invalid'],
+  ['nested/Library.Tests/Library.csproj', ''],
+  ['nested/Library.Tests/Support/Helper.cs', 'class H { void F(){Environment.Exit(1);} }'],
   ['nested/src/domain/tests/Lib.cs', 'class L { static void Main(){Environment.Exit(0);} void Helper(){Environment.Exit(1);} }'],
   ['nested/tests/Lib.cs', 'class L { void F(){Environment.Exit(1);} }'],
 ]);
 const missing = structuredClone(manifest); delete missing.modules.c;
-await assert.rejects(createLoader({ manifest: missing }).scan(mixed), /required module c is missing/);
-await assert.rejects(createLoader({ manifest, fetchBytes: async (file, id) => {
+await assert.rejects(createLoader({ manifest: missing, manifestSha256: pin(missing) }).scan(mixed), /required module c is missing/);
+await assert.rejects(createLoader({ manifest, manifestSha256, fetchBytes: async (file, id) => {
   if (id === 'csharp') throw Error('C# unavailable');
   return readFile(join(directory, file));
 } }).scan(mixed), /load csharp: C# unavailable/);
 const wrong = structuredClone(manifest); wrong.modules.csharp.sha256 = manifest.modules.core.sha256;
-await assert.rejects(createLoader({ manifest: wrong, fetchBytes: async file => readFile(join(directory, file === 'csharp.wasm' ? 'core.wasm' : file)) }).scan(mixed), /binary version\/ABI\/identity mismatch/);
+await assert.rejects(createLoader({ manifest: wrong, manifestSha256: pin(wrong), fetchBytes: async file => readFile(join(directory, file === 'csharp.wasm' ? 'core.wasm' : file)) }).scan(mixed), /binary version\/ABI\/identity mismatch/);
 
 const extensions = Object.values(MODULES).flatMap(m => m.extensions);
 for (const root of corpora) {
