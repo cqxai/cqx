@@ -5,11 +5,19 @@ import os
 import pathlib
 import subprocess
 import tempfile
+from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('zig_toolchain', ROOT / 'scripts/zig-toolchain.py')
 toolchain = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(toolchain)
+for system, machine, expected in [
+    ('Darwin', 'x86_64', 'x86_64-macos'), ('Darwin', 'arm64', 'aarch64-macos'),
+    ('Linux', 'x86_64', 'x86_64-linux'), ('Linux', 'aarch64', 'aarch64-linux'),
+    ('Windows', 'AMD64', 'x86_64-windows'), ('Windows', 'ARM64', 'aarch64-windows'),
+]:
+    with patch.object(toolchain.platform, 'system', return_value=system), patch.object(toolchain.platform, 'machine', return_value=machine):
+        assert toolchain.host() == expected
 zig = toolchain.install(ROOT / '.target/zig')
 env = os.environ.copy()
 env['CQX_BUILD_ZIG'] = str(zig)
