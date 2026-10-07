@@ -612,3 +612,62 @@ do not score as product sources. Whole-file parse failures skip/report. Literal
 executables/argv, escaped dollar backticks, class-free unserialize, numeric casts
 and typed numeric/PDO-quoted SQL, handled/explained catches and suppression reasons
 stay quiet. No extra WASM toolchain is required.
+
+## Modular browser/Worker host
+
+`scripts/cqx-loader.mjs` exposes `createLoader({manifest, baseURL, fetchBytes?,
+compiledModules?, onProgress?})`. Keep one loader per immutable release manifest;
+its compiled-module cache is keyed by version, ABI and SHA-256. Every scan gets
+fresh instances. `await loader.scan(files, {repo, label?, config?})` accepts an
+iterable of `[snapshotRelativePath, source]` and returns `{dataset, reportJson}`. The dataset has one
+`score` report; `reportJson` retains the exact Rust JSON report bytes (including
+floating-point spelling). Empty config uses the root `cqx.json`. Module facts enter the
+core engine before scoring; language scores are never combined.
+
+```js
+import { createLoader } from './scripts/cqx-loader.mjs';
+const baseURL = 'https://your-versioned-wasm-host/v0.1.24/';
+const manifest = await (await fetch(new URL('manifest.json', baseURL))).json();
+const loader = createLoader({ manifest, baseURL });
+const {dataset, reportJson} = await loader.scan([['src/lib.ts', 'export function f() {}']], {
+  repo: 'org/repo',
+});
+```
+
+Browser/Node hosts verify downloaded bytes before compilation. Workers that
+cannot compile bytes at runtime pass trusted deployment bindings as
+`compiledModules: {core: {module: CORE_BINDING, sha256: manifest.modules.core.sha256}}`
+(and `c`/`csharp` bindings when deployed). The deployment must verify the binding
+bytes against the manifest; runtime checks still enforce binary identity/version/
+ABI. Missing required modules, hashes, incompatible binaries, network failures,
+compilation/instantiation and extraction failures reject the scan with a named
+module error. Callers must show that error and must not present partial scores.
+
+Routing is by extension using the shared `scripts/wasm-catalog.mjs` contract.
+Core contains the engine and all pure-Rust frontends; C/C++ and C# are separate
+heavy modules. Metadata is coordinated before routing; only each module's source
+text is sent to its reader. Core also handles extensionless Composer binaries.
+The infrastructure PR supplies core; the following frontend PR adds the heavy
+modules and their manifest entries.
+
+## Pinned grammar build dependency
+
+Zig **0.15.2** is a deliberate pinned build dependency for tree-sitter's C grammar
+sources. It includes its own compiler; a separate system LLVM installation is
+never required. Native Rust linking still uses the host's ordinary linker/SDK.
+Python 3.11+ bootstraps checksum-verified official archives into `.target/zig`;
+`scripts/zig-toolchain.json` records the version and SHA-256 for Intel/ARM macOS,
+Linux and Windows. The pin comes from https://ziglang.org/download/index.json.
+The cc-rs adapter translates `--target=wasm32-unknown-unknown` to Zig's
+`--target=wasm32-freestanding`; tree-sitter's pinned freestanding headers supply
+the existing libc shim. Build-tool environment variables never configure scans.
+
+```sh
+python3 scripts/build-tree-wasm.py
+node scripts/wasm-manifest.mjs .target/wasm-dist core
+node scripts/test-loader.mjs .target/wasm-dist
+```
+
+Use `--cache PATH` to choose a build cache and `--output PATH` for a copied wasm
+artifact. Cached archives are verified on every use; corrupt caches fail closed.
+Unsupported hosts produce an explicit missing-pin error.
