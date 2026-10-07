@@ -436,3 +436,16 @@ external project disagreed:
 Locally the test skips when the checkouts are absent. Setting
 `CQX_REFERENCE_DIR` asserts they are present, so a failed fetch fails the job
 rather than quietly checking nothing.
+
+## Zig frontend
+
+Zig files use the pure-Rust zigsyn 0.1.0 structured parser in CLI and WASM.
+Parse failures skip/report whole files. Bound std.process.exit, catch unreachable
+and unexplained catch {}, and non-literal std.process.Child.init executable
+arguments contribute syntax evidence in the original five categories. Exact body
+duplication and file size/share reuse the existing rules. These findings do not
+claim whole-program types or taint analysis. Only cqx.json calibrates zig/<rule>.
+Public root main and build.zig are entry units. Embedded tests, test directories
+and filenames do not contribute product lines; zig-cache, .zig-cache, zig-out
+and generated/vendor sources are excluded. Literal argv executables with dynamic
+ordinary arguments stay quiet. No extra WASM toolchain is required.
