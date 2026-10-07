@@ -115,3 +115,40 @@ snapshot([
 const imported = JSON.parse(call('cqx_score', ''));
 assert.equal(imported.scores.containment, 70);
 console.log('Nested package scripts and unimported top-level .mjs entries: passed');
+
+for (const ext of ['js', 'cjs', 'mjs', 'ts', 'mts', 'cts']) {
+  const path = `tools/check.${ext}`;
+  snapshot([[path, 'if (!ready) process.exit(2);']]);
+  assert.equal(JSON.parse(call('cqx_score', '')).scores.containment, 100, ext);
+  snapshot([['src/lib.js', `import '../${path}';`], [path, 'process.exit(2);']]);
+  assert.equal(JSON.parse(call('cqx_score', '')).scores.containment, 70, ext);
+  // Import metadata must reach the reader containing the candidate script.
+  const meta = call('cqx_manifests');
+  api.cqx_merge_reset();
+  const shards = [[['src/lib.js', `import '../${path}';`]], [[path, 'process.exit(2);']]];
+  for (const files of shards) {
+    snapshot(files);
+    call('cqx_merge_add', call('cqx_gather', meta));
+  }
+  const merged = call('cqx_merge_done');
+  api.cqx_fold_reset();
+  for (const files of shards) {
+    snapshot(files);
+    call('cqx_gather', meta);
+    call('cqx_fold_add', call('cqx_emit', merged));
+  }
+  assert.equal(JSON.parse(call('cqx_fold_done', 'fixture', '')).score.scores.containment, 70, ext);
+}
+for (const runner of ['tsx', 'bun']) {
+  snapshot([
+    ['packages/task/package.json', JSON.stringify({ scripts: { start: `${runner} ../shared/x.ts` } })],
+    ['packages/shared/x.ts', 'function stop() { process.exit(2); } stop();'],
+  ]);
+  assert.equal(JSON.parse(call('cqx_score', '')).scores.containment, 100, runner);
+}
+snapshot([
+  ['packages/task/package.json', '{"bin":{"app":"../../../outside.ts"}}'],
+  ['outside.ts', 'export function stop() { process.exit(2); }'],
+]);
+assert.equal(JSON.parse(call('cqx_score', '')).scores.containment, 70);
+console.log('Standalone JS/TS extensions, imported shards, nested tsx/bun, bounded bin paths: passed');

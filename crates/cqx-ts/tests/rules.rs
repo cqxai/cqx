@@ -52,7 +52,13 @@ fn global_dynamic_code_deducts_but_shadowed_apis_and_callbacks_do_not() {
 
 #[test]
 fn exits_deduct_for_libraries_but_not_entrypoints_or_local_process_objects() {
-    let bad = report(&[("src/index.js", "process.exit(1);")], "{}");
+    let bad = report(
+        &[
+            ("src/index.js", "process.exit(1);"),
+            ("consumer.js", "import './src/index.js';"),
+        ],
+        "{}",
+    );
     assert_eq!(findings(&bad, "exit-in-library"), 1);
     assert!(bad["scores"]["containment"].as_u64().unwrap() < 100);
     for entry in [
@@ -390,7 +396,7 @@ fn review_direct_package_scripts_and_configuration_entries_stay_quiet() {
                 &report(
                     &[
                         ("package.json", &manifest),
-                        ("library.ts", "process.exit(1);")
+                        ("library.ts", "function stop() { process.exit(1); }")
                     ],
                     "{}"
                 ),
@@ -480,4 +486,101 @@ fn npm_nested_relative_scripts_and_unimported_mjs_are_entries() {
         "{}",
     );
     assert_eq!(findings(&got, "exit-in-library"), 1);
+}
+
+#[test]
+fn review_standalone_scripts_cover_all_non_jsx_extensions() {
+    for ext in ["mjs", "js", "cjs", "ts", "mts", "cts"] {
+        let path = format!("tools/check.{ext}");
+        let got = report(&[(&path, "if (!ready) process.exit(2);")], "{}");
+        assert_eq!(findings(&got, "exit-in-library"), 0, "{ext}");
+        assert_eq!(got["lines"], 1, "{ext}");
+        for importer in [
+            format!("import '../{path}';"),
+            format!("export * from '../{path}';"),
+            format!("import('../{path}');"),
+            format!("require('../{path}');"),
+        ] {
+            let got = report(
+                &[("src/lib.js", &importer), (&path, "process.exit(2);")],
+                "{}",
+            );
+            assert_eq!(findings(&got, "exit-in-library"), 1, "{ext}: {importer}");
+        }
+        let got = report(
+            &[(&path, "function stop() { process.exit(2); }")],
+            "{}",
+        );
+        assert_eq!(findings(&got, "exit-in-library"), 1, "{ext}");
+    }
+}
+
+#[test]
+fn review_nested_runners_and_bins_resolve_outside_package_but_not_repo() {
+    for runner in ["tsx", "bun"] {
+        for target in ["./x.ts", "../shared/x.ts"] {
+            let manifest = format!(r#"{{"scripts":{{"start":"{runner} {target}"}}}}"#);
+            let path = if target.starts_with("./") {
+                "packages/task/x.ts"
+            } else {
+                "packages/shared/x.ts"
+            };
+            let got = report(
+                &[
+                    ("packages/task/package.json", &manifest),
+                    (path, "function stop() { process.exit(2); } stop();"),
+                ],
+                "{}",
+            );
+            assert_eq!(findings(&got, "exit-in-library"), 0, "{runner} {target}");
+        }
+    }
+    for bin in [r#""../shared/x.cts""#, r#"{"app":"./../shared/x.cts"}"#] {
+        let manifest = format!(r#"{{"bin":{bin}}}"#);
+        let got = report(
+            &[
+                ("packages/task/package.json", &manifest),
+                (
+                    "packages/shared/x.cts",
+                    "function stop() { process.exit(2); } stop();",
+                ),
+            ],
+            "{}",
+        );
+        assert_eq!(findings(&got, "exit-in-library"), 0, "{bin}");
+        assert_eq!(got["lines"], 1);
+    }
+    for field in [
+        r#""bin":"../../../outside.ts""#,
+        r#""bin":{"app":"../../../outside.ts"}"#,
+        r#""scripts":{"start":"tsx ../../../outside.ts"}"#,
+    ] {
+        let manifest = format!("{{{field}}}");
+        let got = report(
+            &[
+                ("packages/task/package.json", &manifest),
+                ("outside.ts", "function stop() { process.exit(2); }"),
+            ],
+            "{}",
+        );
+        assert_eq!(findings(&got, "exit-in-library"), 1, "{field}");
+    }
+}
+
+#[test]
+fn review_extensionless_and_js_spelled_typescript_imports_are_libraries() {
+    for (path, specifier) in [
+        ("tools/check.ts", "../tools/check"),
+        ("tools/check.ts", "../tools/check.js"),
+        ("tools/check.mts", "../tools/check.mjs"),
+        ("tools/check.cts", "../tools/check.cjs"),
+        ("tools/check/index.ts", "../tools/check"),
+    ] {
+        let importer = format!("import '{specifier}';");
+        let got = report(
+            &[("src/lib.ts", &importer), (path, "process.exit(2);")],
+            "{}",
+        );
+        assert_eq!(findings(&got, "exit-in-library"), 1, "{path}: {specifier}");
+    }
 }

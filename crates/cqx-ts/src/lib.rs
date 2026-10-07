@@ -56,11 +56,11 @@ pub fn entry_files(vfs: &Vfs) -> BTreeSet<String> {
                 (matches!(runner, "node" | "tsx" | "bun") && is_source(file)).then_some(file)
             });
         for bin in paths.into_iter().chain(scripts) {
-            result.insert(resolve_relative(dir, bin));
+            result.extend(resolve_relative(dir, bin));
         }
     }
     // Scan the full snapshot before sharding: imports in another shard still
-    // make an .mjs file a library. Parse AST nodes, never strings or comments.
+    // make a standalone script a library. Parse AST nodes, never strings or comments.
     let mut imported = BTreeSet::new();
     let mut scripts = BTreeSet::new();
     for path in vfs.paths().filter(|p| is_source(p)) {
@@ -99,9 +99,14 @@ pub fn entry_files(vfs: &Vfs) -> BTreeSet<String> {
                 _ => None,
             };
             if let Some(specifier) = specifier.filter(|s| s.starts_with('.')) {
-                imported.insert(resolve_relative(&dir, specifier));
+                if let Some(path) = resolve_relative(&dir, specifier) {
+                    imported.extend(import_targets(vfs, &path));
+                }
             }
-            if path.ends_with(".mjs") {
+            if matches!(
+                path.rsplit('.').next(),
+                Some("mjs" | "js" | "cjs" | "ts" | "mts" | "cts")
+            ) {
                 if let AstKind::CallExpression(call) = node.kind() {
                     if matches!(&call.callee, Expression::StaticMemberExpression(m) if m.property.name == "exit" && matches!(&m.object, Expression::Identifier(i) if i.name == "process" && i.is_global_reference(semantic.semantic.scoping())))
                         && !nodes.ancestors(node.id()).any(|n| {
@@ -121,19 +126,39 @@ pub fn entry_files(vfs: &Vfs) -> BTreeSet<String> {
     result
 }
 
-fn resolve_relative(dir: &str, file: &str) -> String {
+fn resolve_relative(dir: &str, file: &str) -> Option<String> {
+    if file.starts_with('/') {
+        return None;
+    }
     let joined = format!("{dir}{file}");
     let mut parts = Vec::new();
     for part in joined.split('/') {
         match part {
             "" | "." => {}
             ".." => {
-                parts.pop();
+                parts.pop()?;
             }
             _ => parts.push(part),
         }
     }
-    parts.join("/")
+    Some(parts.join("/"))
+}
+
+// Resolve snapshot-local import spellings, including extensionless imports and
+// the emitted JS extensions commonly used in TypeScript source. Conservatively
+// mark every existing candidate: ambiguity must not hide a library exit.
+fn import_targets(vfs: &Vfs, path: &str) -> Vec<String> {
+    let mut candidates = vec![path.to_string()];
+    for ext in ["ts", "tsx", "js", "jsx", "mjs", "cjs", "mts", "cts"] {
+        candidates.push(format!("{path}.{ext}"));
+        candidates.push(format!("{path}/index.{ext}"));
+    }
+    for (emitted, source) in [("js", "ts"), ("js", "tsx"), ("mjs", "mts"), ("cjs", "cts")] {
+        if let Some(stem) = path.strip_suffix(&format!(".{emitted}")) {
+            candidates.push(format!("{stem}.{source}"));
+        }
+    }
+    candidates.into_iter().filter(|p| vfs.contains(p)).collect()
 }
 
 pub fn run(vfs: &Vfs, out: impl Write) -> Result<Stats, std::io::Error> {
