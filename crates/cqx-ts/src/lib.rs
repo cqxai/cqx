@@ -56,10 +56,84 @@ pub fn entry_files(vfs: &Vfs) -> BTreeSet<String> {
                 (matches!(runner, "node" | "tsx" | "bun") && is_source(file)).then_some(file)
             });
         for bin in paths.into_iter().chain(scripts) {
-            result.insert(format!("{dir}{}", bin.trim_start_matches("./")));
+            result.insert(resolve_relative(dir, bin));
         }
     }
+    // Scan the full snapshot before sharding: imports in another shard still
+    // make an .mjs file a library. Parse AST nodes, never strings or comments.
+    let mut imported = BTreeSet::new();
+    let mut scripts = BTreeSet::new();
+    for path in vfs.paths().filter(|p| is_source(p)) {
+        let source = vfs.read(path).unwrap_or_default();
+        let allocator = Allocator::default();
+        let parsed = Parser::new(&allocator, source, SourceType::from_path(path).unwrap()).parse();
+        if !parsed.diagnostics.is_empty() {
+            continue;
+        }
+        let semantic = SemanticBuilder::new()
+            .with_build_nodes(true)
+            .build(&parsed.program);
+        let nodes = semantic.semantic.nodes();
+        let dir = path
+            .rsplit_once('/')
+            .map(|(d, _)| format!("{d}/"))
+            .unwrap_or_default();
+        for node in nodes.iter() {
+            let specifier = match node.kind() {
+                AstKind::ImportDeclaration(n) => Some(n.source.value.as_str()),
+                AstKind::ExportFromDeclaration(n) => Some(n.source.value.as_str()),
+                AstKind::ExportAllDeclaration(n) => Some(n.source.value.as_str()),
+                AstKind::ImportExpression(n) => match &n.source {
+                    Expression::StringLiteral(s) => Some(s.value.as_str()),
+                    _ => None,
+                },
+                AstKind::CallExpression(n) if matches!(&n.callee, Expression::Identifier(i) if i.name == "require") => {
+                    n.arguments
+                        .first()
+                        .and_then(Argument::as_expression)
+                        .and_then(|e| match e {
+                            Expression::StringLiteral(s) => Some(s.value.as_str()),
+                            _ => None,
+                        })
+                }
+                _ => None,
+            };
+            if let Some(specifier) = specifier.filter(|s| s.starts_with('.')) {
+                imported.insert(resolve_relative(&dir, specifier));
+            }
+            if path.ends_with(".mjs") {
+                if let AstKind::CallExpression(call) = node.kind() {
+                    if matches!(&call.callee, Expression::StaticMemberExpression(m) if m.property.name == "exit" && matches!(&m.object, Expression::Identifier(i) if i.name == "process" && i.is_global_reference(semantic.semantic.scoping())))
+                        && !nodes.ancestors(node.id()).any(|n| {
+                            matches!(
+                                n.kind(),
+                                AstKind::Function(_) | AstKind::ArrowFunctionExpression(_)
+                            )
+                        })
+                    {
+                        scripts.insert(path.to_string());
+                    }
+                }
+            }
+        }
+    }
+    result.extend(scripts.difference(&imported).cloned());
     result
+}
+
+fn resolve_relative(dir: &str, file: &str) -> String {
+    let joined = format!("{dir}{file}");
+    let mut parts = Vec::new();
+    for part in joined.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            _ => parts.push(part),
+        }
+    }
+    parts.join("/")
 }
 
 pub fn run(vfs: &Vfs, out: impl Write) -> Result<Stats, std::io::Error> {

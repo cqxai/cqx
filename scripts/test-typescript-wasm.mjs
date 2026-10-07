@@ -99,3 +99,19 @@ const brokenFolded = JSON.parse(call('cqx_fold_done', 'cqxai/fixture', config));
 assert.deepEqual(brokenFolded.score.scores, partial.scores);
 assert.deepEqual(brokenFolded.score.skipped_files, partial.skipped_files);
 console.log('WASM TS/JS, mixed scoring, root config, progress, shards, and reported parse skips: passed');
+
+snapshot([
+  ['npm/package.json', '{"scripts":{"build":"node ../npm/build.mjs","test":"node ./test.mjs"}}'],
+  ['npm/build.mjs', 'if (!version) process.exit(2); process.exit(1);'],
+  ['npm/test.mjs', 'if (!binary) process.exit(2); process.exit(failed ? 1 : 0);'],
+  ['tools/check.mjs', 'if (!ready) process.exit(2);'],
+]);
+const scripts = JSON.parse(call('cqx_score', ''));
+assert.equal(scripts.scores.containment, 100);
+snapshot([
+  ['src/lib.js', 'import "../npm/build.mjs";'],
+  ['npm/build.mjs', 'process.exit(2);'],
+]);
+const imported = JSON.parse(call('cqx_score', ''));
+assert.equal(imported.scores.containment, 70);
+console.log('Nested package scripts and unimported top-level .mjs entries: passed');
