@@ -24,8 +24,8 @@ fn java_keeps_its_unicode_tables_without_downgrading_rust() {
 
 #[test]
 fn all_language_goldens_are_byte_identical() {
-    // Existing main: Rust + TypeScript. Go is captured from main's scorer;
-    // six new frontends own their fixtures. No frontend may rewrite a sibling.
+    // Existing main after #62: Rust, TypeScript and Go, verified with its scorer.
+    // Six new frontends own their fixtures. No frontend may rewrite a sibling.
     let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures");
     for language in [
         "rust-compat",

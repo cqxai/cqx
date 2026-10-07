@@ -1,0 +1,369 @@
+{
+  "main": "519c1a303bfb41f2d22e5dcf2c7d967bb62728c4",
+  "main_golden_sha256": {
+    "rust-compat": "998077a8bde1031a6cc034108344f1366cf6423644fd771e53e30b2564162801",
+    "typescript": "edb049e2306be9f7780b610b396ea61bc857f63ee464a44c5b9ffaaee1eddfd7",
+    "go": "276736248d86d0fde3bac19ce42e9a60531ff5701b192735804724adc80cb0a1"
+  },
+  "corpora": {
+    "java": {
+      "repository": "google/gson",
+      "commit": "845664ba1c307e6c1910d07cfed2f622e0ad8df1",
+      "before_frontend_commit": "971cd43d4cc005e929a42475c48a6baf9931b772",
+      "before": {
+        "scores": {
+          "containment": 100,
+          "legibility": 100,
+          "modularity": 100,
+          "quality": 96,
+          "security": 100
+        },
+        "lines": 23458,
+        "parsed_files": 264,
+        "skipped_files": [],
+        "fired_rules": {
+          "duplicated-bodies": 2,
+          "oversized-files": 4,
+          "undocumented-suppressions": 5
+        }
+      },
+      "after": {
+        "scores": {
+          "containment": 100,
+          "legibility": 100,
+          "modularity": 100,
+          "quality": 96,
+          "security": 100
+        },
+        "lines": 23458,
+        "parsed_files": 264,
+        "skipped_files": [],
+        "fired_rules": {
+          "duplicated-bodies": 2,
+          "oversized-files": 4,
+          "undocumented-suppressions": 5
+        }
+      },
+      "consolidated_cli": {
+        "scores": {
+          "containment": 100,
+          "legibility": 100,
+          "modularity": 100,
+          "quality": 96,
+          "security": 100
+        },
+        "lines": 23458,
+        "fired_rules": {
+          "java/duplicated-bodies": 2,
+          "java/oversized-files": 4,
+          "java/undocumented-suppressions": 5
+        }
+      }
+    },
+    "kotlin": {
+      "repository": "square/okio",
+      "commit": "a6ae13ee0e7522674ae6382aaf8e6d6e9ef4bb9e",
+      "before_frontend_commit": "80dcbe84e887291f049b3adab3f03272fda2c2a7",
+      "before": {
+        "scores": {
+          "containment": 100,
+          "legibility": 100,
+          "modularity": 100,
+          "quality": 87,
+          "security": 100
+        },
+        "lines": 25839,
+        "parsed_files": 311,
+        "skipped_files": [
+          "android-test/build.gradle.kts: no parse at byte 71",
+          "build-support/build.gradle.kts: no parse at byte 0",
+          "build-support/settings.gradle.kts: no parse at byte 0",
+          "build.gradle.kts: no parse at byte 805",
+          "okio-assetfilesystem/build.gradle.kts: no parse at byte 127",
+          "okio-bom/build.gradle.kts: no parse at byte 0",
+          "okio-fakefilesystem/build.gradle.kts: no parse at byte 218",
+          "okio-nodefilesystem/build.gradle.kts: no parse at byte 218",
+          "okio-testing-support/build.gradle.kts: no parse at byte 60",
+          "okio-wasifilesystem/build.gradle.kts: no parse at byte 172",
+          "okio/build.gradle.kts: no parse at byte 569",
+          "okio/jvm/jmh/build.gradle.kts: no parse at byte 0",
+          "okio/src/commonMain/kotlin/okio/Utf8.kt: no parse at byte 12996",
+          "okio/src/commonMain/kotlin/okio/internal/Buffer.kt: no parse at byte 9757",
+          "samples/build.gradle.kts: no parse at byte 0",
+          "settings.gradle.kts: no parse at byte 0"
+        ],
+        "fired_rules": {
+          "duplicated-bodies": 2,
+          "swallowed-errors": 5,
+          "undocumented-suppressions": 55
+        }
+      },
+      "after": {
+        "scores": {
+          "containment": 100,
+          "legibility": 100,
+          "modularity": 100,
+          "quality": 89,
+          "security": 100
+        },
+        "lines": 28658,
+        "parsed_files": 311,
+        "skipped_files": [
+          "android-test/build.gradle.kts: no parse at byte 71",
+          "build-support/build.gradle.kts: no parse at byte 0",
+          "build-support/settings.gradle.kts: no parse at byte 0",
+          "build.gradle.kts: no parse at byte 805",
+          "okio-assetfilesystem/build.gradle.kts: no parse at byte 127",
+          "okio-bom/build.gradle.kts: no parse at byte 0",
+          "okio-fakefilesystem/build.gradle.kts: no parse at byte 218",
+          "okio-nodefilesystem/build.gradle.kts: no parse at byte 218",
+          "okio-testing-support/build.gradle.kts: no parse at byte 60",
+          "okio-wasifilesystem/build.gradle.kts: no parse at byte 172",
+          "okio/build.gradle.kts: no parse at byte 569",
+          "okio/jvm/jmh/build.gradle.kts: no parse at byte 0",
+          "okio/src/commonMain/kotlin/okio/Utf8.kt: no parse at byte 12996",
+          "okio/src/commonMain/kotlin/okio/internal/Buffer.kt: no parse at byte 9757",
+          "samples/build.gradle.kts: no parse at byte 0",
+          "settings.gradle.kts: no parse at byte 0"
+        ],
+        "fired_rules": {
+          "duplicated-bodies": 2,
+          "oversized-files": 1,
+          "swallowed-errors": 19,
+          "undocumented-suppressions": 2
+        }
+      },
+      "consolidated_cli": {
+        "scores": {
+          "containment": 100,
+          "legibility": 100,
+          "modularity": 100,
+          "quality": 84,
+          "security": 100
+        },
+        "lines": 31425,
+        "fired_rules": {
+          "java/swallowed-errors": 1,
+          "kotlin/duplicated-bodies": 2,
+          "kotlin/oversized-files": 1,
+          "kotlin/swallowed-errors": 19,
+          "kotlin/undocumented-suppressions": 2
+        }
+      }
+    },
+    "swift": {
+      "repository": "apple/swift-argument-parser",
+      "commit": "efd239f0055b3d6b6cc122a786c46a0ea8d0235b",
+      "before_frontend_commit": "693aef6d06a4f2623a9f01d19769b25cfcdb0c62",
+      "before": {
+        "scores": {
+          "containment": 70,
+          "legibility": 100,
+          "modularity": 100,
+          "quality": 97,
+          "security": 96
+        },
+        "lines": 17894,
+        "parsed_files": 169,
+        "skipped_files": [
+          "Tests/ArgumentParserUnitTests/SplitArgumentTests.swift: no parse at byte 594"
+        ],
+        "fired_rules": {
+          "duplicated-bodies": 1,
+          "exit-in-library": 30,
+          "forced-operations": 23,
+          "nonliteral-process": 3,
+          "oversized-files": 2
+        }
+      },
+      "after": {
+        "scores": {
+          "containment": 70,
+          "legibility": 100,
+          "modularity": 100,
+          "quality": 96,
+          "security": 95
+        },
+        "lines": 19319,
+        "parsed_files": 169,
+        "skipped_files": [
+          "Tests/ArgumentParserUnitTests/SplitArgumentTests.swift: no parse at byte 594"
+        ],
+        "fired_rules": {
+          "duplicated-bodies": 1,
+          "exit-in-library": 30,
+          "forced-operations": 29,
+          "nonliteral-process": 4,
+          "oversized-files": 2
+        }
+      },
+      "consolidated_cli": {
+        "scores": {
+          "containment": 70,
+          "legibility": 100,
+          "modularity": 100,
+          "quality": 96,
+          "security": 95
+        },
+        "lines": 19319,
+        "fired_rules": {
+          "swift/duplicated-bodies": 1,
+          "swift/exit-in-library": 30,
+          "swift/forced-operations": 29,
+          "swift/nonliteral-process": 4,
+          "swift/oversized-files": 2
+        }
+      }
+    },
+    "zig": {
+      "repository": "Hejsil/zig-clap",
+      "commit": "05faf3905e8548f5cc269a8836e154065e70128d",
+      "before_frontend_commit": "078521993912a5cf3c2b233a2683b4bdec13869d",
+      "before": {
+        "scores": {
+          "containment": 100,
+          "legibility": 100,
+          "modularity": 96,
+          "quality": 100,
+          "security": 100
+        },
+        "lines": 2070,
+        "parsed_files": 12,
+        "skipped_files": [],
+        "fired_rules": {
+          "oversized-files": 1
+        }
+      },
+      "after": {
+        "scores": {
+          "containment": 100,
+          "legibility": 100,
+          "modularity": 96,
+          "quality": 100,
+          "security": 100
+        },
+        "lines": 2070,
+        "parsed_files": 12,
+        "skipped_files": [],
+        "fired_rules": {
+          "oversized-files": 1
+        }
+      },
+      "consolidated_cli": {
+        "scores": {
+          "containment": 100,
+          "legibility": 100,
+          "modularity": 96,
+          "quality": 100,
+          "security": 100
+        },
+        "lines": 2070,
+        "fired_rules": {
+          "zig/oversized-files": 1
+        }
+      }
+    },
+    "python": {
+      "repository": "psf/requests",
+      "commit": "611c6162cbc4ac2020a2f91c7cfa4f3abf9bbb60",
+      "before_frontend_commit": "d4e5c769412309a0118629f2bee0930872ee6a7f",
+      "before": {
+        "scores": {
+          "containment": 100,
+          "legibility": 100,
+          "modularity": 100,
+          "quality": 90,
+          "security": 100
+        },
+        "lines": 6874,
+        "parsed_files": 37,
+        "skipped_files": [],
+        "fired_rules": {
+          "oversized-files": 2,
+          "undocumented-suppressions": 29
+        }
+      },
+      "after": {
+        "scores": {
+          "containment": 100,
+          "legibility": 100,
+          "modularity": 100,
+          "quality": 99,
+          "security": 100
+        },
+        "lines": 6874,
+        "parsed_files": 37,
+        "skipped_files": [],
+        "fired_rules": {
+          "oversized-files": 2,
+          "undocumented-suppressions": 1
+        }
+      },
+      "consolidated_cli": {
+        "scores": {
+          "containment": 100,
+          "legibility": 100,
+          "modularity": 100,
+          "quality": 99,
+          "security": 100
+        },
+        "lines": 6874,
+        "fired_rules": {
+          "python/oversized-files": 2,
+          "python/undocumented-suppressions": 1
+        }
+      }
+    },
+    "php": {
+      "repository": "symfony/yaml",
+      "commit": "d17e54ee331c6bba6232fe1e381711cb0c5c8666",
+      "before_frontend_commit": "695e41643b99d3576ec22a4dc63da0d94d3215a5",
+      "before": {
+        "scores": {
+          "containment": 100,
+          "legibility": 100,
+          "modularity": 97,
+          "quality": 100,
+          "security": 94
+        },
+        "lines": 4277,
+        "parsed_files": 30,
+        "skipped_files": [],
+        "fired_rules": {
+          "oversized-files": 2,
+          "unsafe-deserialization": 1
+        }
+      },
+      "after": {
+        "scores": {
+          "containment": 100,
+          "legibility": 100,
+          "modularity": 97,
+          "quality": 100,
+          "security": 94
+        },
+        "lines": 4311,
+        "parsed_files": 30,
+        "skipped_files": [],
+        "fired_rules": {
+          "oversized-files": 2,
+          "unsafe-deserialization": 1
+        }
+      },
+      "consolidated_cli": {
+        "scores": {
+          "containment": 100,
+          "legibility": 100,
+          "modularity": 97,
+          "quality": 100,
+          "security": 94
+        },
+        "lines": 4311,
+        "fired_rules": {
+          "php/oversized-files": 2,
+          "php/unsafe-deserialization": 1
+        }
+      }
+    }
+  }
+}
