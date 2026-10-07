@@ -4,7 +4,7 @@ members = ["crates/cqx-c", "crates/cqx-csharp", "crates/cqx-syntax", "crates/cqx
 exclude = ["vendor/rezel-lang-python", "vendor/python-unicode", "vendor/rezel-lang-swift", "vendor/swift-unicode", "vendor/rezel-lang-kotlin", "vendor/kotlin-unicode", "fixtures", "vendor/rezel-lang-java", "vendor/java-unicode"]
 
 [workspace.package]
-version = "0.1.24"
+version = "0.1.25"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/cqxai/cqx"
