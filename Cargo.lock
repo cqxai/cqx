@@ -138,7 +138,7 @@ dependencies = [
 
 [[package]]
 name = "cqx"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-analysis",
  "cqx-history",
@@ -153,7 +153,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-analysis"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-c",
  "cqx-csharp",
@@ -174,7 +174,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-c"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-layout",
  "cqx-schema",
@@ -189,7 +189,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-csharp"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-layout",
  "cqx-schema",
@@ -203,7 +203,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-go"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-layout",
  "cqx-schema",
@@ -216,7 +216,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-history"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-analysis",
  "cqx-schema",
@@ -231,7 +231,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-java"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-layout",
  "cqx-schema",
@@ -249,7 +249,7 @@ version = "1.0.24"
 
 [[package]]
 name = "cqx-kotlin"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-layout",
  "cqx-schema",
@@ -268,14 +268,14 @@ version = "1.0.24"
 
 [[package]]
 name = "cqx-layout"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "cqx-mcp"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-scan",
  "cqx-score",
@@ -286,7 +286,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-php"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-layout",
  "cqx-schema",
@@ -303,7 +303,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-python"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-layout",
  "cqx-schema",
@@ -324,7 +324,7 @@ version = "1.0.24"
 
 [[package]]
 name = "cqx-rust"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-layout",
  "cqx-schema",
@@ -342,7 +342,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-scan"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-analysis",
  "cqx-score",
@@ -355,7 +355,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-schema"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "serde",
  "serde_json",
@@ -363,7 +363,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-score"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-schema",
  "cqx-store",
@@ -374,7 +374,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-source"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-schema",
  "rezel-common",
@@ -382,7 +382,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-store"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-schema",
  "deka-cli-core",
@@ -393,7 +393,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-swift"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-layout",
  "cqx-schema",
@@ -412,7 +412,7 @@ version = "1.0.24"
 
 [[package]]
 name = "cqx-syntax"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-layout",
  "cqx-schema",
@@ -422,7 +422,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-ts"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-layout",
  "cqx-schema",
@@ -441,7 +441,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-vfs"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-layout",
  "serde",
@@ -451,7 +451,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-view"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-rust",
  "cqx-schema",
@@ -462,7 +462,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-wasm"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-analysis",
  "cqx-rust",
@@ -475,7 +475,7 @@ dependencies = [
 
 [[package]]
 name = "cqx-zig"
-version = "0.1.24"
+version = "0.1.25"
 dependencies = [
  "cqx-layout",
  "cqx-schema",
