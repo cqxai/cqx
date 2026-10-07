@@ -108,8 +108,26 @@ They deduct only when enabled in the repository root's real `cqx.json`:
 
 Each language uses its own product lines for per-10k-line densities (minimum
 500 lines), so adding clean code in another language cannot dilute findings.
-Rule deductions add into the same five category scores. TypeScript thresholds
-reuse the Rust ramps, without claiming independent corpus calibration.
+Each language gets its own five category scores. For each category, the
+headline is the line-weighted average of those scores, rounded to the nearest
+integer. The 500-line density floor stays in effect for small languages;
+headline weights use their actual product lines. TypeScript thresholds reuse
+the Rust ramps, without claiming independent corpus calibration.
+
+Mixed reports add `languages: { <language>: { lines, scores, rules } }`.
+Top-level `scores` hold the weighted headline and top-level `rules` retain all
+findings and their original deductions. Single-language report JSON stays
+byte-identical, with no added block. A numeric `min_score` gates every headline
+category. To gate languages independently, use, for example:
+
+```json
+{ "version": 1, "min_score": { "rust": 95, "typescript": 85 } }
+```
+
+Every category of each named language must meet its floor. A language with no
+product lines is not gated. `--min-score N` overrides either form with a
+headline floor. Changing between headline and language floors cannot be proven
+to tighten the standard, so `--tighten-only` refuses that change.
 Test files (`*.test.*`, `*.spec.*`, test/tests/__tests__ directories) are present
 in the graph but excluded from scoring. Files with parser or semantic
 diagnostics are skipped; the report names each file and its reason in
