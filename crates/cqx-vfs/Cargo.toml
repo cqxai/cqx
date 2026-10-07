@@ -9,3 +9,5 @@ description = "An in-memory snapshot of the files being analysed."
 [dependencies]
 serde = { workspace = true }
 walkdir = { workspace = true }
+
+serde_json.workspace=true

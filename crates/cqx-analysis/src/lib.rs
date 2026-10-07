@@ -13,6 +13,7 @@ pub fn manifests(vfs: &Vfs) -> Result<Value, String> {
     };
     metadata["typescript_bins"] = serde_json::json!(cqx_ts::entry_files(vfs));
     metadata["go_modules"] = serde_json::json!(cqx_go::modules(vfs));
+    metadata["php"] = serde_json::json!(cqx_php::metadata(vfs));
     Ok(metadata)
 }
 
@@ -20,6 +21,7 @@ pub struct Prepared {
     rust: cqx_rust::extract::Prepared,
     bins: std::collections::BTreeSet<String>,
     go: cqx_go::Prepared,
+    php: cqx_php::Metadata,
 }
 
 pub fn prepare_reporting(
@@ -34,17 +36,27 @@ pub fn prepare_reporting(
         .flatten()
         .filter_map(|v| v.as_str().map(str::to_string))
         .collect();
+    let php = serde_json::from_value(metadata["php"].clone()).unwrap_or_default();
     let go_modules = serde_json::from_value(metadata["go_modules"].clone()).unwrap_or_default();
     let go_files = vfs.paths().filter(|p| cqx_go::is_source(p)).count() as u32;
+    let extra_files = vfs
+        .paths()
+        .filter(|p| cqx_php::is_source_in(vfs, p, &php))
+        .count() as u32;
     let ts_files = vfs.paths().filter(|p| cqx_ts::is_source(p)).count() as u32;
     let rust = cqx_rust::extract::prepare_reporting(
         vfs,
         metadata,
-        &|n| total(n + ts_files + go_files),
+        &|n| total(n + ts_files + go_files + extra_files),
         tick,
     )?;
     let go = cqx_go::prepare(vfs, go_modules, tick)?;
-    Ok(Prepared { rust, bins, go })
+    Ok(Prepared {
+        rust,
+        bins,
+        go,
+        php,
+    })
 }
 
 impl Prepared {
@@ -77,6 +89,12 @@ impl Prepared {
         stats.files += go.files;
         stats.nodes += go.nodes;
         stats.edges += go.edges;
+        let extra = cqx_php::run_with_metadata(vfs, &mut out, tick, &self.php)?;
+        stats.packages += usize::from(extra.files > 0);
+        stats.files += extra.files;
+        stats.nodes += extra.nodes;
+        stats.edges += extra.edges;
+        stats.unparsed.extend(extra.unparsed);
         stats.unparsed.extend(ts.unparsed);
         stats.unparsed.extend(go.unparsed);
         Ok(stats)

@@ -436,3 +436,31 @@ external project disagreed:
 Locally the test skips when the checkouts are absent. Setting
 `CQX_REFERENCE_DIR` asserts they are present, so a failed fetch fails the job
 rather than quietly checking nothing.
+
+## PHP frontend: scope of the score
+
+Pure-Rust Rezel PHP 8.5 parsing feeds CLI and WASM scans. The score measures
+source effects, containment, visible security review sites and structural quality:
+library exit/die, non-literal shell/process commands and interpolated backticks,
+eval, parameter/superglobal-looking unserialize without allowed_classes=false,
+SQL concatenation at bound PDO/mysqli query APIs, empty catches, @ suppression
+density, unexplained phpcs/phpstan suppression, exact duplication and file size.
+It uses the original five categories and only php/<rule> in cqx.json.
+
+Optional parameter/return declarations and strict_types are retained as facts.
+Declarations bind PDO/mysqli and distinguish numeric SQL terms/string legacy
+assert input. The score does **not** measure complete type safety, untyped values,
+taint flow, framework semantics or general correctness; no string-domain rule
+is invented for PHP scalar APIs. A high score makes no promise about those gaps.
+String assert and create_function are legacy execution APIs: they are scored only
+when the nearest Composer PHP requirement demonstrably admits pre-8.0 versions
+(using recognized semver clauses). Missing/unsupported requirements do not infer
+legacy execution; modern string assert is not counted as dynamic code.
+
+Composer bin scripts (including nested manifests and extensionless PHP files),
+root index.php and public/web front controllers are entry units. Metadata travels
+to sharded readers. PHPUnit bindings, test paths/names, vendor and generated files
+do not score as product sources. Whole-file parse failures skip/report. Literal
+executables/argv, escaped dollar backticks, class-free unserialize, numeric casts
+and typed numeric/PDO-quoted SQL, handled/explained catches and suppression reasons
+stay quiet. No extra WASM toolchain is required.

@@ -1,0 +1,19 @@
+[package]
+name="cqx-php"
+version.workspace=true
+edition.workspace=true
+license.workspace=true
+repository.workspace=true
+description="php source analysis for cqx."
+[dependencies]
+cqx-schema.workspace=true
+cqx-vfs.workspace=true
+cqx-source={path="../cqx-source"}
+rezel-common="=0.0.0"
+rezel-lang-php="=0.0.0"
+serde_json.workspace=true
+semver="1"
+serde.workspace=true
+[dev-dependencies]
+cqx-score={path="../cqx-score"}
+cqx-store={path="../cqx-store"}
