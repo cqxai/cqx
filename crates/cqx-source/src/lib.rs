@@ -7,6 +7,10 @@ use std::{
     io::{self, Write},
     ops::Range,
 };
+pub struct Lexed {
+    pub tokens: Vec<(Range<usize>, String)>,
+    pub comments: Vec<Range<usize>>,
+}
 #[derive(Default)]
 pub struct Stats {
     pub files: usize,
@@ -90,6 +94,50 @@ impl<W: Write> Emitter<W> {
                 break;
             }
         }
+        self.make_file(path, source, test, tokens, comments)
+    }
+    pub fn file_tokens<'s, 'w>(
+        &'w mut self,
+        path: &'s str,
+        source: &'s str,
+        test: bool,
+        lexed: Lexed,
+        ignored: &[Range<usize>],
+    ) -> io::Result<File<'s, 'w, W>> {
+        let file = Id::file(path);
+        let ignored_lines: std::collections::BTreeSet<_> = ignored
+            .iter()
+            .flat_map(|r| {
+                let from = source[..r.start].bytes().filter(|b| *b == b'\n').count();
+                let to = source[..r.end].bytes().filter(|b| *b == b'\n').count();
+                from..=to
+            })
+            .collect();
+        let lines = source
+            .lines()
+            .enumerate()
+            .filter(|(line, _)| !ignored_lines.contains(line))
+            .count();
+        self.writer.node(
+            Node::new(file.clone(), NodeKind::File)
+                .attr("path", path)
+                .attr("language", self.language)
+                .attr("role", if test { "test" } else { "product" })
+                .attr("lines", lines as u64),
+        )?;
+        self.stats.files += 1;
+        self.make_file(path, source, test, lexed.tokens, lexed.comments)
+    }
+    fn make_file<'s, 'w>(
+        &'w mut self,
+        path: &'s str,
+        source: &'s str,
+        test: bool,
+        tokens: Vec<(Range<usize>, String)>,
+        comments: Vec<Range<usize>>,
+    ) -> io::Result<File<'s, 'w, W>> {
+        let lang = self.language;
+        let file = Id::file(path);
         Ok(File {
             writer: &mut self.writer,
             language: lang,
@@ -145,6 +193,15 @@ impl<W: Write> File<'_, '_, W> {
         range: Range<usize>,
         body: Option<Range<usize>>,
     ) -> io::Result<()> {
+        self.symbol_with_attrs(name, range, body, &[])
+    }
+    pub fn symbol_with_attrs(
+        &mut self,
+        name: &str,
+        range: Range<usize>,
+        body: Option<Range<usize>>,
+        attrs: &[(String, String)],
+    ) -> io::Result<()> {
         let id = Id::symbol(&format!(
             "{}:{}::{name}@{}",
             self.language, self.path, range.start
@@ -153,6 +210,9 @@ impl<W: Write> File<'_, '_, W> {
             .attr("name", name)
             .attr("language", self.language)
             .attr("lang:kind", "function");
+        for (key, value) in attrs {
+            node = node.attr(key, value.as_str());
+        }
         if !self.test {
             if let Some(body) = body {
                 let tokens: Vec<_> = self

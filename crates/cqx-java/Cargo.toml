@@ -6,6 +6,7 @@ license.workspace = true
 repository.workspace = true
 description = "java syntax analysis for cqx."
 [dependencies]
+cqx-layout = { path = "../cqx-layout" }
 cqx-schema.workspace = true
 cqx-vfs.workspace = true
 cqx-source = { path = "../cqx-source" }

@@ -44,7 +44,7 @@ fn review_cli_scores_build_package_and_testimonial_service() {
         .find(|r| r["language"] == "java" && r["rule"] == "exit-in-library")
         .unwrap();
     assert_eq!(rule["total_findings"], 2);
-    assert_eq!(p["lines"], 2);
+    assert_eq!(p["lines"], 3);
     assert!(rule["findings"]
         .as_array()
         .unwrap()

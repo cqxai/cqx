@@ -256,6 +256,15 @@ impl Metrics {
             .skipped_files
             .sort_by(|a, b| a["file"].as_str().cmp(&b["file"].as_str()));
         metrics.scale = (metrics.lines as f64 / 10_000.0).max(0.05);
+        // Reader completion order must not select/reorder frontend findings.
+        // Rust retains its existing report ordering for compatibility.
+        for (rule, measure) in &mut metrics.values {
+            if rule.contains('/') {
+                measure.findings.sort_by(|a, b| {
+                    (&a.file, a.line, a.col, &a.what).cmp(&(&b.file, b.line, b.col, &b.what))
+                });
+            }
+        }
         metrics.locate(stream);
         metrics
     }
@@ -828,7 +837,7 @@ impl Metrics {
             .collect();
 
         // file -> the items in it, each with its extent.
-        let mut items: HashMap<&str, Vec<Item>> = HashMap::new();
+        let mut items: HashMap<&str, Vec<(Item, [u32; 2])>> = HashMap::new();
         for edge in &stream.edges {
             if edge.kind != EdgeKind::Contains {
                 continue;
@@ -840,12 +849,15 @@ impl Metrics {
             if ev.line[0] == 0 {
                 continue;
             }
-            items.entry(ev.file.as_str()).or_default().push(Item {
-                name: (*name).to_string(),
-                kind: (*kind).to_string(),
-                from: ev.line[0],
-                to: ev.line[1].max(ev.line[0]),
-            });
+            items.entry(ev.file.as_str()).or_default().push((
+                Item {
+                    name: (*name).to_string(),
+                    kind: (*kind).to_string(),
+                    from: ev.line[0],
+                    to: ev.line[1].max(ev.line[0]),
+                },
+                ev.col,
+            ));
         }
 
         for measure in self.values.values_mut() {
@@ -861,9 +873,15 @@ impl Metrics {
                 // also contains it.
                 finding.item = candidates
                     .iter()
-                    .filter(|i| i.from <= finding.line && finding.line <= i.to)
-                    .min_by_key(|i| i.to - i.from)
-                    .cloned();
+                    .filter(|(i, col)| {
+                        i.from <= finding.line
+                            && finding.line <= i.to
+                            && (finding.col == [0, 0]
+                                || (i.from != finding.line || finding.col[0] >= col[0])
+                                    && (i.to != finding.line || finding.col[1] <= col[1]))
+                    })
+                    .min_by_key(|(i, _)| i.to - i.from)
+                    .map(|(i, _)| i.clone());
             }
         }
     }

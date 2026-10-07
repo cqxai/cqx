@@ -241,7 +241,10 @@ impl PackageFacts {
     /// which is a fixpoint over all of it, happens once afterwards.
     pub fn gather(files: &[&ParsedFile]) -> PackageFacts {
         let mut facts = PackageFacts::default();
-        for ParsedFile { rel_path, parsed, .. } in files.iter().copied() {
+        for ParsedFile {
+            rel_path, parsed, ..
+        } in files.iter().copied()
+        {
             let mut file_aliases = HashMap::new();
             let mut collector = Collector {
                 defined: &mut facts.defined,
@@ -488,9 +491,25 @@ pub fn parse_package_watched(
     nested: &[String],
     done: &dyn Fn(),
 ) -> (Vec<ParsedFile>, Vec<String>) {
+    parse_package_with_layout(
+        vfs,
+        roots,
+        nested,
+        &cqx_layout::Layout::from_paths(vfs.paths()),
+        done,
+    )
+}
+
+pub fn parse_package_with_layout(
+    vfs: &Vfs,
+    roots: &[(String, bool)],
+    nested: &[String],
+    layout: &cqx_layout::Layout,
+    done: &dyn Fn(),
+) -> (Vec<ParsedFile>, Vec<String>) {
     let mut parsed = Vec::new();
     let mut failures = Vec::new();
-    for (dir, is_test, path) in files_of(vfs, roots, nested) {
+    for (dir, is_test, path) in files_of_layout(vfs, roots, nested, layout) {
         {
             let path = path.as_str();
             let (dir, is_test) = (&dir, &is_test);
@@ -524,11 +543,27 @@ pub fn files_of(
     roots: &[(String, bool)],
     nested: &[String],
 ) -> Vec<(String, bool, String)> {
+    files_of_layout(
+        vfs,
+        roots,
+        nested,
+        &cqx_layout::Layout::from_paths(vfs.paths()),
+    )
+}
+
+pub fn files_of_layout(
+    vfs: &Vfs,
+    roots: &[(String, bool)],
+    nested: &[String],
+    layout: &cqx_layout::Layout,
+) -> Vec<(String, bool, String)> {
     let mut found = Vec::new();
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     for (dir, is_test) in roots {
         for path in vfs.under(dir) {
-            if !path.ends_with(".rs") {
+            if !path.ends_with(".rs")
+                || layout.excluded("rust", path, vfs.read(path).unwrap_or_default())
+            {
                 continue;
             }
             if nested.iter().any(|n| crate::extract::is_inside(path, n)) {

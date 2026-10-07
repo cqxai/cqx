@@ -21,12 +21,6 @@ pub struct Stats {
 
 pub use cqx_vfs::is_typescript_source as is_source;
 
-fn is_test(path: &str) -> bool {
-    path.split('/')
-        .any(|s| matches!(s, "test" | "tests" | "__tests__"))
-        || [".test.", ".spec."].iter().any(|s| path.contains(s))
-}
-
 /// Package entries include declared bins and scripts that directly run a source
 /// file with Node, tsx or Bun. `index` by itself is often a library.
 pub fn entry_files(vfs: &Vfs) -> BTreeSet<String> {
@@ -177,13 +171,28 @@ pub fn run_with_entries(
     bins: &BTreeSet<String>,
     tick: &dyn Fn(),
 ) -> Result<Stats, std::io::Error> {
+    run_with_layout(
+        vfs,
+        out,
+        bins,
+        tick,
+        &cqx_layout::Layout::from_paths(vfs.paths()),
+    )
+}
+pub fn run_with_layout(
+    vfs: &Vfs,
+    out: impl Write,
+    bins: &BTreeSet<String>,
+    tick: &dyn Fn(),
+    layout: &cqx_layout::Layout,
+) -> Result<Stats, std::io::Error> {
     let mut writer = Writer::new(out);
     writer.fact(&Fact::header("typescript", &vfs.label))?;
     let package = Id::package("typescript:root");
     let mut stats = Stats::default();
     for path in vfs.paths().filter(|p| is_source(p)) {
         let source = vfs.read(path).unwrap_or_default();
-        if excluded_source(path, source) {
+        if layout.excluded("typescript", path, source) || excluded_source(path, source) {
             tick();
             continue;
         }
@@ -225,7 +234,7 @@ pub fn run_with_entries(
             directory.clone(),
         ))?;
         let file = Id::file(path);
-        let test = is_test(path);
+        let test = layout.is_test("typescript", path);
         writer.node(
             Node::new(file.clone(), NodeKind::File)
                 .attr("path", path)
@@ -608,23 +617,9 @@ fn is_config(path: &str) -> bool {
     })
 }
 
-fn excluded_source(path: &str, source: &str) -> bool {
+fn excluded_source(path: &str, _source: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
-    let leading = source.trim_start_matches('\u{feff}').trim_start();
-    name.ends_with(".d.ts")
-        || name.ends_with(".min.js")
-        || name.ends_with(".min.mjs")
-        || name.contains(".generated.")
-        || leading.strip_prefix("//").is_some_and(|comment| {
-            comment
-                .trim_start()
-                .strip_prefix("@generated")
-                .is_some_and(|rest| rest.is_empty() || rest.starts_with(char::is_whitespace))
-        })
-        || leading
-            .strip_prefix("/*")
-            .and_then(|c| c.split_once("*/"))
-            .is_some_and(|(banner, _)| banner.trim() == "eslint-disable")
+    name.ends_with(".d.ts") || name.ends_with(".min.js") || name.ends_with(".min.mjs")
 }
 
 fn skipped_file<W: Write>(

@@ -7,5 +7,7 @@ repository.workspace = true
 description = "An in-memory snapshot of the files being analysed."
 
 [dependencies]
+cqx-layout = { path = "../cqx-layout" }
 serde = { workspace = true }
 walkdir = { workspace = true }
+serde_json.workspace = true

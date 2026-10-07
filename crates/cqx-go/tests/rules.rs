@@ -304,15 +304,13 @@ fn oversized_rules_use_repository_thresholds_and_stay_quiet_below_them() {
     let bad = report(&[("lib.go", "package p\nvar a = 1\nvar b = 2")], config);
     assert_eq!(findings(&bad, "oversized-files"), 1);
     assert!(bad["scores"]["modularity"].as_u64().unwrap() < 100);
-    assert!(
-        bad["rules"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|r| r["language"] == "go"
-                && r["rule"] == "oversized-line-share"
-                && r["deducted"].as_f64().unwrap_or(0.0) > 0.0)
-    );
+    assert!(bad["rules"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|r| r["language"] == "go"
+            && r["rule"] == "oversized-line-share"
+            && r["deducted"].as_f64().unwrap_or(0.0) > 0.0));
     let good = report(&[("lib.go", "package p\nvar a = 1")], config);
     assert_eq!(findings(&good, "oversized-files"), 0);
     assert_eq!(good["scores"]["modularity"], 100);
@@ -425,32 +423,26 @@ fn excluded_go_files_retain_their_graph_and_no_neutral_score_effects() {
     assert_eq!(stats.files, 3);
     let stream = Stream::from_ndjson(&String::from_utf8(out).unwrap());
     for path in ["message.pb.go", "vendor/dependency/lib.go"] {
-        assert!(
-            stream
-                .nodes
-                .iter()
-                .any(|n| n.id == cqx_schema::Id::file(path) && n.attrs["role"] == "test")
-        );
-        assert!(
-            stream
-                .edges
-                .iter()
-                .any(|e| e.from == cqx_schema::Id::file(path)
-                    && e.kind == cqx_schema::EdgeKind::Contains)
-        );
+        assert!(stream
+            .nodes
+            .iter()
+            .any(|n| n.id == cqx_schema::Id::file(path) && n.attrs["role"] == "test"));
+        assert!(stream
+            .edges
+            .iter()
+            .any(|e| e.from == cqx_schema::Id::file(path)
+                && e.kind == cqx_schema::EdgeKind::Contains));
     }
     let config = Config::from_text(Some(r#"{"rules":{"go/oversized-files":{"params":{"max_lines":2}},"go/oversized-line-share":{"params":{"max_lines":2}}}}"#)).unwrap();
     let got = cqx_score::report_json(&config, &Metrics::compute(&stream, &config));
     assert_eq!(got["lines"], 1);
     assert_eq!(findings(&got, "oversized-files"), 0);
     assert_eq!(findings(&got, "duplicated-bodies"), 0);
-    assert!(
-        got["scores"]
-            .as_object()
-            .unwrap()
-            .values()
-            .all(|s| s == 100)
-    );
+    assert!(got["scores"]
+        .as_object()
+        .unwrap()
+        .values()
+        .all(|s| s == 100));
 }
 
 #[test]
@@ -509,6 +501,7 @@ fn vendor_is_excluded_by_default_including_nested_modules() {
         &[
             ("lib.go", "package p"),
             ("vendor/thirdparty/lib.go", source),
+            ("nested/go.mod", "module nested"),
             ("nested/vendor/thirdparty/lib.go", source),
         ],
         "{}",
@@ -574,11 +567,9 @@ fn skipped_syntax_and_token_errors_do_not_abort_or_dilute_good_go_files() {
     assert_eq!(skipped.len(), 2);
     assert_eq!(skipped[0]["file"], "bad-token.go");
     assert_eq!(skipped[1]["file"], "bad.go");
-    assert!(
-        skipped
-            .iter()
-            .all(|s| !s["reason"].as_str().unwrap().is_empty())
-    );
+    assert!(skipped
+        .iter()
+        .all(|s| !s["reason"].as_str().unwrap().is_empty()));
 }
 
 #[test]
@@ -593,36 +584,26 @@ fn signatures_and_module_identity_are_real_graph_facts() {
     let mut out = Vec::new();
     cqx_go::run(&vfs, &mut out).unwrap();
     let stream = Stream::from_ndjson(&String::from_utf8(out).unwrap());
-    assert!(
-        stream
-            .edges
-            .iter()
-            .any(|e| e.kind == cqx_schema::EdgeKind::Param && e.to.0 == "type:go:string")
-    );
-    assert!(
-        stream
-            .edges
-            .iter()
-            .any(|e| e.kind == cqx_schema::EdgeKind::Returns && e.to.0 == "type:go:error")
-    );
-    assert!(
-        stream
-            .nodes
-            .iter()
-            .any(|n| n.id.0 == "pkg:go:example.com/lib:internal:lib")
-    );
-    assert!(
-        stream
-            .nodes
-            .iter()
-            .any(|n| n.id.0 == "sym:go:generic.go::*Box[T].Get")
-    );
-    assert!(
-        stream
-            .edges
-            .iter()
-            .any(|e| e.kind == cqx_schema::EdgeKind::Param && e.to.0 == "type:go:map[string][]*T")
-    );
+    assert!(stream
+        .edges
+        .iter()
+        .any(|e| e.kind == cqx_schema::EdgeKind::Param && e.to.0 == "type:go:string"));
+    assert!(stream
+        .edges
+        .iter()
+        .any(|e| e.kind == cqx_schema::EdgeKind::Returns && e.to.0 == "type:go:error"));
+    assert!(stream
+        .nodes
+        .iter()
+        .any(|n| n.id.0 == "pkg:go:example.com/lib:internal:lib"));
+    assert!(stream
+        .nodes
+        .iter()
+        .any(|n| n.id.0 == "sym:go:generic.go::*Box[T].Get"));
+    assert!(stream
+        .edges
+        .iter()
+        .any(|e| e.kind == cqx_schema::EdgeKind::Param && e.to.0 == "type:go:map[string][]*T"));
 }
 
 #[test]

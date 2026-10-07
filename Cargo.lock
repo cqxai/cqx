@@ -138,9 +138,15 @@ version = "0.1.24"
 dependencies = [
  "cqx-go",
  "cqx-java",
+ "cqx-kotlin",
+ "cqx-layout",
+ "cqx-php",
+ "cqx-python",
  "cqx-rust",
+ "cqx-swift",
  "cqx-ts",
  "cqx-vfs",
+ "cqx-zig",
  "deka-cli-core",
  "serde_json",
 ]
@@ -149,6 +155,7 @@ dependencies = [
 name = "cqx-go"
 version = "0.1.24"
 dependencies = [
+ "cqx-layout",
  "cqx-schema",
  "cqx-score",
  "cqx-store",
@@ -176,6 +183,7 @@ dependencies = [
 name = "cqx-java"
 version = "0.1.24"
 dependencies = [
+ "cqx-layout",
  "cqx-schema",
  "cqx-score",
  "cqx-source",
@@ -190,6 +198,32 @@ name = "cqx-java-unicode"
 version = "1.0.24"
 
 [[package]]
+name = "cqx-kotlin"
+version = "0.1.24"
+dependencies = [
+ "cqx-layout",
+ "cqx-schema",
+ "cqx-score",
+ "cqx-source",
+ "cqx-store",
+ "cqx-vfs",
+ "rezel-common",
+ "rezel-lang-kotlin",
+ "serde_json",
+]
+
+[[package]]
+name = "cqx-kotlin-unicode"
+version = "1.0.24"
+
+[[package]]
+name = "cqx-layout"
+version = "0.1.24"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "cqx-mcp"
 version = "0.1.24"
 dependencies = [
@@ -201,9 +235,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "cqx-php"
+version = "0.1.24"
+dependencies = [
+ "cqx-layout",
+ "cqx-schema",
+ "cqx-score",
+ "cqx-source",
+ "cqx-store",
+ "cqx-vfs",
+ "rezel-common",
+ "rezel-lang-php",
+ "semver",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "cqx-python"
+version = "0.1.24"
+dependencies = [
+ "cqx-layout",
+ "cqx-schema",
+ "cqx-score",
+ "cqx-source",
+ "cqx-store",
+ "cqx-vfs",
+ "rezel-common",
+ "rezel-lang-python",
+ "serde_json",
+ "toml",
+ "unicode-normalization",
+]
+
+[[package]]
+name = "cqx-python-unicode"
+version = "1.0.24"
+
+[[package]]
 name = "cqx-rust"
 version = "0.1.24"
 dependencies = [
+ "cqx-layout",
  "cqx-schema",
  "cqx-store",
  "cqx-vfs",
@@ -269,9 +342,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "cqx-swift"
+version = "0.1.24"
+dependencies = [
+ "cqx-layout",
+ "cqx-schema",
+ "cqx-score",
+ "cqx-source",
+ "cqx-store",
+ "cqx-vfs",
+ "rezel-common",
+ "rezel-lang-swift",
+ "serde_json",
+]
+
+[[package]]
+name = "cqx-swift-unicode"
+version = "1.0.24"
+
+[[package]]
 name = "cqx-ts"
 version = "0.1.24"
 dependencies = [
+ "cqx-layout",
  "cqx-schema",
  "cqx-score",
  "cqx-store",
@@ -290,7 +383,9 @@ dependencies = [
 name = "cqx-vfs"
 version = "0.1.24"
 dependencies = [
+ "cqx-layout",
  "serde",
+ "serde_json",
  "walkdir",
 ]
 
@@ -316,6 +411,21 @@ dependencies = [
  "cqx-vfs",
  "cqx-view",
  "serde_json",
+]
+
+[[package]]
+name = "cqx-zig"
+version = "0.1.24"
+dependencies = [
+ "cqx-layout",
+ "cqx-schema",
+ "cqx-score",
+ "cqx-source",
+ "cqx-store",
+ "cqx-vfs",
+ "rezel-common",
+ "serde_json",
+ "zigsyn",
 ]
 
 [[package]]
@@ -784,7 +894,7 @@ version = "0.153.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b795bfdf0b88722a9f0e9a61a9ef6d2ecd115a728f5f0290fcc66da3ec5151ea"
 dependencies = [
- "phf",
+ "phf 0.14.0",
  "proc-macro2",
  "quote",
  "syn 3.0.6",
@@ -894,7 +1004,7 @@ dependencies = [
  "oxc_diagnostics",
  "oxc_span",
  "oxc_str",
- "phf",
+ "phf 0.14.0",
  "rustc-hash",
  "unicode-id-start",
 ]
@@ -963,7 +1073,7 @@ dependencies = [
  "oxc_index",
  "oxc_span",
  "oxc_str",
- "phf",
+ "phf 0.14.0",
  "unicode-id-start",
 ]
 
@@ -997,13 +1107,42 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "phf"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fd6780a80ae0c52cc120a26a1a42c1ae51b247a253e4e06113d23d2c2edd078"
+dependencies = [
+ "phf_shared 0.11.3",
+]
+
+[[package]]
+name = "phf"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "010378780309880b08997fae13be7834dba947d36393bd372f2b1556deb2a2f6"
 dependencies = [
  "phf_macros",
- "phf_shared",
+ "phf_shared 0.14.0",
  "serde",
+]
+
+[[package]]
+name = "phf_codegen"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aef8048c789fa5e851558d709946d6d79a8ff88c0440c587967f8e94bfb1216a"
+dependencies = [
+ "phf_generator 0.11.3",
+ "phf_shared 0.11.3",
+]
+
+[[package]]
+name = "phf_generator"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c80231409c20246a13fddb31776fb942c38553c51e871f8cbd687a4cfb5843d"
+dependencies = [
+ "phf_shared 0.11.3",
+ "rand",
 ]
 
 [[package]]
@@ -1013,7 +1152,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aeb62e0959d5a1bebc965f4d15d9e2b7cea002b6b0f5ba8cde6cc26738467100"
 dependencies = [
  "fastrand",
- "phf_shared",
+ "phf_shared 0.14.0",
 ]
 
 [[package]]
@@ -1022,11 +1161,20 @@ version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5fa8d0ca26d424d27630da600c6624696e7dec8bf7b3b492b383c5dc49e5e085"
 dependencies = [
- "phf_generator",
- "phf_shared",
+ "phf_generator 0.14.0",
+ "phf_shared 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.11.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67eabc2ef2a60eb7faa00097bd1ffdb5bd28e62bf39990626a582201b7a754e5"
+dependencies = [
+ "siphasher",
 ]
 
 [[package]]
@@ -1109,6 +1257,7 @@ version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e058c7de0b26af77780c769414d6257830bb240f3c38477dbc2c16e5f54d6d4c"
 dependencies = [
+ "libc",
  "rand_chacha",
  "rand_core",
 ]
@@ -1155,6 +1304,49 @@ name = "rezel-lang-java"
 version = "0.0.0"
 dependencies = [
  "cqx-java-unicode",
+ "rezel-common",
+ "rezel-lr",
+ "zerocopy",
+]
+
+[[package]]
+name = "rezel-lang-kotlin"
+version = "0.0.0"
+dependencies = [
+ "cqx-kotlin-unicode",
+ "rezel-common",
+ "rezel-lr",
+ "zerocopy",
+]
+
+[[package]]
+name = "rezel-lang-php"
+version = "0.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3739308ed7bc13b5d616db48b32bb82e8cc15f0fabcc125402671d543d4c7821"
+dependencies = [
+ "rezel-common",
+ "rezel-lr",
+ "zerocopy",
+]
+
+[[package]]
+name = "rezel-lang-python"
+version = "0.0.0"
+dependencies = [
+ "cqx-python-unicode",
+ "rezel-common",
+ "rezel-lr",
+ "unicode-normalization",
+ "unicode_names2",
+ "zerocopy",
+]
+
+[[package]]
+name = "rezel-lang-swift"
+version = "0.0.0"
+dependencies = [
+ "cqx-swift-unicode",
  "rezel-common",
  "rezel-lr",
  "zerocopy",
@@ -1222,6 +1414,12 @@ name = "self_cell"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2ab42ca02749e120097e328d91d415325bdf43b1c72c4c8badf37375fe40a813"
+
+[[package]]
+name = "semver"
+version = "1.0.28"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
 
 [[package]]
 name = "seq-macro"
@@ -1486,6 +1684,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinyvec"
+version = "1.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
+
+[[package]]
 name = "tokio"
 version = "1.53.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1596,6 +1800,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d245f478577f809a851594d02313b640fb437e0bb33866753cff937863096954"
 
 [[package]]
+name = "unicode-normalization"
+version = "0.1.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5033c97c4262335cded6d6fc3e5c18ab755e1a3dc96376350f3d8e9f009ad956"
+dependencies = [
+ "tinyvec",
+]
+
+[[package]]
 name = "unicode-segmentation"
 version = "1.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1606,6 +1819,26 @@ name = "unicode-width"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254"
+
+[[package]]
+name = "unicode_names2"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d189085656ca1203291e965444e7f6a2723fbdd1dd9f34f8482e79bafd8338a0"
+dependencies = [
+ "phf 0.11.3",
+ "unicode_names2_generator",
+]
+
+[[package]]
+name = "unicode_names2_generator"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1262662dc96937c71115228ce2e1d30f41db71a7a45d3459e98783ef94052214"
+dependencies = [
+ "phf_codegen",
+ "rand",
+]
 
 [[package]]
 name = "utf8_iter"
@@ -1887,6 +2120,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.6",
+]
+
+[[package]]
+name = "zigsyn"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18c2e53e0acf479814aa8b9e94ccfe0cce54151f1354df4537b318a344d38bcb"
+dependencies = [
+ "anyhow",
+ "serde",
+ "strum",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

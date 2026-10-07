@@ -1,0 +1,9 @@
+[package]
+name = "cqx-layout"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Shared, snapshot-independent project layout and scope policy."
+[dependencies]
+serde.workspace = true

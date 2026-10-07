@@ -288,6 +288,306 @@ pub fn defaults() -> BTreeMap<String, Rule> {
     ] {
       rules.insert(format!("java/{id}"), Rule { category: category.into(), language: "java".into(), describes: describes.into(), remedy: remedy.into(), weight, free, full, enabled: true, params: BTreeMap::new() });
     }
+    for id in [
+        "duplicated-bodies",
+        "oversized-files",
+        "oversized-line-share",
+        "exit-in-library",
+        "undocumented-suppressions",
+    ] {
+        let mut rule = rules[id].clone();
+        rule.language = "kotlin".into();
+        rule.describes = format!("kotlin syntax findings for {id}, using the existing ramp");
+        rule.remedy = format!("Review {id}; configure kotlin/{id} only in cqx.json.");
+        rules.insert(format!("kotlin/{id}"), rule);
+    }
+    for (id, category, weight, free, full, describes, remedy) in [
+        (
+            "swallowed-errors",
+            "quality",
+            10.0,
+            1.0,
+            6.0,
+            "unexplained empty catches per 10k product lines",
+            "Handle the error or explain why ignoring it is safe.",
+        ),
+        (
+            "nonliteral-process",
+            "security",
+            15.0,
+            0.0,
+            6.0,
+            "non-literal executable or command at standard process APIs per 10k product lines",
+            "Use a literal executable and separate arguments; review dynamic command input.",
+        ),
+    ] {
+        rules.insert(
+            format!("kotlin/{id}"),
+            Rule {
+                category: category.into(),
+                language: "kotlin".into(),
+                describes: describes.into(),
+                remedy: remedy.into(),
+                weight,
+                free,
+                full,
+                enabled: true,
+                params: BTreeMap::new(),
+            },
+        );
+    }
+    for id in [
+        "duplicated-bodies",
+        "oversized-files",
+        "oversized-line-share",
+        "exit-in-library",
+    ] {
+        let mut rule = rules[id].clone();
+        rule.language = "swift".into();
+        rule.describes = format!("swift syntax findings for {id}, using the existing ramp");
+        rule.remedy = format!("Review {id}; configure swift/{id} only in cqx.json.");
+        rules.insert(format!("swift/{id}"), rule);
+    }
+    for (id, category, weight, free, full, describes, remedy) in [
+        (
+            "swallowed-errors",
+            "quality",
+            10.0,
+            1.0,
+            6.0,
+            "unexplained empty catches per 10k product lines",
+            "Handle the error or explain why ignoring it is safe.",
+        ),
+        (
+            "nonliteral-process",
+            "security",
+            15.0,
+            0.0,
+            6.0,
+            "non-literal executable or command at standard process APIs per 10k product lines",
+            "Use a literal executable and separate arguments; review dynamic command input.",
+        ),
+    ] {
+        rules.insert(
+            format!("swift/{id}"),
+            Rule {
+                category: category.into(),
+                language: "swift".into(),
+                describes: describes.into(),
+                remedy: remedy.into(),
+                weight,
+                free,
+                full,
+                enabled: true,
+                params: BTreeMap::new(),
+            },
+        );
+    }
+    rules.insert(
+        "swift/forced-operations".into(),
+        Rule {
+            category: "quality".into(),
+            language: "swift".into(),
+            describes: "try! and expression force unwraps per 10k product lines".into(),
+            remedy: "Handle nil and thrown errors; calibrate only in cqx.json.".into(),
+            weight: 10.0,
+            free: 5.0,
+            full: 30.0,
+            enabled: true,
+            params: BTreeMap::new(),
+        },
+    );
+    for id in [
+        "duplicated-bodies",
+        "oversized-files",
+        "oversized-line-share",
+        "exit-in-library",
+    ] {
+        let mut rule = rules[id].clone();
+        rule.language = "zig".into();
+        rule.describes = format!("zig syntax findings for {id}, using the existing ramp");
+        rule.remedy = format!("Review {id}; configure zig/{id} only in cqx.json.");
+        rules.insert(format!("zig/{id}"), rule);
+    }
+    for (id, category, weight, free, full, describes, remedy) in [
+        (
+            "swallowed-errors",
+            "quality",
+            10.0,
+            1.0,
+            6.0,
+            "unexplained empty catches per 10k product lines",
+            "Handle the error or explain why ignoring it is safe.",
+        ),
+        (
+            "nonliteral-process",
+            "security",
+            15.0,
+            0.0,
+            6.0,
+            "non-literal executable or command at standard process APIs per 10k product lines",
+            "Use a literal executable and separate arguments; review dynamic command input.",
+        ),
+    ] {
+        rules.insert(
+            format!("zig/{id}"),
+            Rule {
+                category: category.into(),
+                language: "zig".into(),
+                describes: describes.into(),
+                remedy: remedy.into(),
+                weight,
+                free,
+                full,
+                enabled: true,
+                params: BTreeMap::new(),
+            },
+        );
+    }
+    for id in [
+        "duplicated-bodies",
+        "oversized-files",
+        "oversized-line-share",
+        "exit-in-library",
+        "undocumented-suppressions",
+    ] {
+        let mut rule = rules[id].clone();
+        rule.language = "python".into();
+        rule.describes = format!("python syntax findings for {id}, using the existing ramp");
+        rule.remedy = format!("Review {id}; configure python/{id} only in cqx.json.");
+        rules.insert(format!("python/{id}"), rule);
+    }
+    for (id, category, weight, free, full, describes, remedy) in [
+        (
+            "swallowed-errors",
+            "quality",
+            10.0,
+            1.0,
+            6.0,
+            "unexplained empty catches per 10k product lines",
+            "Handle the error or explain why ignoring it is safe.",
+        ),
+        (
+            "nonliteral-process",
+            "security",
+            15.0,
+            0.0,
+            6.0,
+            "non-literal executable or command at standard process APIs per 10k product lines",
+            "Use a literal executable and separate arguments; review dynamic command input.",
+        ),
+    ] {
+        rules.insert(
+            format!("python/{id}"),
+            Rule {
+                category: category.into(),
+                language: "python".into(),
+                describes: describes.into(),
+                remedy: remedy.into(),
+                weight,
+                free,
+                full,
+                enabled: true,
+                params: BTreeMap::new(),
+            },
+        );
+    }
+    for (id, desc) in [
+        (
+            "dynamic-code",
+            "builtin eval/exec sites per 10k product lines",
+        ),
+        (
+            "unsafe-deserialization",
+            "pickle and yaml.load without SafeLoader sites per 10k product lines",
+        ),
+    ] {
+        rules.insert(format!("python/{id}"),Rule{category:"security".into(),language:"python".into(),describes:desc.into(),remedy:"Use constrained data formats and explicit safe loaders; review trusted-input boundaries.".into(),weight:15.0,free:0.0,full:6.0,enabled:true,params:BTreeMap::new()});
+    }
+    for id in [
+        "duplicated-bodies",
+        "oversized-files",
+        "oversized-line-share",
+        "exit-in-library",
+        "undocumented-suppressions",
+    ] {
+        let mut rule = rules[id].clone();
+        rule.language = "php".into();
+        rule.describes = format!("php syntax findings for {id}, using the existing ramp");
+        rule.remedy = format!("Review {id}; configure php/{id} only in cqx.json.");
+        rules.insert(format!("php/{id}"), rule);
+    }
+    for (id, category, weight, free, full, describes, remedy) in [
+        (
+            "swallowed-errors",
+            "quality",
+            10.0,
+            1.0,
+            6.0,
+            "unexplained empty catches per 10k product lines",
+            "Handle the error or explain why ignoring it is safe.",
+        ),
+        (
+            "nonliteral-process",
+            "security",
+            15.0,
+            0.0,
+            6.0,
+            "non-literal executable or command at standard process APIs per 10k product lines",
+            "Use a literal executable and separate arguments; review dynamic command input.",
+        ),
+    ] {
+        rules.insert(
+            format!("php/{id}"),
+            Rule {
+                category: category.into(),
+                language: "php".into(),
+                describes: describes.into(),
+                remedy: remedy.into(),
+                weight,
+                free,
+                full,
+                enabled: true,
+                params: BTreeMap::new(),
+            },
+        );
+    }
+    for (id, category, weight, free, full, desc) in [
+        (
+            "dynamic-code",
+            "security",
+            15.0,
+            0.0,
+            6.0,
+            "eval and declared-legacy dynamic code API sites",
+        ),
+        (
+            "unsafe-deserialization",
+            "security",
+            15.0,
+            0.0,
+            6.0,
+            "parameter/superglobal-looking unserialize input",
+        ),
+        (
+            "concatenated-sql",
+            "security",
+            15.0,
+            0.0,
+            6.0,
+            "dynamic SQL concatenation at bound mysqli/PDO query APIs",
+        ),
+        (
+            "error-suppression",
+            "quality",
+            10.0,
+            5.0,
+            30.0,
+            "@ error suppression density",
+        ),
+    ] {
+        rules.insert(format!("php/{id}"),Rule{category:category.into(),language:"php".into(),describes:format!("{desc} per 10k product lines"),remedy:"Review input and error boundaries; use explicit data formats, parameterized SQL and error handling.".into(),weight,free,full,enabled:true,params:BTreeMap::new()});
+    }
     rules
 }
 

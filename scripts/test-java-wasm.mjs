@@ -72,7 +72,7 @@ const reviewed = JSON.parse(call('cqx_score', ''));
 const findingCount = (report, rule) => report.rules.find(r => r.language === 'java' && r.rule === rule).total_findings;
 assert.equal(findingCount(reviewed, 'exit-in-library'), 3);
 assert.equal(findingCount(reviewed, 'undocumented-suppressions'), 1);
-assert.equal(reviewed.lines, 4);
+assert.equal(reviewed.lines, 5);
 const reviewMeta = call('cqx_manifests');
 const reviewShards = [[reviewFiles[0]], reviewFiles.slice(1)];
 api.cqx_merge_reset();

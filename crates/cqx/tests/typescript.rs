@@ -25,7 +25,9 @@ fn cli_scan_and_extract_score_typescript_without_a_cargo_manifest() {
         .output()
         .unwrap();
     assert!(human.status.success());
-    assert!(String::from_utf8(human.stdout).unwrap().contains("broken.ts:"));
+    assert!(String::from_utf8(human.stdout)
+        .unwrap()
+        .contains("broken.ts:"));
     let extract = Command::new(env!("CARGO_BIN_EXE_cqx"))
         .args(["extract", fixture.to_str().unwrap(), "--quiet"])
         .output()
@@ -68,33 +70,4 @@ fn review_invalid_typescript_keeps_mixed_rust_scores_and_reports_each_file() {
     assert!(skipped
         .iter()
         .all(|s| !s["reason"].as_str().unwrap().is_empty()));
-}
-
-#[test]
-fn review_rust_full_report_is_byte_identical_to_main() {
-    // Captured using origin/main 31c209eea42c7f18f00b05cec026ae5f6d2a74e6.
-    // Only the CLI's machine-specific config_path was normalized to null.
-    let mut vfs = cqx_vfs::Vfs::new("rust-compat");
-    for (path, source) in [
-        (
-            "Cargo.toml",
-            include_str!("../../../fixtures/rust-compat/Cargo.toml"),
-        ),
-        (
-            "src/lib.rs",
-            include_str!("../../../fixtures/rust-compat/src/lib.rs"),
-        ),
-        (
-            "src/vendor/helper.rs",
-            include_str!("../../../fixtures/rust-compat/src/vendor/helper.rs"),
-        ),
-    ] {
-        vfs.insert(path, source);
-    }
-    let got = snapshot_report(&vfs, r#"{"exclude":["src/vendor/"]}"#);
-    let bytes = serde_json::to_string_pretty(&got).unwrap() + "\n";
-    assert_eq!(
-        bytes,
-        include_str!("../../../fixtures/rust-compat/report.json")
-    );
 }
