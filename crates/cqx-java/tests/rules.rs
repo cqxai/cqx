@@ -65,7 +65,7 @@ fn empty_catches_fire_but_handling_and_intent_comments_stay_quiet() {
 fn suppressions_fire_but_explained_annotations_stay_quiet() {
     assert_eq!(
         count(
-            "class Library { @SuppressWarnings(\"unchecked\") void f() {} }",
+            "@SuppressWarnings(\"unchecked\") class Library { void f() {} }",
             "undocumented-suppressions"
         ),
         1
@@ -78,7 +78,7 @@ fn generated_build_and_test_conventions_remove_findings_and_product_lines() {
         "build/Generated.java",
         "target/generated-sources/Generated.java",
         "src/test/java/Library.java",
-        "src/main/java/LibraryTest.java",
+        "src/test/java/LibraryTest.java",
     ] {
         let p = report(
             &[
@@ -177,4 +177,113 @@ fn modern_java_entrypoints_and_decoded_names() {
         1
     );
     assert_eq!(count("class Library { void f() throws Exception { Runtime.getRuntime().exec(new String[]{\"git\", user}); } }", "nonliteral-process"), 0);
+}
+
+#[test]
+fn review_build_names_are_packages_unless_directly_below_project_roots() {
+    for manifest in [
+        "pom.xml",
+        "build.gradle",
+        "build.gradle.kts",
+        "settings.gradle",
+        "settings.gradle.kts",
+    ] {
+        for dir in [
+            "build",
+            "target",
+            "generated-sources",
+            "generated",
+            "vendor",
+        ] {
+            let manifest_path = format!("modules/app/{manifest}");
+            let package = format!("modules/app/src/main/java/com/acme/{dir}/Library.java");
+            let output = format!("modules/app/{dir}/Output.java");
+            let p = report(
+                &[
+                    (&manifest_path, ""),
+                    (
+                        &package,
+                        "class Library { void stop() { System.exit(1); } }",
+                    ),
+                    (&output, "class Output { void stop() { System.exit(1); } }"),
+                ],
+                "{}",
+            );
+            assert_eq!(findings(&p, "exit-in-library"), 1, "{manifest}: {dir}");
+            assert_eq!(p["lines"], 1, "{manifest}: {dir}");
+        }
+    }
+}
+
+#[test]
+fn review_testimonial_and_product_test_suffixes_are_product_code() {
+    for path in [
+        "src/main/java/com/acme/TestimonialService.java",
+        "src/main/java/com/acme/CacheTest.java",
+        "src/main/java/com/acme/CacheTests.java",
+        "src/main/java/com/acme/CacheIT.java",
+        "src/main/java/com/acme/test/Library.java",
+    ] {
+        let p = report(
+            &[(path, "class Library { void stop() { System.exit(1); } }")],
+            "{}",
+        );
+        assert_eq!(findings(&p, "exit-in-library"), 1, "{path}");
+        assert_eq!(p["lines"], 1, "{path}");
+    }
+    for path in [
+        "src/test/java/Library.java",
+        "modules/app/src/test/java/LibraryTest.java",
+        "src/test/java/LibraryTests.java",
+        "src/test/java/LibraryIT.java",
+        "src/testFixtures/java/Library.java",
+        "src/androidTest/java/Library.java",
+    ] {
+        let p = report(
+            &[(path, "class Library { void stop() { System.exit(1); } }")],
+            "{}",
+        );
+        assert_eq!(findings(&p, "exit-in-library"), 0, "{path}");
+        assert_eq!(p["lines"], 0, "{path}");
+    }
+}
+
+#[test]
+fn review_suppressions_only_count_broad_scope_or_all() {
+    for code in [
+        "class Library { @SuppressWarnings(\"unchecked\") void f() {} }",
+        "class Library { @SuppressWarnings(\"rawtypes\") Object value; }",
+        "class Library { void f() { @SuppressWarnings(\"unchecked\") Object value = get(); } }",
+        "class Library { @SuppressWarnings({\"unchecked\", \"rawtypes\"}) void f() {} }",
+        "class Library { @SuppressWarnings(value = {\"unchecked\", \"deprecation\"}) void f() {} }",
+        "class Library { @SuppressWarnings(\"deprecation\") void f() {} }",
+    ] {
+        assert_eq!(count(code, "undocumented-suppressions"), 0, "{code}");
+    }
+    for code in [
+        "@SuppressWarnings(\"unchecked\") class Library {}",
+        "@SuppressWarnings(\"rawtypes\") class Library {}",
+        "@SuppressWarnings(\"deprecation\") class Library {}",
+        "class Library { @SuppressWarnings(\"all\") void f() {} }",
+        "class Library { @SuppressWarnings({\"unchecked\", \"all\"}) Object value; }",
+        "class Library { void f() { @SuppressWarnings(value = \"all\") Object value = get(); } }",
+        "class Library { @SuppressWarnings(\"all\") class Nested {} }",
+    ] {
+        assert_eq!(count(code, "undocumented-suppressions"), 1, "{code}");
+    }
+    for code in [
+        "// Reviewed legacy generic boundary.\n@SuppressWarnings(\"unchecked\") class Library {}",
+        "@SuppressWarnings(\"all\") // Reviewed generated interoperability boundary.\nclass Library {}",
+        "class Library { /* Validated generic boundary. */ @SuppressWarnings(\"all\") void f() {} }",
+    ] { assert_eq!(count(code, "undocumented-suppressions"), 0, "{code}"); }
+}
+
+#[test]
+fn review_main_only_exempts_its_own_class() {
+    for code in [
+        "class App { public static void main(String[] args) { System.exit(1); } } class Library { void stop() { System.exit(2); } }",
+        "class App { public static void main(String[] args) { System.exit(1); } class Library { void stop() { System.exit(2); } } }",
+        "class Outer { class App { void main() { System.exit(1); } } void stop() { System.exit(2); } }",
+        "class App { void main() { helper(); } void helper() { System.exit(1); } } class Library { void stop() { System.exit(2); } }",
+    ] { assert_eq!(count(code, "exit-in-library"), 1, "{code}"); }
 }
