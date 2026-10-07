@@ -1,0 +1,3269 @@
+language = "JavaLanguage"
+kind = "JavaKind"
+language_path = "crate::generated::LANGUAGE"
+coverage = "complete"
+ignore = [
+	"⚠",
+	";",
+	".",
+	")",
+	"(",
+	"extends",
+	"super",
+	",",
+	"]",
+	"[",
+	"void",
+	"class",
+	"this",
+	"new",
+	"}",
+	"{",
+	"public",
+	"protected",
+	"private",
+	"abstract",
+	"static",
+	"final",
+	"strictfp",
+	"default",
+	"synchronized",
+	"native",
+	"transient",
+	"volatile",
+	"sealed",
+	"non",
+	"throws",
+	"implements",
+	"permits",
+	"record",
+	"interface",
+	"enum",
+	":",
+	"?",
+	"...",
+	"->",
+	"::",
+	"@",
+	"if",
+	"else",
+	"while",
+	"for",
+	"var",
+	"assert",
+	"switch",
+	"case",
+	"_",
+	"when",
+	"throw",
+	"do",
+	"break",
+	"continue",
+	"return",
+	"yield",
+	"try",
+	"catch",
+	"finally",
+	"instanceof",
+	"package",
+	"import",
+	"module",
+	"open",
+	"requires",
+	"transitive",
+	"exports",
+	"to",
+	"opens",
+	"uses",
+	"provides",
+	"with",
+	"Asterisk",
+]
+
+[kind_names]
+"⚠" = "Error"
+"_" = "UnnamedPatternToken"
+";" = "Semicolon"
+"." = "Dot"
+"," = "Comma"
+":" = "Colon"
+"?" = "QuestionMark"
+"..." = "Ellipsis"
+"->" = "Arrow"
+"::" = "DoubleColon"
+"@" = "At"
+"(" = "LeftParen"
+")" = "RightParen"
+"[" = "LeftBracket"
+"]" = "RightBracket"
+"{" = "LeftBrace"
+"}" = "RightBrace"
+"permits" = "PermitsKeyword"
+"throws" = "ThrowsKeyword"
+
+[[node]]
+name = "JavaLineComment"
+kind = "LineComment"
+
+[[node]]
+name = "JavaBlockComment"
+kind = "BlockComment"
+
+[[node]]
+name = "JavaProgram"
+kind = "Program"
+
+[[node.field]]
+name = "compilation_unit"
+type = "JavaCompilationUnit"
+cardinality = "one"
+selector = { node = "CompilationUnit" }
+
+[[node]]
+name = "JavaCompilationUnit"
+kind = "CompilationUnit"
+
+[[node.field]]
+name = "package"
+type = "JavaPackageDeclaration"
+cardinality = "optional"
+selector = { node = "PackageDeclaration" }
+
+[[node.field]]
+name = "imports"
+type = "JavaImportDeclaration"
+cardinality = "many"
+selector = { node = "ImportDeclaration" }
+
+[[node.field]]
+name = "declarations"
+type = "JavaTopLevelDeclaration"
+cardinality = "many"
+selector = { node = "TopLevelDeclaration" }
+
+[[node.field]]
+name = "unnamed"
+type = "JavaUnnamedCompilationUnit"
+cardinality = "optional"
+selector = { node = "UnnamedCompilationUnit" }
+
+[[node]]
+name = "JavaPackageDeclaration"
+kind = "PackageDeclaration"
+
+[[node.field]]
+name = "annotations"
+type = "JavaAnnotationNode"
+cardinality = "many"
+selector = { union = "JavaAnnotationNode" }
+
+[[node.field]]
+name = "name"
+type = "JavaName"
+cardinality = "one"
+selector = { union = "JavaName" }
+
+[[node.field]]
+name = "semicolon_token"
+cardinality = "one"
+selector = { token = ";" }
+
+[[node]]
+name = "JavaMarkerAnnotation"
+kind = "MarkerAnnotation"
+
+[[node.field]]
+name = "at_token"
+cardinality = "one"
+selector = { token = "@" }
+
+[[node.field]]
+name = "name"
+type = "JavaName"
+cardinality = "one"
+selector = { union = "JavaName" }
+
+[[node]]
+name = "JavaIdentifier"
+kind = "Identifier"
+
+[[node]]
+name = "JavaScopedIdentifier"
+kind = "ScopedIdentifier"
+
+[[node.field]]
+name = "qualifier"
+type = "JavaName"
+cardinality = "one"
+selector = { union = "JavaName" }
+occurrence = 0
+
+[[node.field]]
+name = "dot_token"
+cardinality = "one"
+selector = { token = "." }
+
+[[node.field]]
+name = "name"
+type = "JavaIdentifier"
+cardinality = "one"
+selector = { node = "Identifier" }
+
+[[node]]
+name = "JavaAnnotation"
+kind = "Annotation"
+
+[[node.field]]
+name = "at_token"
+cardinality = "one"
+selector = { token = "@" }
+
+[[node.field]]
+name = "name"
+type = "JavaName"
+cardinality = "one"
+selector = { union = "JavaName" }
+
+[[node.field]]
+name = "arguments"
+type = "JavaAnnotationArgumentList"
+cardinality = "one"
+selector = { node = "AnnotationArgumentList" }
+
+[[node]]
+name = "JavaAnnotationArgumentList"
+kind = "AnnotationArgumentList"
+
+[[node.field]]
+name = "left_paren_token"
+cardinality = "one"
+selector = { token = "(" }
+
+[[node.field]]
+name = "right_paren_token"
+cardinality = "one"
+selector = { token = ")" }
+
+[[node.field]]
+name = "values"
+type = "JavaAnnotationValue"
+cardinality = "many"
+selector = { union = "JavaAnnotationValue" }
+
+[[node]]
+name = "JavaAssignmentExpression"
+kind = "AssignmentExpression"
+
+[[node.field]]
+name = "left"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+occurrence = 0
+
+[[node.field]]
+name = "operator"
+type = "JavaAssignOp"
+cardinality = "one"
+selector = { node = "AssignOp" }
+
+[[node.field]]
+name = "right"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+occurrence = 1
+
+[[node]]
+name = "JavaFieldAccess"
+kind = "FieldAccess"
+
+[[node.field]]
+name = "qualifier"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+
+[[node.field]]
+name = "name"
+type = "JavaIdentifier"
+cardinality = "optional"
+selector = { node = "Identifier" }
+
+[[node]]
+name = "JavaIntegerLiteral"
+kind = "IntegerLiteral"
+
+[[node]]
+name = "JavaFloatingPointLiteral"
+kind = "FloatingPointLiteral"
+
+[[node]]
+name = "JavaBooleanLiteral"
+kind = "BooleanLiteral"
+
+[[node]]
+name = "JavaCharacterLiteral"
+kind = "CharacterLiteral"
+
+[[node]]
+name = "JavaStringLiteral"
+kind = "StringLiteral"
+
+[[node]]
+name = "JavaTextBlock"
+kind = "TextBlock"
+
+[[node]]
+name = "JavaNullLiteral"
+kind = "null"
+
+[[node]]
+name = "JavaThisExpression"
+kind = "ThisExpression"
+
+[[node]]
+name = "JavaSuperExpression"
+kind = "SuperExpression"
+
+[[node]]
+name = "JavaQualifiedSuperExpression"
+kind = "QualifiedSuperExpression"
+
+[[node.field]]
+name = "qualifier"
+type = "JavaName"
+cardinality = "one"
+selector = { union = "JavaName" }
+
+[[node.field]]
+name = "super_expression"
+type = "JavaSuperExpression"
+cardinality = "one"
+selector = { node = "SuperExpression" }
+
+[[node]]
+name = "JavaClassLiteral"
+kind = "ClassLiteral"
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "optional"
+selector = { union = "JavaType" }
+
+[[node.field]]
+name = "dot_token"
+cardinality = "one"
+selector = { token = "." }
+
+[[node.field]]
+name = "class_token"
+cardinality = "one"
+selector = { token = "class" }
+
+[[node.field]]
+name = "void_token"
+cardinality = "optional"
+selector = { token = "void" }
+
+[[node]]
+name = "JavaPrimitiveType"
+kind = "PrimitiveType"
+
+[[node]]
+name = "JavaTypeName"
+kind = "TypeName"
+
+[[node]]
+name = "JavaScopedTypeName"
+kind = "ScopedTypeName"
+
+[[node.field]]
+name = "annotations"
+type = "JavaAnnotationNode"
+cardinality = "many"
+selector = { union = "JavaAnnotationNode" }
+
+[[node.field]]
+name = "qualifier"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+occurrence = 0
+
+[[node.field]]
+name = "dot_token"
+cardinality = "one"
+selector = { token = "." }
+
+[[node.field]]
+name = "name"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+occurrence = 1
+
+[[node]]
+name = "JavaGenericType"
+kind = "GenericType"
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node.field]]
+name = "arguments"
+type = "JavaTypeArguments"
+cardinality = "one"
+selector = { node = "TypeArguments" }
+
+[[node]]
+name = "JavaTypeArguments"
+kind = "TypeArguments"
+
+[[node.field]]
+name = "arguments"
+type = "JavaTypeArgument"
+cardinality = "many"
+selector = { union = "JavaTypeArgument" }
+
+[[node]]
+name = "JavaAnnotatedType"
+kind = "AnnotatedType"
+
+[[node.field]]
+name = "annotations"
+type = "JavaAnnotationNode"
+cardinality = "many"
+selector = { union = "JavaAnnotationNode" }
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node]]
+name = "JavaWildcard"
+kind = "Wildcard"
+
+[[node.field]]
+name = "annotations"
+type = "JavaAnnotationNode"
+cardinality = "many"
+selector = { union = "JavaAnnotationNode" }
+
+[[node.field]]
+name = "question_token"
+cardinality = "one"
+selector = { token = "?" }
+
+[[node.field]]
+name = "extends_token"
+cardinality = "optional"
+selector = { token = "extends" }
+
+[[node.field]]
+name = "super_token"
+cardinality = "optional"
+selector = { token = "super" }
+
+[[node.field]]
+name = "bound"
+type = "JavaType"
+cardinality = "optional"
+selector = { union = "JavaType" }
+
+[[node]]
+name = "JavaArrayType"
+kind = "ArrayType"
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node.field]]
+name = "dimensions"
+type = "JavaDimension"
+cardinality = "many"
+selector = { node = "Dimension" }
+
+[[node]]
+name = "JavaDimension"
+kind = "Dimension"
+
+[[node.field]]
+name = "annotations"
+type = "JavaAnnotationNode"
+cardinality = "many"
+selector = { union = "JavaAnnotationNode" }
+
+[[node.field]]
+name = "left_bracket_token"
+cardinality = "one"
+selector = { token = "[" }
+
+[[node.field]]
+name = "right_bracket_token"
+cardinality = "one"
+selector = { token = "]" }
+
+[[node]]
+name = "JavaParenthesizedExpression"
+kind = "ParenthesizedExpression"
+
+[[node.field]]
+name = "left_paren_token"
+cardinality = "one"
+selector = { token = "(" }
+
+[[node.field]]
+name = "expression"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+
+[[node.field]]
+name = "right_paren_token"
+cardinality = "one"
+selector = { token = ")" }
+
+[[node]]
+name = "JavaObjectCreationExpression"
+kind = "ObjectCreationExpression"
+
+[[node.field]]
+name = "enclosing_expression"
+type = "JavaExpression"
+cardinality = "optional"
+selector = { union = "JavaExpression" }
+
+[[node.field]]
+name = "type_arguments"
+type = "JavaTypeArguments"
+cardinality = "optional"
+selector = { node = "TypeArguments" }
+
+[[node.field]]
+name = "type_"
+type = "JavaCreatedClassType"
+cardinality = "one"
+selector = { node = "CreatedClassType" }
+
+[[node.field]]
+name = "arguments"
+type = "JavaArgumentList"
+cardinality = "one"
+selector = { node = "ArgumentList" }
+
+[[node.field]]
+name = "class_body"
+type = "JavaClassBody"
+cardinality = "optional"
+selector = { node = "ClassBody" }
+
+[[node]]
+name = "JavaCreatedClassType"
+kind = "CreatedClassType"
+
+[[node.field]]
+name = "annotations"
+type = "JavaAnnotationNode"
+cardinality = "many"
+selector = { union = "JavaAnnotationNode" }
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node]]
+name = "JavaArgumentList"
+kind = "ArgumentList"
+
+[[node.field]]
+name = "left_paren_token"
+cardinality = "one"
+selector = { token = "(" }
+
+[[node.field]]
+name = "arguments"
+type = "JavaExpression"
+cardinality = "many"
+selector = { union = "JavaExpression" }
+
+[[node.field]]
+name = "right_paren_token"
+cardinality = "one"
+selector = { token = ")" }
+
+[[node]]
+name = "JavaClassBody"
+kind = "ClassBody"
+
+[[node.field]]
+name = "left_brace_token"
+cardinality = "one"
+selector = { token = "{" }
+
+[[node.field]]
+name = "members"
+type = "JavaMemberDeclaration"
+cardinality = "many"
+selector = { union = "JavaMemberDeclaration" }
+
+[[node.field]]
+name = "right_brace_token"
+cardinality = "one"
+selector = { token = "}" }
+
+[[node]]
+name = "JavaFieldDeclaration"
+kind = "FieldDeclaration"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node.field]]
+name = "declarators"
+type = "JavaVariableDeclarator"
+cardinality = "many"
+selector = { node = "VariableDeclarator" }
+
+[[node.field]]
+name = "semicolon_token"
+cardinality = "one"
+selector = { token = ";" }
+
+[[node]]
+name = "JavaModifiers"
+kind = "Modifiers"
+
+[[node]]
+name = "JavaNonSealedModifier"
+kind = "NonSealedModifier"
+
+[[node]]
+name = "JavaVariableDeclarator"
+kind = "VariableDeclarator"
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "dimensions"
+type = "JavaDimension"
+cardinality = "many"
+selector = { node = "Dimension" }
+
+[[node.field]]
+name = "initializer"
+type = "JavaVariableInitializer"
+cardinality = "optional"
+selector = { union = "JavaVariableInitializer" }
+
+[[node]]
+name = "JavaDefinition"
+kind = "Definition"
+
+[[node]]
+name = "JavaAssignOp"
+kind = "AssignOp"
+
+[[node]]
+name = "JavaArrayInitializer"
+kind = "ArrayInitializer"
+
+[[node.field]]
+name = "left_brace_token"
+cardinality = "one"
+selector = { token = "{" }
+
+[[node.field]]
+name = "values"
+type = "JavaVariableInitializer"
+cardinality = "many"
+selector = { union = "JavaVariableInitializer" }
+
+[[node.field]]
+name = "right_brace_token"
+cardinality = "one"
+selector = { token = "}" }
+
+[[node]]
+name = "JavaMethodDeclaration"
+kind = "MethodDeclaration"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "type_parameters"
+type = "JavaTypeParameters"
+cardinality = "optional"
+selector = { node = "TypeParameters" }
+
+[[node.field]]
+name = "return_type"
+type = "JavaType"
+cardinality = "optional"
+selector = { union = "JavaType" }
+
+[[node.field]]
+name = "void_token"
+cardinality = "optional"
+selector = { token = "void" }
+
+[[node.field]]
+name = "dimensions"
+type = "JavaDimension"
+cardinality = "many"
+selector = { node = "Dimension" }
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "parameters"
+type = "JavaFormalParameters"
+cardinality = "one"
+selector = { node = "FormalParameters" }
+
+[[node.field]]
+name = "throws"
+type = "JavaThrows"
+cardinality = "optional"
+selector = { node = "Throws" }
+
+[[node.field]]
+name = "body"
+type = "JavaBlock"
+cardinality = "optional"
+selector = { node = "Block" }
+
+[[node]]
+name = "JavaTypeParameters"
+kind = "TypeParameters"
+
+[[node.field]]
+name = "parameters"
+type = "JavaTypeParameter"
+cardinality = "many"
+selector = { node = "TypeParameter" }
+
+[[node]]
+name = "JavaTypeParameter"
+kind = "TypeParameter"
+
+[[node.field]]
+name = "annotations"
+type = "JavaAnnotationNode"
+cardinality = "many"
+selector = { union = "JavaAnnotationNode" }
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "bound"
+type = "JavaTypeBound"
+cardinality = "optional"
+selector = { node = "TypeBound" }
+
+[[node]]
+name = "JavaTypeBound"
+kind = "TypeBound"
+
+[[node.field]]
+name = "types"
+type = "JavaType"
+cardinality = "many"
+selector = { union = "JavaType" }
+
+[[node]]
+name = "JavaFormalParameters"
+kind = "FormalParameters"
+
+[[node.field]]
+name = "parameters"
+type = "JavaParameter"
+cardinality = "many"
+selector = { union = "JavaParameter" }
+
+[[node]]
+name = "JavaReceiverParameter"
+kind = "ReceiverParameter"
+
+[[node.field]]
+name = "annotations"
+type = "JavaAnnotationNode"
+cardinality = "many"
+selector = { union = "JavaAnnotationNode" }
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node.field]]
+name = "qualifier"
+type = "JavaIdentifier"
+cardinality = "optional"
+selector = { node = "Identifier" }
+
+[[node.field]]
+name = "this_token"
+cardinality = "one"
+selector = { token = "this" }
+
+[[node]]
+name = "JavaFormalParameter"
+kind = "FormalParameter"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "dimensions"
+type = "JavaDimension"
+cardinality = "many"
+selector = { node = "Dimension" }
+
+[[node]]
+name = "JavaSpreadParameter"
+kind = "SpreadParameter"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node.field]]
+name = "varargs_annotations"
+type = "JavaAnnotationNode"
+cardinality = "many"
+selector = { union = "JavaAnnotationNode" }
+
+[[node.field]]
+name = "ellipsis_token"
+cardinality = "one"
+selector = { token = "..." }
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node]]
+name = "JavaThrows"
+kind = "Throws"
+
+[[node.field]]
+name = "types"
+type = "JavaExceptionType"
+cardinality = "many"
+selector = { node = "ExceptionType" }
+
+[[node]]
+name = "JavaExceptionType"
+kind = "ExceptionType"
+
+[[node.field]]
+name = "annotations"
+type = "JavaAnnotationNode"
+cardinality = "many"
+selector = { union = "JavaAnnotationNode" }
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node]]
+name = "JavaBlock"
+kind = "Block"
+
+[[node.field]]
+name = "left_brace_token"
+cardinality = "one"
+selector = { token = "{" }
+
+[[node.field]]
+name = "statements"
+type = "JavaStatement"
+cardinality = "many"
+selector = { union = "JavaStatement" }
+
+[[node.field]]
+name = "right_brace_token"
+cardinality = "one"
+selector = { token = "}" }
+
+[[node]]
+name = "JavaEmptyStatement"
+kind = "EmptyStatement"
+
+[[node.field]]
+name = "semicolon_token"
+cardinality = "one"
+selector = { token = ";" }
+
+[[node]]
+name = "JavaLocalTypeDeclaration"
+kind = "LocalTypeDeclaration"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaLocalTypeModifiers"
+cardinality = "optional"
+selector = { node = "LocalTypeModifiers" }
+
+[[node.field]]
+name = "declaration"
+type = "JavaLocalTypeCore"
+cardinality = "one"
+selector = { union = "JavaLocalTypeCore" }
+
+[[node]]
+name = "JavaLocalTypeModifiers"
+kind = "LocalTypeModifiers"
+
+[[node]]
+name = "JavaClassDeclarationCore"
+kind = "ClassDeclarationCore"
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "type_parameters"
+type = "JavaTypeParameters"
+cardinality = "optional"
+selector = { node = "TypeParameters" }
+
+[[node.field]]
+name = "superclass"
+type = "JavaSuperclass"
+cardinality = "optional"
+selector = { node = "Superclass" }
+
+[[node.field]]
+name = "interfaces"
+type = "JavaSuperInterfaces"
+cardinality = "optional"
+selector = { node = "SuperInterfaces" }
+
+[[node.field]]
+name = "permits"
+type = "JavaPermits"
+cardinality = "optional"
+selector = { node = "Permits" }
+
+[[node.field]]
+name = "body"
+type = "JavaClassBody"
+cardinality = "one"
+selector = { node = "ClassBody" }
+
+[[node]]
+name = "JavaSuperclass"
+kind = "Superclass"
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node]]
+name = "JavaSuperInterfaces"
+kind = "SuperInterfaces"
+
+[[node.field]]
+name = "types"
+type = "JavaInterfaceTypeList"
+cardinality = "one"
+selector = { node = "InterfaceTypeList" }
+
+[[node]]
+name = "JavaInterfaceTypeList"
+kind = "InterfaceTypeList"
+
+[[node.field]]
+name = "types"
+type = "JavaType"
+cardinality = "many"
+selector = { union = "JavaType" }
+
+[[node]]
+name = "JavaPermits"
+kind = "Permits"
+
+[[node.field]]
+name = "types"
+type = "JavaInterfaceTypeList"
+cardinality = "one"
+selector = { node = "InterfaceTypeList" }
+
+[[node]]
+name = "JavaRecordDeclarationCore"
+kind = "RecordDeclarationCore"
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "type_parameters"
+type = "JavaTypeParameters"
+cardinality = "optional"
+selector = { node = "TypeParameters" }
+
+[[node.field]]
+name = "header"
+type = "JavaRecordHeader"
+cardinality = "one"
+selector = { node = "RecordHeader" }
+
+[[node.field]]
+name = "interfaces"
+type = "JavaSuperInterfaces"
+cardinality = "optional"
+selector = { node = "SuperInterfaces" }
+
+[[node.field]]
+name = "body"
+type = "JavaRecordBody"
+cardinality = "one"
+selector = { node = "RecordBody" }
+
+[[node]]
+name = "JavaRecordHeader"
+kind = "RecordHeader"
+
+[[node.field]]
+name = "components"
+type = "JavaRecordComponent"
+cardinality = "many"
+selector = { node = "RecordComponent" }
+
+[[node]]
+name = "JavaRecordComponent"
+kind = "RecordComponent"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node.field]]
+name = "varargs_annotations"
+type = "JavaAnnotationNode"
+cardinality = "many"
+selector = { union = "JavaAnnotationNode" }
+
+[[node.field]]
+name = "ellipsis_token"
+cardinality = "optional"
+selector = { token = "..." }
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "dimensions"
+type = "JavaDimension"
+cardinality = "many"
+selector = { node = "Dimension" }
+
+[[node]]
+name = "JavaRecordBody"
+kind = "RecordBody"
+
+[[node.field]]
+name = "members"
+type = "JavaRecordMemberDeclaration"
+cardinality = "many"
+selector = { union = "JavaRecordMemberDeclaration" }
+
+[[node]]
+name = "JavaCompactConstructorDeclaration"
+kind = "CompactConstructorDeclaration"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "body"
+type = "JavaBlock"
+cardinality = "one"
+selector = { node = "Block" }
+
+[[node]]
+name = "JavaInterfaceDeclarationCore"
+kind = "InterfaceDeclarationCore"
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "type_parameters"
+type = "JavaTypeParameters"
+cardinality = "optional"
+selector = { node = "TypeParameters" }
+
+[[node.field]]
+name = "extends"
+type = "JavaExtendsInterfaces"
+cardinality = "optional"
+selector = { node = "ExtendsInterfaces" }
+
+[[node.field]]
+name = "permits"
+type = "JavaPermits"
+cardinality = "optional"
+selector = { node = "Permits" }
+
+[[node.field]]
+name = "body"
+type = "JavaInterfaceBody"
+cardinality = "one"
+selector = { node = "InterfaceBody" }
+
+[[node]]
+name = "JavaExtendsInterfaces"
+kind = "ExtendsInterfaces"
+
+[[node.field]]
+name = "types"
+type = "JavaInterfaceTypeList"
+cardinality = "one"
+selector = { node = "InterfaceTypeList" }
+
+[[node]]
+name = "JavaInterfaceBody"
+kind = "InterfaceBody"
+
+[[node.field]]
+name = "members"
+type = "JavaInterfaceMemberDeclaration"
+cardinality = "many"
+selector = { union = "JavaInterfaceMemberDeclaration" }
+
+[[node]]
+name = "JavaConstantDeclaration"
+kind = "ConstantDeclaration"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node.field]]
+name = "declarators"
+type = "JavaVariableDeclarator"
+cardinality = "many"
+selector = { node = "VariableDeclarator" }
+
+[[node]]
+name = "JavaEnumDeclaration"
+kind = "EnumDeclaration"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "declaration"
+type = "JavaEnumDeclarationCore"
+cardinality = "one"
+selector = { node = "EnumDeclarationCore" }
+
+[[node]]
+name = "JavaEnumDeclarationCore"
+kind = "EnumDeclarationCore"
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "interfaces"
+type = "JavaSuperInterfaces"
+cardinality = "optional"
+selector = { node = "SuperInterfaces" }
+
+[[node.field]]
+name = "body"
+type = "JavaEnumBody"
+cardinality = "one"
+selector = { node = "EnumBody" }
+
+[[node]]
+name = "JavaEnumBody"
+kind = "EnumBody"
+
+[[node.field]]
+name = "constants"
+type = "JavaEnumConstant"
+cardinality = "many"
+selector = { node = "EnumConstant" }
+
+[[node.field]]
+name = "declarations"
+type = "JavaEnumBodyDeclarations"
+cardinality = "optional"
+selector = { node = "EnumBodyDeclarations" }
+
+[[node]]
+name = "JavaEnumConstant"
+kind = "EnumConstant"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "arguments"
+type = "JavaArgumentList"
+cardinality = "optional"
+selector = { node = "ArgumentList" }
+
+[[node.field]]
+name = "class_body"
+type = "JavaClassBody"
+cardinality = "optional"
+selector = { node = "ClassBody" }
+
+[[node]]
+name = "JavaEnumBodyDeclarations"
+kind = "EnumBodyDeclarations"
+
+[[node.field]]
+name = "members"
+type = "JavaMemberDeclaration"
+cardinality = "many"
+selector = { union = "JavaMemberDeclaration" }
+
+[[node]]
+name = "JavaRecordDeclaration"
+kind = "RecordDeclaration"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "declaration"
+type = "JavaRecordDeclarationCore"
+cardinality = "one"
+selector = { node = "RecordDeclarationCore" }
+
+[[node]]
+name = "JavaClassDeclaration"
+kind = "ClassDeclaration"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "declaration"
+type = "JavaClassDeclarationCore"
+cardinality = "one"
+selector = { node = "ClassDeclarationCore" }
+
+[[node]]
+name = "JavaInterfaceDeclaration"
+kind = "InterfaceDeclaration"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "declaration"
+type = "JavaInterfaceDeclarationCore"
+cardinality = "one"
+selector = { node = "InterfaceDeclarationCore" }
+
+[[node]]
+name = "JavaAnnotationTypeDeclaration"
+kind = "AnnotationTypeDeclaration"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "declaration"
+type = "JavaAnnotationTypeDeclarationCore"
+cardinality = "one"
+selector = { node = "AnnotationTypeDeclarationCore" }
+
+[[node]]
+name = "JavaAnnotationTypeDeclarationCore"
+kind = "AnnotationTypeDeclarationCore"
+
+[[node.field]]
+name = "name"
+type = "JavaIdentifier"
+cardinality = "one"
+selector = { node = "Identifier" }
+
+[[node.field]]
+name = "body"
+type = "JavaAnnotationTypeBody"
+cardinality = "one"
+selector = { node = "AnnotationTypeBody" }
+
+[[node]]
+name = "JavaAnnotationTypeBody"
+kind = "AnnotationTypeBody"
+
+[[node.field]]
+name = "members"
+type = "JavaAnnotationMemberDeclaration"
+cardinality = "many"
+selector = { union = "JavaAnnotationMemberDeclaration" }
+
+[[node]]
+name = "JavaAnnotationTypeElementDeclaration"
+kind = "AnnotationTypeElementDeclaration"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node.field]]
+name = "name"
+type = "JavaIdentifier"
+cardinality = "one"
+selector = { node = "Identifier" }
+
+[[node.field]]
+name = "dimensions"
+type = "JavaDimension"
+cardinality = "many"
+selector = { node = "Dimension" }
+
+[[node.field]]
+name = "default"
+type = "JavaDefaultValue"
+cardinality = "optional"
+selector = { node = "DefaultValue" }
+
+[[node]]
+name = "JavaDefaultValue"
+kind = "DefaultValue"
+
+[[node.field]]
+name = "value"
+type = "JavaAnnotationValue"
+cardinality = "one"
+selector = { union = "JavaAnnotationValue" }
+
+[[node]]
+name = "JavaExpressionStatement"
+kind = "ExpressionStatement"
+
+[[node.field]]
+name = "expression"
+type = "JavaStatementExpression"
+cardinality = "one"
+selector = { node = "StatementExpression" }
+
+[[node.field]]
+name = "semicolon_token"
+cardinality = "one"
+selector = { token = ";" }
+
+[[node]]
+name = "JavaStatementExpression"
+kind = "StatementExpression"
+
+[[node.field]]
+name = "expression"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+
+[[node]]
+name = "JavaUpdateExpression"
+kind = "UpdateExpression"
+
+[[node.field]]
+name = "expression"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+
+[[node.field]]
+name = "operator"
+type = "JavaUpdateOp"
+cardinality = "one"
+selector = { node = "UpdateOp" }
+
+[[node]]
+name = "JavaUpdateOp"
+kind = "UpdateOp"
+
+[[node]]
+name = "JavaMethodInvocation"
+kind = "MethodInvocation"
+
+[[node.field]]
+name = "qualifier"
+type = "JavaExpression"
+cardinality = "optional"
+selector = { union = "JavaExpression" }
+
+[[node.field]]
+name = "type_arguments"
+type = "JavaTypeArguments"
+cardinality = "optional"
+selector = { node = "TypeArguments" }
+
+[[node.field]]
+name = "name"
+type = "JavaMethodName"
+cardinality = "one"
+selector = { node = "MethodName" }
+
+[[node.field]]
+name = "arguments"
+type = "JavaArgumentList"
+cardinality = "one"
+selector = { node = "ArgumentList" }
+
+[[node]]
+name = "JavaMethodName"
+kind = "MethodName"
+
+[[node.field]]
+name = "identifier"
+type = "JavaIdentifier"
+cardinality = "one"
+selector = { node = "Identifier" }
+
+[[node]]
+name = "JavaLabeledStatement"
+kind = "LabeledStatement"
+
+[[node.field]]
+name = "label"
+type = "JavaLabel"
+cardinality = "one"
+selector = { node = "Label" }
+
+[[node.field]]
+name = "statement"
+type = "JavaStatement"
+cardinality = "one"
+selector = { union = "JavaStatement" }
+
+[[node]]
+name = "JavaLabel"
+kind = "Label"
+
+[[node.field]]
+name = "identifier"
+type = "JavaIdentifier"
+cardinality = "one"
+selector = { node = "Identifier" }
+
+[[node]]
+name = "JavaIfStatement"
+kind = "IfStatement"
+
+[[node.field]]
+name = "condition"
+type = "JavaParenthesizedExpression"
+cardinality = "one"
+selector = { node = "ParenthesizedExpression" }
+
+[[node.field]]
+name = "then_statement"
+type = "JavaStatement"
+cardinality = "one"
+selector = { union = "JavaStatement" }
+occurrence = 0
+
+[[node.field]]
+name = "else_statement"
+type = "JavaStatement"
+cardinality = "optional"
+selector = { union = "JavaStatement" }
+occurrence = 1
+
+[[node]]
+name = "JavaWhileStatement"
+kind = "WhileStatement"
+
+[[node.field]]
+name = "condition"
+type = "JavaParenthesizedExpression"
+cardinality = "one"
+selector = { node = "ParenthesizedExpression" }
+
+[[node.field]]
+name = "statement"
+type = "JavaStatement"
+cardinality = "one"
+selector = { union = "JavaStatement" }
+
+[[node]]
+name = "JavaForStatement"
+kind = "ForStatement"
+
+[[node.field]]
+name = "specification"
+type = "JavaForSpec"
+cardinality = "one"
+selector = { node = "ForSpec" }
+
+[[node.field]]
+name = "statement"
+type = "JavaStatement"
+cardinality = "one"
+selector = { union = "JavaStatement" }
+
+[[node]]
+name = "JavaForSpec"
+kind = "ForSpec"
+
+[[node.field]]
+name = "enhanced_modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "initializer"
+type = "JavaForInitializer"
+cardinality = "optional"
+selector = { node = "ForInitializer" }
+
+[[node.field]]
+name = "condition"
+type = "JavaForCondition"
+cardinality = "optional"
+selector = { node = "ForCondition" }
+
+[[node.field]]
+name = "update"
+type = "JavaForUpdate"
+cardinality = "optional"
+selector = { node = "ForUpdate" }
+
+[[node.field]]
+name = "enhanced_type"
+type = "JavaLocalVariableType"
+cardinality = "optional"
+selector = { union = "JavaLocalVariableType" }
+
+[[node.field]]
+name = "enhanced_name"
+type = "JavaDefinition"
+cardinality = "optional"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "enhanced_dimensions"
+type = "JavaDimension"
+cardinality = "many"
+selector = { node = "Dimension" }
+
+[[node.field]]
+name = "enhanced_expression"
+type = "JavaExpression"
+cardinality = "optional"
+selector = { union = "JavaExpression" }
+
+[[node]]
+name = "JavaForInitializer"
+kind = "ForInitializer"
+
+[[node.field]]
+name = "declaration"
+type = "JavaLocalVariableDeclarationCore"
+cardinality = "optional"
+selector = { node = "LocalVariableDeclarationCore" }
+
+[[node.field]]
+name = "expressions"
+type = "JavaStatementExpression"
+cardinality = "many"
+selector = { node = "StatementExpression" }
+
+[[node]]
+name = "JavaForCondition"
+kind = "ForCondition"
+
+[[node.field]]
+name = "expression"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+
+[[node]]
+name = "JavaForUpdate"
+kind = "ForUpdate"
+
+[[node.field]]
+name = "expressions"
+type = "JavaStatementExpression"
+cardinality = "many"
+selector = { node = "StatementExpression" }
+
+[[node]]
+name = "JavaLocalVariableDeclaration"
+kind = "LocalVariableDeclaration"
+
+[[node.field]]
+name = "declaration"
+type = "JavaLocalVariableDeclarationCore"
+cardinality = "one"
+selector = { node = "LocalVariableDeclarationCore" }
+
+[[node.field]]
+name = "semicolon_token"
+cardinality = "one"
+selector = { token = ";" }
+
+[[node]]
+name = "JavaLocalVariableDeclarationCore"
+kind = "LocalVariableDeclarationCore"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "type_"
+type = "JavaLocalVariableType"
+cardinality = "one"
+selector = { union = "JavaLocalVariableType" }
+
+[[node.field]]
+name = "declarators"
+type = "JavaVariableDeclarator"
+cardinality = "many"
+selector = { node = "VariableDeclarator" }
+
+[[node]]
+name = "JavaInferredLocalType"
+kind = "InferredLocalType"
+
+[[node]]
+name = "JavaLambdaFormalParameters"
+kind = "LambdaFormalParameters"
+
+[[node.field]]
+name = "parameters"
+type = "JavaLambdaParameter"
+cardinality = "many"
+selector = { union = "JavaLambdaParameter" }
+
+[[node]]
+name = "JavaLambdaVarParameter"
+kind = "LambdaVarParameter"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "type_"
+type = "JavaInferredLambdaType"
+cardinality = "one"
+selector = { node = "InferredLambdaType" }
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node]]
+name = "JavaInferredLambdaType"
+kind = "InferredLambdaType"
+
+[[node]]
+name = "JavaEnhancedForStatement"
+kind = "EnhancedForStatement"
+
+[[node.field]]
+name = "specification"
+type = "JavaForSpec"
+cardinality = "one"
+selector = { node = "ForSpec" }
+
+[[node.field]]
+name = "statement"
+type = "JavaStatement"
+cardinality = "one"
+selector = { union = "JavaStatement" }
+
+[[node]]
+name = "JavaAssertStatement"
+kind = "AssertStatement"
+
+[[node.field]]
+name = "condition"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+occurrence = 0
+
+[[node.field]]
+name = "detail"
+type = "JavaExpression"
+cardinality = "optional"
+selector = { union = "JavaExpression" }
+occurrence = 1
+
+[[node]]
+name = "JavaSwitchStatement"
+kind = "SwitchStatement"
+
+[[node.field]]
+name = "selector"
+type = "JavaParenthesizedExpression"
+cardinality = "one"
+selector = { node = "ParenthesizedExpression" }
+
+[[node.field]]
+name = "body"
+type = "JavaSwitchStatementBlock"
+cardinality = "one"
+selector = { node = "SwitchStatementBlock" }
+
+[[node]]
+name = "JavaSwitchStatementBlock"
+kind = "SwitchStatementBlock"
+
+[[node.field]]
+name = "items"
+type = "JavaSwitchStatementItem"
+cardinality = "many"
+selector = { union = "JavaSwitchStatementItem" }
+
+[[node]]
+name = "JavaSwitchStatementRule"
+kind = "SwitchStatementRule"
+
+[[node.field]]
+name = "label"
+type = "JavaSwitchLabel"
+cardinality = "one"
+selector = { node = "SwitchLabel" }
+
+[[node.field]]
+name = "outcome"
+type = "JavaSwitchStatementOutcome"
+cardinality = "one"
+selector = { union = "JavaSwitchStatementOutcome" }
+
+[[node.field]]
+name = "semicolon_token"
+cardinality = "optional"
+selector = { token = ";" }
+
+[[node]]
+name = "JavaSwitchLabel"
+kind = "SwitchLabel"
+
+[[node.field]]
+name = "default_token"
+cardinality = "optional"
+selector = { token = "default" }
+
+[[node.field]]
+name = "labels"
+type = "JavaSwitchCaseLabelRest"
+cardinality = "optional"
+selector = { node = "SwitchCaseLabelRest" }
+
+[[node]]
+name = "JavaSwitchCaseLabelRest"
+kind = "SwitchCaseLabelRest"
+
+[[node.field]]
+name = "elements"
+type = "JavaSwitchCaseElement"
+cardinality = "many"
+selector = { node = "SwitchCaseElement" }
+
+[[node.field]]
+name = "guard"
+type = "JavaGuard"
+cardinality = "optional"
+selector = { node = "Guard" }
+
+[[node]]
+name = "JavaSwitchCaseElement"
+kind = "SwitchCaseElement"
+
+[[node.field]]
+name = "default_token"
+cardinality = "optional"
+selector = { token = "default" }
+
+[[node.field]]
+name = "expression"
+type = "JavaExpression"
+cardinality = "optional"
+selector = { union = "JavaExpression" }
+
+[[node.field]]
+name = "pattern"
+type = "JavaPattern"
+cardinality = "optional"
+selector = { node = "Pattern" }
+
+[[node]]
+name = "JavaPattern"
+kind = "Pattern"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaPatternModifiers"
+cardinality = "optional"
+selector = { node = "PatternModifiers" }
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node.field]]
+name = "body"
+type = "JavaPatternBody"
+cardinality = "one"
+selector = { union = "JavaPatternBody" }
+
+[[node]]
+name = "JavaPatternModifiers"
+kind = "PatternModifiers"
+
+[[node]]
+name = "JavaPatternVariable"
+kind = "PatternVariable"
+
+[[node.field]]
+name = "name"
+type = "JavaPatternName"
+cardinality = "one"
+selector = { union = "JavaPatternName" }
+
+[[node]]
+name = "JavaUnnamedPattern"
+kind = "UnnamedPattern"
+
+[[node]]
+name = "JavaRecordPatternBody"
+kind = "RecordPatternBody"
+
+[[node.field]]
+name = "left_paren_token"
+cardinality = "one"
+selector = { token = "(" }
+
+[[node.field]]
+name = "components"
+type = "JavaComponentPattern"
+cardinality = "many"
+selector = { node = "ComponentPattern" }
+
+[[node.field]]
+name = "right_paren_token"
+cardinality = "one"
+selector = { token = ")" }
+
+[[node]]
+name = "JavaComponentPattern"
+kind = "ComponentPattern"
+
+[[node.field]]
+name = "pattern"
+type = "JavaComponentPatternBody"
+cardinality = "one"
+selector = { union = "JavaComponentPatternBody" }
+
+[[node]]
+name = "JavaGuard"
+kind = "Guard"
+
+[[node.field]]
+name = "expression"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+
+[[node]]
+name = "JavaThrowStatement"
+kind = "ThrowStatement"
+
+[[node.field]]
+name = "expression"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+
+[[node]]
+name = "JavaSwitchBlockStatementGroup"
+kind = "SwitchBlockStatementGroup"
+
+[[node.field]]
+name = "label"
+type = "JavaSwitchLabel"
+cardinality = "one"
+selector = { node = "SwitchLabel" }
+
+[[node.field]]
+name = "colon_token"
+cardinality = "one"
+selector = { token = ":" }
+
+[[node.field]]
+name = "body"
+type = "JavaSwitchBlockStatementGroupBody"
+cardinality = "one"
+selector = { node = "SwitchBlockStatementGroupBody" }
+
+[[node]]
+name = "JavaSwitchBlockStatementGroupBody"
+kind = "SwitchBlockStatementGroupBody"
+
+[[node.field]]
+name = "statements"
+type = "JavaSwitchGroupStatements"
+cardinality = "one"
+selector = { node = "SwitchGroupStatements" }
+
+[[node]]
+name = "JavaSwitchGroupStatements"
+kind = "SwitchGroupStatements"
+
+[[node.field]]
+name = "nested"
+type = "JavaSwitchGroupStatements"
+cardinality = "optional"
+selector = { node = "SwitchGroupStatements" }
+
+[[node.field]]
+name = "statements"
+type = "JavaStatement"
+cardinality = "optional"
+selector = { union = "JavaStatement" }
+
+[[node]]
+name = "JavaDoStatement"
+kind = "DoStatement"
+
+[[node.field]]
+name = "statement"
+type = "JavaStatement"
+cardinality = "one"
+selector = { union = "JavaStatement" }
+
+[[node.field]]
+name = "condition"
+type = "JavaParenthesizedExpression"
+cardinality = "one"
+selector = { node = "ParenthesizedExpression" }
+
+[[node]]
+name = "JavaBreakStatement"
+kind = "BreakStatement"
+
+[[node.field]]
+name = "label"
+type = "JavaLabel"
+cardinality = "optional"
+selector = { node = "Label" }
+
+[[node]]
+name = "JavaContinueStatement"
+kind = "ContinueStatement"
+
+[[node.field]]
+name = "label"
+type = "JavaLabel"
+cardinality = "optional"
+selector = { node = "Label" }
+
+[[node]]
+name = "JavaReturnStatement"
+kind = "ReturnStatement"
+
+[[node.field]]
+name = "expression"
+type = "JavaExpression"
+cardinality = "optional"
+selector = { union = "JavaExpression" }
+
+[[node]]
+name = "JavaYieldStatement"
+kind = "YieldStatement"
+
+[[node.field]]
+name = "expression"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+
+[[node]]
+name = "JavaSynchronizedStatement"
+kind = "SynchronizedStatement"
+
+[[node.field]]
+name = "expression"
+type = "JavaParenthesizedExpression"
+cardinality = "one"
+selector = { node = "ParenthesizedExpression" }
+
+[[node.field]]
+name = "block"
+type = "JavaBlock"
+cardinality = "one"
+selector = { node = "Block" }
+
+[[node]]
+name = "JavaTryStatement"
+kind = "TryStatement"
+
+[[node.field]]
+name = "block"
+type = "JavaBlock"
+cardinality = "one"
+selector = { node = "Block" }
+
+[[node.field]]
+name = "catches"
+type = "JavaCatchClause"
+cardinality = "many"
+selector = { node = "CatchClause" }
+
+[[node.field]]
+name = "finally"
+type = "JavaFinallyClause"
+cardinality = "optional"
+selector = { node = "FinallyClause" }
+
+[[node]]
+name = "JavaCatchClause"
+kind = "CatchClause"
+
+[[node.field]]
+name = "parameter"
+type = "JavaCatchFormalParameter"
+cardinality = "one"
+selector = { node = "CatchFormalParameter" }
+
+[[node.field]]
+name = "block"
+type = "JavaBlock"
+cardinality = "one"
+selector = { node = "Block" }
+
+[[node]]
+name = "JavaCatchFormalParameter"
+kind = "CatchFormalParameter"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "type_"
+type = "JavaCatchType"
+cardinality = "one"
+selector = { node = "CatchType" }
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node]]
+name = "JavaCatchType"
+kind = "CatchType"
+
+[[node.field]]
+name = "alternatives"
+type = "JavaCatchTypeElement"
+cardinality = "many"
+selector = { union = "JavaCatchTypeElement" }
+
+[[node]]
+name = "JavaCatchAlternativeType"
+kind = "CatchAlternativeType"
+
+[[node.field]]
+name = "annotations"
+type = "JavaAnnotationNode"
+cardinality = "many"
+selector = { union = "JavaAnnotationNode" }
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node]]
+name = "JavaFinallyClause"
+kind = "FinallyClause"
+
+[[node.field]]
+name = "block"
+type = "JavaBlock"
+cardinality = "one"
+selector = { node = "Block" }
+
+[[node]]
+name = "JavaTryWithResourcesStatement"
+kind = "TryWithResourcesStatement"
+
+[[node.field]]
+name = "resources"
+type = "JavaResourceSpecification"
+cardinality = "one"
+selector = { node = "ResourceSpecification" }
+
+[[node.field]]
+name = "block"
+type = "JavaBlock"
+cardinality = "one"
+selector = { node = "Block" }
+
+[[node.field]]
+name = "catches"
+type = "JavaCatchClause"
+cardinality = "many"
+selector = { node = "CatchClause" }
+
+[[node.field]]
+name = "finally"
+type = "JavaFinallyClause"
+cardinality = "optional"
+selector = { node = "FinallyClause" }
+
+[[node]]
+name = "JavaResourceSpecification"
+kind = "ResourceSpecification"
+
+[[node.field]]
+name = "resources"
+type = "JavaResource"
+cardinality = "many"
+selector = { node = "Resource" }
+
+[[node]]
+name = "JavaResource"
+kind = "Resource"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "type_"
+type = "JavaLocalVariableType"
+cardinality = "optional"
+selector = { union = "JavaLocalVariableType" }
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "optional"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "expression"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+
+[[node]]
+name = "JavaStaticInitializer"
+kind = "StaticInitializer"
+
+[[node.field]]
+name = "block"
+type = "JavaBlock"
+cardinality = "one"
+selector = { node = "Block" }
+
+[[node]]
+name = "JavaConstructorDeclaration"
+kind = "ConstructorDeclaration"
+
+[[node.field]]
+name = "modifiers"
+type = "JavaModifiers"
+cardinality = "optional"
+selector = { node = "Modifiers" }
+
+[[node.field]]
+name = "type_parameters"
+type = "JavaTypeParameters"
+cardinality = "optional"
+selector = { node = "TypeParameters" }
+
+[[node.field]]
+name = "name"
+type = "JavaDefinition"
+cardinality = "one"
+selector = { node = "Definition" }
+
+[[node.field]]
+name = "parameters"
+type = "JavaFormalParameters"
+cardinality = "one"
+selector = { node = "FormalParameters" }
+
+[[node.field]]
+name = "throws"
+type = "JavaThrows"
+cardinality = "optional"
+selector = { node = "Throws" }
+
+[[node.field]]
+name = "body"
+type = "JavaConstructorBody"
+cardinality = "one"
+selector = { node = "ConstructorBody" }
+
+[[node]]
+name = "JavaConstructorBody"
+kind = "ConstructorBody"
+
+[[node.field]]
+name = "statements"
+type = "JavaStatement"
+cardinality = "many"
+selector = { union = "JavaStatement" }
+
+[[node.field]]
+name = "invocation"
+type = "JavaExplicitConstructorInvocation"
+cardinality = "optional"
+selector = { node = "ExplicitConstructorInvocation" }
+
+[[node]]
+name = "JavaExplicitConstructorInvocation"
+kind = "ExplicitConstructorInvocation"
+
+[[node.field]]
+name = "type_arguments"
+type = "JavaTypeArguments"
+cardinality = "optional"
+selector = { node = "TypeArguments" }
+
+[[node.field]]
+name = "arguments"
+type = "JavaArgumentList"
+cardinality = "one"
+selector = { node = "ArgumentList" }
+
+[[node.field]]
+name = "semicolon_token"
+cardinality = "one"
+selector = { token = ";" }
+
+[[node]]
+name = "JavaArrayAccess"
+kind = "ArrayAccess"
+
+[[node.field]]
+name = "array"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+occurrence = 0
+
+[[node.field]]
+name = "index"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+occurrence = 1
+
+[[node]]
+name = "JavaMethodReference"
+kind = "MethodReference"
+
+[[node.field]]
+name = "qualifier_expression"
+type = "JavaExpression"
+cardinality = "optional"
+selector = { union = "JavaExpression" }
+
+[[node.field]]
+name = "qualifier_type"
+type = "JavaType"
+cardinality = "optional"
+selector = { union = "JavaType" }
+
+[[node.field]]
+name = "type_arguments"
+type = "JavaTypeArguments"
+cardinality = "optional"
+selector = { node = "TypeArguments" }
+
+[[node.field]]
+name = "member_name"
+type = "JavaMethodReferenceName"
+cardinality = "optional"
+selector = { node = "MethodReferenceName" }
+
+[[node.field]]
+name = "new_token"
+cardinality = "optional"
+selector = { token = "new" }
+
+[[node]]
+name = "JavaMethodReferenceName"
+kind = "MethodReferenceName"
+
+[[node.field]]
+name = "identifier"
+type = "JavaIdentifier"
+cardinality = "one"
+selector = { node = "Identifier" }
+
+[[node]]
+name = "JavaArrayCreationExpression"
+kind = "ArrayCreationExpression"
+
+[[node.field]]
+name = "type_"
+type = "JavaArrayCreationType"
+cardinality = "one"
+selector = { node = "ArrayCreationType" }
+
+[[node.field]]
+name = "dimension_expressions"
+type = "JavaDimExpr"
+cardinality = "many"
+selector = { node = "DimExpr" }
+
+[[node.field]]
+name = "dimensions"
+type = "JavaDimension"
+cardinality = "many"
+selector = { node = "Dimension" }
+
+[[node.field]]
+name = "initializer"
+type = "JavaArrayInitializer"
+cardinality = "optional"
+selector = { node = "ArrayInitializer" }
+
+[[node]]
+name = "JavaArrayCreationType"
+kind = "ArrayCreationType"
+
+[[node.field]]
+name = "annotations"
+type = "JavaAnnotationNode"
+cardinality = "many"
+selector = { union = "JavaAnnotationNode" }
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node]]
+name = "JavaDimExpr"
+kind = "DimExpr"
+
+[[node.field]]
+name = "annotations"
+type = "JavaAnnotationNode"
+cardinality = "many"
+selector = { union = "JavaAnnotationNode" }
+
+[[node.field]]
+name = "expression"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+
+[[node]]
+name = "JavaBinaryExpression"
+kind = "BinaryExpression"
+
+[[node.field]]
+name = "left"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+occurrence = 0
+
+[[node.field]]
+name = "operator"
+type = "JavaOperator"
+cardinality = "one"
+selector = { union = "JavaOperator" }
+
+[[node.field]]
+name = "right"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+occurrence = 1
+
+[[node]]
+name = "JavaCompareOp"
+kind = "CompareOp"
+
+[[node]]
+name = "JavaLogicOp"
+kind = "LogicOp"
+
+[[node]]
+name = "JavaBitOp"
+kind = "BitOp"
+
+[[node]]
+name = "JavaArithOp"
+kind = "ArithOp"
+
+[[node]]
+name = "JavaInstanceofExpression"
+kind = "InstanceofExpression"
+
+[[node.field]]
+name = "expression"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+
+[[node.field]]
+name = "type_"
+type = "JavaType"
+cardinality = "one"
+selector = { union = "JavaType" }
+
+[[node.field]]
+name = "modifiers"
+type = "JavaPatternModifiers"
+cardinality = "optional"
+selector = { node = "PatternModifiers" }
+
+[[node.field]]
+name = "pattern"
+type = "JavaInstanceofPattern"
+cardinality = "optional"
+selector = { node = "InstanceofPattern" }
+
+[[node]]
+name = "JavaInstanceofPattern"
+kind = "InstanceofPattern"
+
+[[node.field]]
+name = "body"
+type = "JavaPatternBody"
+cardinality = "one"
+selector = { union = "JavaPatternBody" }
+
+[[node]]
+name = "JavaLambdaExpression"
+kind = "LambdaExpression"
+
+[[node.field]]
+name = "parameters"
+type = "JavaLambdaParameters"
+cardinality = "one"
+selector = { union = "JavaLambdaParameters" }
+
+[[node.field]]
+name = "body_expression"
+type = "JavaExpression"
+cardinality = "optional"
+selector = { union = "JavaExpression" }
+
+[[node.field]]
+name = "body_block"
+type = "JavaBlock"
+cardinality = "optional"
+selector = { node = "Block" }
+
+[[node]]
+name = "JavaInferredParameters"
+kind = "InferredParameters"
+
+[[node.field]]
+name = "parameters"
+type = "JavaDefinition"
+cardinality = "many"
+selector = { node = "Definition" }
+
+[[node]]
+name = "JavaSwitchExpression"
+kind = "SwitchExpression"
+
+[[node.field]]
+name = "selector"
+type = "JavaParenthesizedExpression"
+cardinality = "one"
+selector = { node = "ParenthesizedExpression" }
+
+[[node.field]]
+name = "body"
+type = "JavaSwitchExpressionBlock"
+cardinality = "one"
+selector = { node = "SwitchExpressionBlock" }
+
+[[node]]
+name = "JavaSwitchExpressionBlock"
+kind = "SwitchExpressionBlock"
+
+[[node.field]]
+name = "items"
+type = "JavaSwitchExpressionItem"
+cardinality = "many"
+selector = { union = "JavaSwitchExpressionItem" }
+
+[[node]]
+name = "JavaSwitchExpressionRule"
+kind = "SwitchExpressionRule"
+
+[[node.field]]
+name = "label"
+type = "JavaSwitchLabel"
+cardinality = "one"
+selector = { node = "SwitchLabel" }
+
+[[node.field]]
+name = "outcome"
+type = "JavaSwitchExpressionOutcome"
+cardinality = "one"
+selector = { union = "JavaSwitchExpressionOutcome" }
+
+[[node.field]]
+name = "semicolon_token"
+cardinality = "optional"
+selector = { token = ";" }
+
+[[node]]
+name = "JavaTernaryExpression"
+kind = "TernaryExpression"
+
+[[node.field]]
+name = "condition"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+occurrence = 0
+
+[[node.field]]
+name = "true_expression"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+occurrence = 1
+
+[[node.field]]
+name = "false_expression"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+occurrence = 2
+
+[[node]]
+name = "JavaUnaryExpression"
+kind = "UnaryExpression"
+
+[[node.field]]
+name = "operator"
+type = "JavaOperator"
+cardinality = "one"
+selector = { union = "JavaOperator" }
+
+[[node.field]]
+name = "expression"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+
+[[node]]
+name = "JavaCastExpression"
+kind = "CastExpression"
+
+[[node.field]]
+name = "types"
+type = "JavaType"
+cardinality = "many"
+selector = { union = "JavaType" }
+
+[[node.field]]
+name = "expression"
+type = "JavaExpression"
+cardinality = "one"
+selector = { union = "JavaExpression" }
+
+[[node]]
+name = "JavaElementValueArrayInitializer"
+kind = "ElementValueArrayInitializer"
+
+[[node.field]]
+name = "values"
+type = "JavaAnnotationValue"
+cardinality = "many"
+selector = { union = "JavaAnnotationValue" }
+
+[[node]]
+name = "JavaElementValuePair"
+kind = "ElementValuePair"
+
+[[node.field]]
+name = "name"
+type = "JavaIdentifier"
+cardinality = "one"
+selector = { node = "Identifier" }
+
+[[node.field]]
+name = "value"
+type = "JavaAnnotationValue"
+cardinality = "one"
+occurrence = 1
+selector = { union = "JavaAnnotationValue" }
+
+[[node]]
+name = "JavaImportDeclaration"
+kind = "ImportDeclaration"
+
+[[node.field]]
+name = "declaration"
+type = "JavaImportKind"
+cardinality = "one"
+selector = { union = "JavaImportKind" }
+
+[[node]]
+name = "JavaModuleImportDeclaration"
+kind = "ModuleImportDeclaration"
+
+[[node.field]]
+name = "name"
+type = "JavaName"
+cardinality = "one"
+selector = { union = "JavaName" }
+
+[[node.field]]
+name = "semicolon_token"
+cardinality = "one"
+selector = { token = ";" }
+
+[[node]]
+name = "JavaTypeOrStaticImportDeclaration"
+kind = "TypeOrStaticImportDeclaration"
+
+[[node.field]]
+name = "static_token"
+cardinality = "optional"
+selector = { token = "static" }
+
+[[node.field]]
+name = "name"
+type = "JavaName"
+cardinality = "one"
+selector = { union = "JavaName" }
+
+[[node.field]]
+name = "asterisk_token"
+cardinality = "optional"
+selector = { token = "Asterisk" }
+
+[[node.field]]
+name = "semicolon_token"
+cardinality = "one"
+selector = { token = ";" }
+
+[[node]]
+name = "JavaTopLevelDeclaration"
+kind = "TopLevelDeclaration"
+
+[[node.field]]
+name = "declaration"
+type = "JavaTopLevelTypeDeclaration"
+cardinality = "optional"
+selector = { union = "JavaTopLevelTypeDeclaration" }
+
+[[node.field]]
+name = "semicolon_token"
+cardinality = "optional"
+selector = { token = ";" }
+
+[[node]]
+name = "JavaUnnamedCompilationUnit"
+kind = "UnnamedCompilationUnit"
+
+[[node.field]]
+name = "body"
+type = "JavaUnnamedCompilationUnitBody"
+cardinality = "one"
+selector = { union = "JavaUnnamedCompilationUnitBody" }
+
+[[node]]
+name = "JavaModuleDeclaration"
+kind = "ModuleDeclaration"
+
+[[node.field]]
+name = "open_token"
+cardinality = "optional"
+selector = { token = "open" }
+
+[[node.field]]
+name = "annotations"
+type = "JavaAnnotationNode"
+cardinality = "many"
+selector = { union = "JavaAnnotationNode" }
+
+[[node.field]]
+name = "name"
+type = "JavaName"
+cardinality = "one"
+selector = { union = "JavaName" }
+
+[[node.field]]
+name = "body"
+type = "JavaModuleBody"
+cardinality = "one"
+selector = { node = "ModuleBody" }
+
+[[node]]
+name = "JavaModuleBody"
+kind = "ModuleBody"
+
+[[node.field]]
+name = "left_brace_token"
+cardinality = "one"
+selector = { token = "{" }
+
+[[node.field]]
+name = "directives"
+type = "JavaModuleDirective"
+cardinality = "many"
+selector = { node = "ModuleDirective" }
+
+[[node.field]]
+name = "right_brace_token"
+cardinality = "one"
+selector = { token = "}" }
+
+[[node]]
+name = "JavaModuleDirective"
+kind = "ModuleDirective"
+
+[[node.field]]
+name = "requires_token"
+cardinality = "optional"
+selector = { token = "requires" }
+
+[[node.field]]
+name = "exports_token"
+cardinality = "optional"
+selector = { token = "exports" }
+
+[[node.field]]
+name = "opens_token"
+cardinality = "optional"
+selector = { token = "opens" }
+
+[[node.field]]
+name = "uses_token"
+cardinality = "optional"
+selector = { token = "uses" }
+
+[[node.field]]
+name = "provides_token"
+cardinality = "optional"
+selector = { token = "provides" }
+
+[[node.field]]
+name = "static_token"
+cardinality = "optional"
+selector = { token = "static" }
+
+[[node.field]]
+name = "transitive_token"
+cardinality = "optional"
+selector = { token = "transitive" }
+
+[[node.field]]
+name = "names"
+type = "JavaName"
+cardinality = "many"
+selector = { union = "JavaName" }
+
+[[node]]
+name = "JavaUnitBeforeFirstMethod"
+kind = "UnitBeforeFirstMethod"
+
+[[node]]
+name = "JavaCompactBeforeFirstMethod"
+kind = "CompactBeforeFirstMethod"
+
+[[node]]
+name = "JavaCompactMemberDeclarationNoMethod"
+kind = "CompactMemberDeclarationNoMethod"
+
+[[node]]
+name = "JavaCompactMemberDeclaration"
+kind = "CompactMemberDeclaration"
+
+[[node]]
+name = "JavaClassContent"
+kind = "ClassContent"
+
+[[union]]
+name = "JavaComment"
+variants = [
+	{ name = "Line", type = "JavaLineComment" },
+	{ name = "Block", type = "JavaBlockComment" },
+]
+
+[[union]]
+name = "JavaName"
+variants = [
+	{ name = "Identifier", type = "JavaIdentifier" },
+	{ name = "Scoped", type = "JavaScopedIdentifier" },
+]
+
+[[union]]
+name = "JavaAnnotationNode"
+variants = [
+	{ name = "Marker", type = "JavaMarkerAnnotation" },
+	{ name = "Normal", type = "JavaAnnotation" },
+]
+
+[[union]]
+name = "JavaAnnotationValue"
+variants = [
+	{ name = "Expression", type = "JavaExpression" },
+	{ name = "Array", type = "JavaElementValueArrayInitializer" },
+	{ name = "Annotation", type = "JavaAnnotationNode" },
+	{ name = "Pair", type = "JavaElementValuePair" },
+]
+
+[[union]]
+name = "JavaImportKind"
+variants = [
+	{ name = "Module", type = "JavaModuleImportDeclaration" },
+	{ name = "TypeOrStatic", type = "JavaTypeOrStaticImportDeclaration" },
+]
+
+[[union]]
+name = "JavaUnnamedCompilationUnitBody"
+variants = [
+	{ name = "Module", type = "JavaModuleDeclaration" },
+	{ name = "Compact", type = "JavaUnitBeforeFirstMethod" },
+]
+
+[[union]]
+name = "JavaTopLevelTypeDeclaration"
+variants = [
+	{ name = "Class", type = "JavaClassDeclaration" },
+	{ name = "Record", type = "JavaRecordDeclaration" },
+	{ name = "Interface", type = "JavaInterfaceDeclaration" },
+	{ name = "AnnotationType", type = "JavaAnnotationTypeDeclaration" },
+	{ name = "Enum", type = "JavaEnumDeclaration" },
+]
+
+[[union]]
+name = "JavaMemberDeclaration"
+variants = [
+	{ name = "Field", type = "JavaFieldDeclaration" },
+	{ name = "Method", type = "JavaMethodDeclaration" },
+	{ name = "Constructor", type = "JavaConstructorDeclaration" },
+	{ name = "StaticInitializer", type = "JavaStaticInitializer" },
+	{ name = "Initializer", type = "JavaBlock" },
+	{ name = "Class", type = "JavaClassDeclaration" },
+	{ name = "Record", type = "JavaRecordDeclaration" },
+	{ name = "Interface", type = "JavaInterfaceDeclaration" },
+	{ name = "AnnotationType", type = "JavaAnnotationTypeDeclaration" },
+	{ name = "Enum", type = "JavaEnumDeclaration" },
+]
+
+[[union]]
+name = "JavaRecordMemberDeclaration"
+variants = [
+	{ name = "CompactConstructor", type = "JavaCompactConstructorDeclaration" },
+	{ name = "Field", type = "JavaFieldDeclaration" },
+	{ name = "Method", type = "JavaMethodDeclaration" },
+	{ name = "Constructor", type = "JavaConstructorDeclaration" },
+	{ name = "StaticInitializer", type = "JavaStaticInitializer" },
+	{ name = "Initializer", type = "JavaBlock" },
+	{ name = "Class", type = "JavaClassDeclaration" },
+	{ name = "Record", type = "JavaRecordDeclaration" },
+	{ name = "Interface", type = "JavaInterfaceDeclaration" },
+	{ name = "AnnotationType", type = "JavaAnnotationTypeDeclaration" },
+	{ name = "Enum", type = "JavaEnumDeclaration" },
+]
+
+[[union]]
+name = "JavaInterfaceMemberDeclaration"
+variants = [
+	{ name = "Constant", type = "JavaConstantDeclaration" },
+	{ name = "Method", type = "JavaMethodDeclaration" },
+	{ name = "Class", type = "JavaClassDeclaration" },
+	{ name = "Record", type = "JavaRecordDeclaration" },
+	{ name = "Interface", type = "JavaInterfaceDeclaration" },
+	{ name = "AnnotationType", type = "JavaAnnotationTypeDeclaration" },
+	{ name = "Enum", type = "JavaEnumDeclaration" },
+]
+
+[[union]]
+name = "JavaAnnotationMemberDeclaration"
+variants = [
+	{ name = "Element", type = "JavaAnnotationTypeElementDeclaration" },
+	{ name = "Constant", type = "JavaConstantDeclaration" },
+	{ name = "Class", type = "JavaClassDeclaration" },
+	{ name = "Record", type = "JavaRecordDeclaration" },
+	{ name = "Interface", type = "JavaInterfaceDeclaration" },
+	{ name = "AnnotationType", type = "JavaAnnotationTypeDeclaration" },
+	{ name = "Enum", type = "JavaEnumDeclaration" },
+]
+
+[[union]]
+name = "JavaParameter"
+variants = [
+	{ name = "Receiver", type = "JavaReceiverParameter" },
+	{ name = "Formal", type = "JavaFormalParameter" },
+	{ name = "Spread", type = "JavaSpreadParameter" },
+]
+
+[[union]]
+name = "JavaLocalTypeCore"
+variants = [
+	{ name = "Class", type = "JavaClassDeclarationCore" },
+	{ name = "Record", type = "JavaRecordDeclarationCore" },
+	{ name = "Interface", type = "JavaInterfaceDeclarationCore" },
+	{ name = "AnnotationType", type = "JavaAnnotationTypeDeclarationCore" },
+	{ name = "Enum", type = "JavaEnumDeclarationCore" },
+]
+
+[[union]]
+name = "JavaVariableInitializer"
+variants = [
+	{ name = "Expression", type = "JavaExpression" },
+	{ name = "Array", type = "JavaArrayInitializer" },
+]
+
+[[union]]
+name = "JavaCatchTypeElement"
+variants = [
+	{ name = "Type", type = "JavaType" },
+	{ name = "Alternative", type = "JavaCatchAlternativeType" },
+]
+
+[[union]]
+name = "JavaStatement"
+variants = [
+	{ name = "Block", type = "JavaBlock" },
+	{ name = "Empty", type = "JavaEmptyStatement" },
+	{ name = "Expression", type = "JavaExpressionStatement" },
+	{ name = "ConstructorInvocation", type = "JavaExplicitConstructorInvocation" },
+	{ name = "Labeled", type = "JavaLabeledStatement" },
+	{ name = "If", type = "JavaIfStatement" },
+	{ name = "While", type = "JavaWhileStatement" },
+	{ name = "For", type = "JavaForStatement" },
+	{ name = "EnhancedFor", type = "JavaEnhancedForStatement" },
+	{ name = "Assert", type = "JavaAssertStatement" },
+	{ name = "Switch", type = "JavaSwitchStatement" },
+	{ name = "Do", type = "JavaDoStatement" },
+	{ name = "Break", type = "JavaBreakStatement" },
+	{ name = "Continue", type = "JavaContinueStatement" },
+	{ name = "Return", type = "JavaReturnStatement" },
+	{ name = "Yield", type = "JavaYieldStatement" },
+	{ name = "Synchronized", type = "JavaSynchronizedStatement" },
+	{ name = "Throw", type = "JavaThrowStatement" },
+	{ name = "Try", type = "JavaTryStatement" },
+	{ name = "TryWithResources", type = "JavaTryWithResourcesStatement" },
+	{ name = "LocalVariable", type = "JavaLocalVariableDeclaration" },
+	{ name = "LocalType", type = "JavaLocalTypeDeclaration" },
+]
+
+[[union]]
+name = "JavaSwitchStatementItem"
+variants = [
+	{ name = "Rule", type = "JavaSwitchStatementRule" },
+	{ name = "Group", type = "JavaSwitchBlockStatementGroup" },
+]
+
+[[union]]
+name = "JavaSwitchStatementOutcome"
+variants = [
+	{ name = "Expression", type = "JavaStatementExpression" },
+	{ name = "Statement", type = "JavaStatement" },
+]
+
+[[union]]
+name = "JavaSwitchExpressionItem"
+variants = [
+	{ name = "Rule", type = "JavaSwitchExpressionRule" },
+	{ name = "Group", type = "JavaSwitchBlockStatementGroup" },
+]
+
+[[union]]
+name = "JavaSwitchExpressionOutcome"
+variants = [
+	{ name = "Expression", type = "JavaExpression" },
+	{ name = "Statement", type = "JavaStatement" },
+]
+
+[[union]]
+name = "JavaExpression"
+variants = [
+	{ name = "Assignment", type = "JavaAssignmentExpression" },
+	{ name = "Binary", type = "JavaBinaryExpression" },
+	{ name = "Instanceof", type = "JavaInstanceofExpression" },
+	{ name = "InstanceofPattern", type = "JavaInstanceofPattern" },
+	{ name = "Lambda", type = "JavaLambdaExpression" },
+	{ name = "Switch", type = "JavaSwitchExpression" },
+	{ name = "Ternary", type = "JavaTernaryExpression" },
+	{ name = "Update", type = "JavaUpdateExpression" },
+	{ name = "Unary", type = "JavaUnaryExpression" },
+	{ name = "Cast", type = "JavaCastExpression" },
+	{ name = "ClassLiteral", type = "JavaClassLiteral" },
+	{ name = "Parenthesized", type = "JavaParenthesizedExpression" },
+	{ name = "ObjectCreation", type = "JavaObjectCreationExpression" },
+	{ name = "FieldAccess", type = "JavaFieldAccess" },
+	{ name = "ArrayAccess", type = "JavaArrayAccess" },
+	{ name = "MethodInvocation", type = "JavaMethodInvocation" },
+	{ name = "MethodReference", type = "JavaMethodReference" },
+	{ name = "ArrayCreation", type = "JavaArrayCreationExpression" },
+	{ name = "Identifier", type = "JavaIdentifier" },
+	{ name = "IntegerLiteral", type = "JavaIntegerLiteral" },
+	{ name = "FloatingPointLiteral", type = "JavaFloatingPointLiteral" },
+	{ name = "BooleanLiteral", type = "JavaBooleanLiteral" },
+	{ name = "CharacterLiteral", type = "JavaCharacterLiteral" },
+	{ name = "StringLiteral", type = "JavaStringLiteral" },
+	{ name = "TextBlock", type = "JavaTextBlock" },
+	{ name = "NullLiteral", type = "JavaNullLiteral" },
+	{ name = "This", type = "JavaThisExpression" },
+	{ name = "Super", type = "JavaSuperExpression" },
+	{ name = "QualifiedSuper", type = "JavaQualifiedSuperExpression" },
+]
+
+[[union]]
+name = "JavaOperator"
+variants = [
+	{ name = "Assign", type = "JavaAssignOp" },
+	{ name = "Update", type = "JavaUpdateOp" },
+	{ name = "Compare", type = "JavaCompareOp" },
+	{ name = "Logic", type = "JavaLogicOp" },
+	{ name = "Bit", type = "JavaBitOp" },
+	{ name = "Arithmetic", type = "JavaArithOp" },
+]
+
+[[union]]
+name = "JavaLambdaParameters"
+variants = [
+	{ name = "Single", type = "JavaDefinition" },
+	{ name = "Formal", type = "JavaLambdaFormalParameters" },
+	{ name = "Inferred", type = "JavaInferredParameters" },
+]
+
+[[union]]
+name = "JavaLambdaParameter"
+variants = [
+	{ name = "Formal", type = "JavaFormalParameter" },
+	{ name = "Inferred", type = "JavaLambdaVarParameter" },
+	{ name = "Spread", type = "JavaSpreadParameter" },
+]
+
+[[union]]
+name = "JavaType"
+variants = [
+	{ name = "Annotated", type = "JavaAnnotatedType" },
+	{ name = "Array", type = "JavaArrayType" },
+	{ name = "Generic", type = "JavaGenericType" },
+	{ name = "Scoped", type = "JavaScopedTypeName" },
+	{ name = "Named", type = "JavaTypeName" },
+	{ name = "Primitive", type = "JavaPrimitiveType" },
+]
+
+[[union]]
+name = "JavaTypeArgument"
+variants = [
+	{ name = "Annotated", type = "JavaAnnotatedType" },
+	{ name = "Array", type = "JavaArrayType" },
+	{ name = "Generic", type = "JavaGenericType" },
+	{ name = "Scoped", type = "JavaScopedTypeName" },
+	{ name = "Named", type = "JavaTypeName" },
+	{ name = "Primitive", type = "JavaPrimitiveType" },
+	{ name = "Wildcard", type = "JavaWildcard" },
+]
+
+[[union]]
+name = "JavaLocalVariableType"
+variants = [
+	{ name = "Inferred", type = "JavaInferredLocalType" },
+	{ name = "Annotated", type = "JavaAnnotatedType" },
+	{ name = "Array", type = "JavaArrayType" },
+	{ name = "Generic", type = "JavaGenericType" },
+	{ name = "Scoped", type = "JavaScopedTypeName" },
+	{ name = "Named", type = "JavaTypeName" },
+	{ name = "Primitive", type = "JavaPrimitiveType" },
+]
+
+[[union]]
+name = "JavaPatternNode"
+variants = [
+	{ name = "Pattern", type = "JavaPattern" },
+	{ name = "Variable", type = "JavaPatternVariable" },
+	{ name = "Component", type = "JavaComponentPattern" },
+]
+
+[[union]]
+name = "JavaPatternBody"
+variants = [
+	{ name = "Variable", type = "JavaPatternVariable" },
+	{ name = "Record", type = "JavaRecordPatternBody" },
+]
+
+[[union]]
+name = "JavaPatternName"
+variants = [
+	{ name = "Named", type = "JavaDefinition" },
+	{ name = "Unnamed", type = "JavaUnnamedPattern" },
+]
+
+[[union]]
+name = "JavaComponentPatternBody"
+variants = [
+	{ name = "Pattern", type = "JavaPattern" },
+	{ name = "Unnamed", type = "JavaUnnamedPattern" },
+]

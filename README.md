@@ -169,6 +169,35 @@ gosyn limitation is compact grouped imports lacking a final semicolon or
 newline before `)`; gofmt-style imports work. All build-tag variants are read
 as source; analysis does not choose a GOOS/GOARCH build or invoke Go tooling.
 
+## Java
+
+The CLI and browser WASM API also analyze `.java`. The strict pure-Rust
+Rezel Java SE 26 parser emits facts from its decoded AST; a parse or AST-lowering
+failure skips that whole file and reports the reason. No JDK or C compiler is
+needed. Classic, instance and compact-source `main` entry units are recognized.
+The parser and its pinned Unicode tables are vendored with unchanged source;
+manifest aliases isolate Java Unicode 17 from Rust's existing Unicode 18 tables.
+See [the dependency provenance](vendor/README.md).
+
+Rules are `java/exit-in-library`, `java/nonliteral-process`,
+`java/swallowed-errors`, `java/undocumented-suppressions`, and the existing
+file-size and exact-body-duplication rules. They use the original five categories
+and the existing ramps, with Java's product-line denominator. Calibration is
+only through `cqx.json`; these defaults have no independent Java calibration.
+`System.exit`, `Runtime.getRuntime().exec`, and `ProcessBuilder` are recognized
+syntactically. A literal executable with dynamic arguments stays quiet. Local
+names and non-standard imports shadow the recognized APIs conservatively.
+This is neither Java type checking nor taint analysis; indirect calls, aliases,
+and values that become constant through data flow are not resolved. String
+parameter density is omitted because this slice does not establish domain types.
+
+Java test directories and `*Test.java`/`*Tests.java` files are excluded from
+product scoring. `build/`, `target/`, generated-source directories, standard
+`@Generated` annotations, and generated headers are excluded entirely. Empty
+catches with explanatory comments and suppressions with adjacent reasons stay
+quiet. Body duplication ignores comments but preserves token and literal values.
+
+
 ## The model
 
 ### One graph, not several views
