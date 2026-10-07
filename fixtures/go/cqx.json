@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "min_score": 60,
+  "rules": {
+    "go/shell-invocation": { "weight": 7 },
+    "go/shell-argument-unchecked": { "enabled": false }
+  }
+}

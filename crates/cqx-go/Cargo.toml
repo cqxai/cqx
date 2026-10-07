@@ -1,0 +1,17 @@
+[package]
+name = "cqx-go"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Pure Rust Go fact extraction for cqx."
+
+[dependencies]
+cqx-schema.workspace = true
+cqx-vfs.workspace = true
+serde_json.workspace = true
+gosyn = "0.2.15"
+
+[dev-dependencies]
+cqx-store = { path = "../cqx-store" }
+cqx-score = { path = "../cqx-score" }
