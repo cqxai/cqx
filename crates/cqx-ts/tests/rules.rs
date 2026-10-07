@@ -434,3 +434,50 @@ fn review_documented_json_parse_and_feature_detection_catches_stay_quiet() {
     assert_eq!(findings(&got, "swallowed-errors"), 0);
     assert_eq!(got["scores"]["quality"], 100);
 }
+
+#[test]
+fn npm_nested_relative_scripts_and_unimported_mjs_are_entries() {
+    let got = report(
+        &[
+            (
+                "npm/package.json",
+                r#"{"scripts":{"build":"node ../npm/build.mjs","test":"node ./test.mjs"}}"#,
+            ),
+            (
+                "npm/build.mjs",
+                "if (!process.argv[2]) { process.exit(2); } process.exit(1);",
+            ),
+            (
+                "npm/test.mjs",
+                "if (!binary) process.exit(2); process.exit(failed ? 1 : 0);",
+            ),
+            ("tools/check.mjs", "if (!ready) process.exit(2);"),
+        ],
+        "{}",
+    );
+    assert_eq!(findings(&got, "exit-in-library"), 0);
+    assert_eq!(got["scores"]["containment"], 100);
+    for importer in [
+        "import '../npm/build.mjs';",
+        "export * from '../npm/build.mjs';",
+        "import('../npm/build.mjs');",
+        "require('../npm/build.mjs');",
+    ] {
+        let got = report(
+            &[
+                ("src/lib.js", importer),
+                ("npm/build.mjs", "process.exit(2);"),
+            ],
+            "{}",
+        );
+        assert_eq!(findings(&got, "exit-in-library"), 1, "{importer}");
+    }
+    let got = report(
+        &[(
+            "tools/lib.mjs",
+            "export function stop() { process.exit(2); }",
+        )],
+        "{}",
+    );
+    assert_eq!(findings(&got, "exit-in-library"), 1);
+}
