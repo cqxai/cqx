@@ -1,0 +1,10 @@
+[package]
+name="cqx-source"
+version.workspace=true
+edition.workspace=true
+license.workspace=true
+repository.workspace=true
+description="Parser-independent source fact emission for cqx."
+[dependencies]
+cqx-schema.workspace=true
+rezel-common="=0.0.0"

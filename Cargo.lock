@@ -137,6 +137,7 @@ name = "cqx-analysis"
 version = "0.1.24"
 dependencies = [
  "cqx-go",
+ "cqx-java",
  "cqx-rust",
  "cqx-ts",
  "cqx-vfs",
@@ -170,6 +171,23 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "cqx-java"
+version = "0.1.24"
+dependencies = [
+ "cqx-schema",
+ "cqx-score",
+ "cqx-source",
+ "cqx-store",
+ "cqx-vfs",
+ "rezel-lang-java",
+ "serde_json",
+]
+
+[[package]]
+name = "cqx-java-unicode"
+version = "1.0.24"
 
 [[package]]
 name = "cqx-mcp"
@@ -229,6 +247,14 @@ dependencies = [
  "deka-cli-core",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "cqx-source"
+version = "0.1.24"
+dependencies = [
+ "cqx-schema",
+ "rezel-common",
 ]
 
 [[package]]
@@ -1116,6 +1142,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "rezel-common"
+version = "0.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50c1d714e12e369e4931db0e912831c4d30232b2a33c9df097bfec415681e5bc"
+dependencies = [
+ "text-size",
+]
+
+[[package]]
+name = "rezel-lang-java"
+version = "0.0.0"
+dependencies = [
+ "cqx-java-unicode",
+ "rezel-common",
+ "rezel-lr",
+ "zerocopy",
+]
+
+[[package]]
+name = "rezel-lr"
+version = "0.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efa6b391da95d283ba078216663b124b45143761cf78d687edb9604fee36934d"
+dependencies = [
+ "rezel-common",
+ "zerocopy",
+]
+
+[[package]]
 name = "rsa"
 version = "0.9.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1361,6 +1416,12 @@ dependencies = [
  "quote",
  "syn 3.0.6",
 ]
+
+[[package]]
+name = "text-size"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f18aa187839b2bdb1ad2fa35ead8c4c2976b64e4363c386d45ac0f7ee85c9233"
 
 [[package]]
 name = "textwrap"

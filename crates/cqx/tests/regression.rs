@@ -37,3 +37,47 @@ fn go_full_report_matches_reviewed_go_branch() {
         include_str!("../../../fixtures/go/report.json")
     );
 }
+
+#[test]
+fn java_keeps_its_unicode_tables_without_downgrading_rust() {
+    let mut vfs = cqx_vfs::Vfs::new("unicode-fixture");
+    vfs.insert(
+        "Cargo.toml",
+        "[package]\nname=\"unicode_fixture\"\nversion=\"0.1.0\"\n",
+    );
+    // U+0558 became an identifier-start character in Unicode 18. Rust's
+    // existing parser accepts it; Java SE 26 still uses Unicode 17.
+    vfs.insert("src/lib.rs", "pub fn ՘() { std::process::exit(1); }");
+    vfs.insert("Library.java", "class ՘ {}");
+    let mut facts = Vec::new();
+    let stats = cqx_analysis::run(&vfs, &mut facts).unwrap();
+    assert_eq!(stats.unparsed.len(), 1, "{:?}", stats.unparsed);
+    assert!(stats.unparsed[0].starts_with("Library.java:"));
+    let stream = cqx_store::facts::Stream::from_ndjson(&String::from_utf8(facts).unwrap());
+    let config = cqx_score::config::Config::from_text(None).unwrap();
+    let report = cqx_score::report_json(
+        &config,
+        &cqx_score::metrics::Metrics::compute(&stream, &config),
+    );
+    assert_eq!(report["scores"]["containment"], 70);
+}
+
+#[test]
+fn java_full_report_is_fixed_before_further_frontends() {
+    // Captured with this Java frontend before any further frontends.
+    // CLI scan metadata, config path and source quotes are normalized away.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/java");
+    let vfs = cqx_vfs::from_dir(&root).unwrap();
+    let mut facts = Vec::new();
+    cqx_analysis::run(&vfs, &mut facts).unwrap();
+    let stream = cqx_store::facts::Stream::from_ndjson(&String::from_utf8(facts).unwrap());
+    let config = cqx_score::config::Config::from_text(vfs.read("cqx.json")).unwrap();
+    let report = cqx_score::report_json(
+        &config,
+        &cqx_score::metrics::Metrics::compute(&stream, &config),
+    );
+    assert_eq!(
+        serde_json::to_string_pretty(&report).unwrap() + "\n",
+        include_str!("../../../fixtures/java/report.json")
+    );
+}
