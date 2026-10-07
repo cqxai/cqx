@@ -745,3 +745,37 @@ Directory discovery retains sibling sources under C/C#-specific names such as
 `deps/` and `bin/`; the owning frontend applies its exclusion. Adding a language
 must not remove another language's input before dispatch. Actual directory CLI
 scans reproduce the score tuples above.
+
+## WASM release artifacts and single-file transition
+
+The existing tag-triggered `release.yml` publishes `core.wasm`, `c.wasm`,
+`csharp.wasm`, `manifest.json`, `cqx-loader.mjs` and `wasm-catalog.mjs` as GitHub
+release assets and into the existing `cqx-wasm/<tag>/` R2 bucket paths, with WASM,
+JSON and JavaScript content types. The manifest records each module's version,
+ABI, languages, extensions and SHA-256. Publication uses the same existing
+release environment; dispatch remains build-only.
+
+The **first modular release** also publishes the complete monolith under the old
+`cqx_wasm.wasm` name, with a `deprecated_artifacts` manifest entry and
+`WASM-DEPRECATION.md`. The next release omits it. `scripts/wasm-compat.mjs` inspects
+all GitHub release tags and their actual asset inventories, including drafts
+and prereleases. A tag with no lower semantic-version modular release retains
+the monolith; a lower modular tag ends that transition. Higher-version releases
+do not determine an older hotfix's policy. Reruns retain their own published
+manifest policy, even after later releases.
+A failed inventory read fails the build. Historical versioned assets stay at
+their existing URLs. Hosts should adopt the loader before the next release.
+
+`scripts/package-wasm.mjs` validates the complete module set, source version,
+ABI/identity and actual hashes before assembling an empty upload directory. This
+prevents mixed or stale cached artifacts from becoming a partial release.
+
+```sh
+node scripts/package-wasm.mjs .target/wasm-dist .target/wasm-upload --legacy
+node scripts/test-wasm-package.mjs .target/wasm-dist
+node scripts/test-wasm-compat.mjs
+python3 scripts/prove-wasm-package.py .target/wasm-dist
+```
+
+The first command only assembles local files; release promotion remains the
+existing tag/release workflow. Omit `--legacy` to assemble later selective releases.
