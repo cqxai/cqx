@@ -116,8 +116,8 @@ the Rust ramps, without claiming independent corpus calibration.
 
 Mixed reports add `languages: { <language>: { lines, scores, rules } }`.
 Top-level `scores` hold the weighted headline and top-level `rules` retain all
-findings and their original deductions. Single-language report JSON stays
-byte-identical, with no added block. A numeric `min_score` gates every headline
+findings and their original deductions. Single-language reports omit the
+`languages` breakdown and retain the same uniform `coverage` schema. A numeric `min_score` gates every headline
 category. To gate languages independently, use, for example:
 
 ```json
@@ -719,12 +719,36 @@ bodies are exempt from library termination; sibling and nested helpers are not.
 C test preprocessor blocks and C# test attributes retain their existing scopes.
 
 These are syntax rules, without preprocessing, cross-translation-unit types,
-cross-file C# name binding or taint inference. Macro/conditional fragments can
-cause a whole-file parse skip, which remains visible in the report. Specific
+cross-file C# name binding or taint inference. C/C++ declaration export macros
+(`LUA_API`, `CJSON_PUBLIC(type)`, `class TINYXML2_LIB Name`) and conditional
+`extern "C"` blocks are normalized with spaces while preserving byte offsets
+and newlines; supported `__declspec`/`__attribute__` forms retain their ASTs.
+Macro definitions and expression calls are not expanded. Unresolved conditional
+fragments use tree-sitter recovery: only ERROR/MISSING subtrees and facts that
+require an incomplete subtree are ignored. A file is skipped only when no tree
+is produced or fewer than 10% of its product lines remain outside error regions.
+A line touched by an error region is conservatively omitted from scored lines.
+Facts on that line survive only for complete nodes outside ERROR/MISSING
+subtrees; normalization never changes statements inside any function body.
+
+Every language uses the same [report JSON schema](docs/report.schema.json).
+JSON includes `skipped`, `recovered`, `recovered_files` (file, language, region
+count, scored/total lines), and `coverage` by language, including languages with
+zero scored lines. Coverage applies the same product/test/config exclusions as
+scoring. Each entry includes `scored_lines`, `total_lines`, `percent` (0–100,
+100 for no product lines), `skipped`, `recovered`, and `partial`, plus file and
+region counts; `scan.files` remains the inventory, while `scan.scored_files` counts
+scored product files. `coverage.<language>.partial` and top-level `partial` are
+true below 90% scored product lines (exactly 90% is not partial). CLI/`--stats`
+headlines and GitHub summaries show recovery/skip counts and PARTIAL, and always
+show the coverage percentage for each language, including C/C++/C#. Human output
+lists recovered regions per file. Scores describe only the scored share; partial
+100s are not a claim about the rest. Specific
 NOLINT/diagnostic/CS warning codes stay quiet; broad unexplained suppression
 still fires. Calibration remains in `cqx.json`, using the existing ramps.
 
-Pinned corpus evidence and full-report hashes are in `docs/heavy-language-evidence.json`.
+Historical v0.1.25 corpus evidence and full-report hashes (before error recovery)
+are in `docs/heavy-language-evidence.json`. These scores are baseline measurements.
 Scores below are containment / legibility / modularity / quality / security.
 Each headline weights independent language scores by actual product lines.
 
@@ -734,17 +758,19 @@ Each headline weights independent language scores by actual product lines.
 | double-conversion | 100/100/100/94/100 | C++ 35/5 |
 | Humanizer | 100/100/100/90/100 | C# 728/7 |
 
-Split and monolithic reports have identical complete JSON bytes on all three
-pinned corpora, all language fixtures and the Rust/TS/Go/C/C++/C# fixture;
-complete datasets also agree. Existing main goldens and the C# golden are
-unchanged. The corpus evidence records all frontend coverage and full hashes.
+Split and monolithic reports have identical complete JSON bytes and datasets
+on all language fixtures and the Rust/TS/Go/C/C++/C# fixture, checked in CI.
+All language report goldens include the same coverage metadata; their rules
+and scores remain unchanged. The C# golden also includes the recovery-threshold
+skip reason.
+The historical corpus evidence records baseline coverage and full hashes.
 C/C++ `out`, `external`, and `deps` exclusions are relative to the project root
 or a recognized build-system marker; source such as `src/external/` is scored.
 
 Directory discovery retains sibling sources under C/C#-specific names such as
 `deps/` and `bin/`; the owning frontend applies its exclusion. Adding a language
 must not remove another language's input before dispatch. Actual directory CLI
-scans reproduce the score tuples above.
+scans at v0.1.25 reproduce the baseline score tuples above.
 
 ## WASM release artifacts and single-file transition
 

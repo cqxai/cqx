@@ -315,7 +315,23 @@
     },
     "version": 1
   },
+  "coverage": {
+    "csharp": {
+      "files": 2,
+      "partial": true,
+      "percent": 50.0,
+      "recovered": 0,
+      "recovered_regions": 0,
+      "scored_files": 1,
+      "scored_lines": 1,
+      "skipped": 1,
+      "total_lines": 2
+    }
+  },
   "lines": 1,
+  "partial": true,
+  "recovered": 0,
+  "recovered_files": [],
   "rules": [
     {
       "capped": false,
@@ -669,10 +685,11 @@
     "quality": 100,
     "security": 85
   },
+  "skipped": 1,
   "skipped_files": [
     {
       "file": "src/Broken.cs",
-      "reason": "syntax error at 1:1 (ERROR)"
+      "reason": "only 0/1 lines recovered (minimum 10%)"
     }
   ]
 }

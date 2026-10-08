@@ -339,7 +339,23 @@
     },
     "version": 1
   },
+  "coverage": {
+    "typescript": {
+      "files": 3,
+      "partial": false,
+      "percent": 100.0,
+      "recovered": 0,
+      "recovered_regions": 0,
+      "scored_files": 2,
+      "scored_lines": 7,
+      "skipped": 1,
+      "total_lines": 7
+    }
+  },
   "lines": 7,
+  "partial": false,
+  "recovered": 0,
+  "recovered_files": [],
   "rules": [
     {
       "capped": false,
@@ -709,6 +725,7 @@
     "quality": 80,
     "security": 83
   },
+  "skipped": 1,
   "skipped_files": [
     {
       "file": "broken.ts",

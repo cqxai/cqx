@@ -65,3 +65,33 @@ assert.deepEqual(folded.score.scores, report.scores);
 assert.deepEqual(folded.score.rules, report.rules);
 assert.deepEqual(folded.score.skipped_files, report.skipped_files);
 console.log('C/C++ WASM parsing, mixed scores, configuration, skips and sharding: passed');
+
+// Macro normalization/recovery metadata survive both native browser scoring
+// and the production reader/coordinator fold, with original source offsets.
+const recovery = [
+  ['cJSON.c', '#include <stdio.h>\nCJSON_PUBLIC(void) f(void) {\n @@@\n char b[15]; sprintf(b, "%d", 1);\n}\n'],
+  ['broken.c', '@\n'.repeat(20)],
+];
+snapshot(recovery);
+const recovered = JSON.parse(call('cqx_score', ''));
+assert.equal(recovered.skipped, 1);
+assert.equal(recovered.recovered, 1);
+assert.equal(recovered.coverage.c.partial, true);
+assert.equal(recovered.coverage.c.scored_files, 1);
+assert.equal(recovered.rules.find(r => r.language === 'c' && r.rule === 'unsafe-buffer-calls').findings[0].line, 4);
+const recoveryMetadata = call('cqx_manifests');
+api.cqx_merge_reset();
+for (const file of recovery) {
+  snapshot([file]);
+  call('cqx_merge_add', call('cqx_gather', recoveryMetadata));
+}
+const recoveryGathered = call('cqx_merge_done');
+api.cqx_fold_reset();
+for (const file of recovery) {
+  snapshot([file]);
+  call('cqx_gather', recoveryMetadata);
+  call('cqx_fold_add', call('cqx_emit', recoveryGathered));
+}
+const recoveryFolded = JSON.parse(call('cqx_fold_done', 'recovery', '{}')).score;
+assert.deepEqual(recoveryFolded, recovered);
+console.log('C/C++ macro recovery, coverage honesty and sharded metadata: passed');

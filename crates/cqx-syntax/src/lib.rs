@@ -6,7 +6,7 @@ use std::{
     hash::{Hash, Hasher},
     io::{self, Write},
 };
-pub use tree_sitter::{Language, Node};
+pub use tree_sitter::{Language, Node, Parser};
 
 #[derive(Default)]
 pub struct Stats {
@@ -17,6 +17,10 @@ pub struct Stats {
 }
 
 pub trait Frontend {
+    /// Must preserve every byte offset and newline in the original source.
+    fn normalize<'a>(&self, source: &'a str) -> std::borrow::Cow<'a, str> {
+        std::borrow::Cow::Borrowed(source)
+    }
     fn needs_final_newline(&self) -> bool {
         false
     }
@@ -37,8 +41,11 @@ pub fn nodes(root: Node<'_>) -> Vec<Node<'_>> {
     let mut result = Vec::new();
     let mut cursor = root.walk();
     loop {
-        result.push(cursor.node());
-        if cursor.goto_first_child() {
+        let node = cursor.node();
+        if !node.is_error() && !node.is_missing() {
+            result.push(node);
+        }
+        if !node.is_error() && !node.is_missing() && cursor.goto_first_child() {
             continue;
         }
         while !cursor.goto_next_sibling() {
@@ -166,58 +173,79 @@ pub fn run(
             tick();
             continue;
         }
-        let input = if frontend.needs_final_newline() && !source.ends_with('\n') {
-            std::borrow::Cow::Owned(format!("{source}\n"))
-        } else {
-            std::borrow::Cow::Borrowed(source)
-        };
+        let mut input = frontend.normalize(source);
+        if frontend.needs_final_newline() && !input.ends_with('\n') {
+            input.to_mut().push('\n');
+        }
         let tree = parser.parse(input.as_ref(), None);
         tick();
-        let reason = match &tree {
-            None => Some("parser did not produce a syntax tree".to_string()),
-            Some(tree) if tree.root_node().has_error() => {
-                let n = nodes(tree.root_node())
-                    .into_iter()
-                    .find(|n| n.is_error() || n.is_missing())
-                    .unwrap_or(tree.root_node());
-                Some(format!(
-                    "syntax error at {}:{} ({})",
-                    n.start_position().row + 1,
-                    n.start_position().column + 1,
-                    n.kind()
-                ))
-            }
-            _ => None,
-        };
         let file = Id::file(path);
-        if let Some(reason) = reason {
+        let test = frontend.is_test(path);
+        let Some(tree) = tree else {
+            let reason = "parser did not produce a syntax tree";
             stats.unparsed.push(format!("{path}: {reason}"));
             writer.node(
                 FactNode::new(file, NodeKind::File)
                     .attr("path", path)
                     .attr("language", lang)
+                    .attr("role", if test { "test" } else { "product" })
+                    .attr("total_lines", source.lines().count())
+                    .attr("skipped", reason),
+            )?;
+            continue;
+        };
+        let root = tree.root_node();
+        let errors = error_regions(root);
+        let entries = frontend.entries(path, source, root);
+        let test_ranges = frontend.test_ranges(source, root);
+        let in_test = |n: Node<'_>| test_ranges.iter().any(|r| r.contains(&n.start_byte()));
+        // Count each touched line once. A missing token at EOF belongs to the
+        // last physical line, even when the grammar requests a final newline.
+        let source_lines = source.split_inclusive('\n').count();
+        let mut damaged = vec![false; source_lines];
+        for n in &errors {
+            if source_lines == 0 {
+                break;
+            }
+            let start = n.start_position().row.min(source_lines - 1);
+            let end = n.end_position();
+            let last = if n.end_byte() > n.start_byte() && end.column == 0 {
+                end.row.saturating_sub(1)
+            } else {
+                end.row
+            }
+            .min(source_lines - 1);
+            damaged[start..=last.max(start)].fill(true);
+        }
+        let mut total_lines = 0u64;
+        let mut product_lines = 0u64;
+        let mut offset = 0;
+        for (row, line) in source.split_inclusive('\n').enumerate() {
+            if !test_ranges.iter().any(|r| r.contains(&offset)) {
+                total_lines += 1;
+                if !damaged[row] {
+                    product_lines += 1;
+                }
+            }
+            offset += line.len();
+        }
+        // Below 10% usable product lines, the remaining tree is too small to score.
+        // Error-free empty/test-only files retain their previous behavior.
+        if !errors.is_empty() && (total_lines == 0 || product_lines * 10 < total_lines) {
+            let reason =
+                format!("only {product_lines}/{total_lines} lines recovered (minimum 10%)");
+            stats.unparsed.push(format!("{path}: {reason}"));
+            writer.node(
+                FactNode::new(file, NodeKind::File)
+                    .attr("path", path)
+                    .attr("language", lang)
+                    .attr("role", if test { "test" } else { "product" })
+                    .attr("total_lines", total_lines)
                     .attr("skipped", reason),
             )?;
             continue;
         }
-        let tree = tree.expect("successful parse");
-        let root = tree.root_node();
-        let entries = frontend.entries(path, source, root);
-        let test_ranges = frontend.test_ranges(source, root);
-        let in_test = |n: Node<'_>| test_ranges.iter().any(|r| r.contains(&n.start_byte()));
-        let product_lines = {
-            let mut offset = 0;
-            source
-                .split_inclusive('\n')
-                .filter(|line| {
-                    let is_test = test_ranges.iter().any(|r| r.contains(&offset));
-                    offset += line.len();
-                    !is_test
-                })
-                .count() as u64
-        };
         let package = Id::package(&format!("{lang}:root"));
-        let test = frontend.is_test(path);
         writer.node(
             FactNode::new(package.clone(), NodeKind::Package)
                 .attr("name", lang)
@@ -227,6 +255,8 @@ pub fn run(
             FactNode::new(file.clone(), NodeKind::File)
                 .attr("path", path)
                 .attr("lines", product_lines)
+                .attr("total_lines", total_lines)
+                .attr("recovered_regions", errors.len())
                 .attr("language", lang)
                 .attr("role", if test { "test" } else { "product" }),
         )?;
@@ -244,7 +274,10 @@ pub fn run(
                     .attr("language", lang)
                     .attr("lang:kind", "function");
                 if !test && !in_test(node) {
-                    if let Some(hash) = fingerprint(source, body) {
+                    if let Some(hash) = (!body.has_error())
+                        .then(|| fingerprint(source, body))
+                        .flatten()
+                    {
                         symbol = symbol.attr("body", hash);
                     }
                 }
@@ -272,13 +305,31 @@ pub fn run(
         for node in all {
             context.test = test || in_test(node);
             context.entry = entries.contains(&node.byte_range());
-            frontend.inspect(&mut context, node)?;
+            // Valid descendants survive; aggregate facts require a complete subtree.
+            if !node.has_error() || node == root {
+                frontend.inspect(&mut context, node)?;
+            }
         }
         stats.files += 1;
     }
     stats.nodes = writer.nodes;
     stats.edges = writer.edges;
     Ok(stats)
+}
+
+/// Outermost ERROR/MISSING regions only; nested errors are not double-counted.
+fn error_regions(root: Node<'_>) -> Vec<Node<'_>> {
+    let mut errors = Vec::new();
+    let mut pending = vec![root];
+    while let Some(n) = pending.pop() {
+        if n.is_error() || n.is_missing() {
+            errors.push(n);
+        } else {
+            let mut cursor = n.walk();
+            pending.extend(n.children(&mut cursor));
+        }
+    }
+    errors
 }
 
 fn fingerprint(source: &str, body: Node<'_>) -> Option<String> {

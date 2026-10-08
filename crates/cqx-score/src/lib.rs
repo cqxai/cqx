@@ -518,6 +518,7 @@ fn print_report(
     m: &Metrics,
 ) {
     println!("CodeQuality Score · {} product lines", m.lines);
+    print_coverage(&report_json(config, m));
     print_skipped_files(&m.skipped_files);
     if let Some(p) = &config.loaded_from {
         println!("configuration: {}", p.display());
@@ -663,7 +664,61 @@ fn build_report(config: &Config, scoring: &Scoring, m: &Metrics) -> serde_json::
     if !m.skipped_files.is_empty() {
         report["skipped_files"] = serde_json::json!(m.skipped_files);
     }
+    report["coverage"] = serde_json::json!(m.coverage);
+    report["skipped"] = serde_json::json!(m.skipped_files.len());
+    report["recovered"] = serde_json::json!(m.recovered_files.len());
+    report["partial"] = serde_json::json!(m.coverage.values().any(|p| p.partial));
+    report["recovered_files"] = serde_json::json!(m.recovered_files);
     report
+}
+
+/// The same coverage headline and per-file recovery details for scan/score.
+pub fn coverage_summary(report: &serde_json::Value) -> Option<String> {
+    let parts = report.get("coverage")?.as_object()?;
+    let scored_files: u64 = parts
+        .values()
+        .filter_map(|p| p["scored_files"].as_u64())
+        .sum();
+    let partial = if report["partial"].as_bool() == Some(true) {
+        " · PARTIAL"
+    } else {
+        ""
+    };
+    let mut summary = format!(
+        "{scored_files} product files scored · {} skipped · {} recovered{}",
+        report["skipped"], report["recovered"], partial
+    );
+    for (language, part) in parts {
+        summary.push_str(&format!(
+            "\n  {language}: {}/{} product lines scored ({:.2}%){}",
+            part["scored_lines"],
+            part["total_lines"],
+            part["percent"].as_f64().unwrap_or(100.0),
+            if part["partial"] == true {
+                " · PARTIAL (below 90%)"
+            } else {
+                ""
+            }
+        ));
+    }
+    Some(summary)
+}
+
+pub fn print_coverage(report: &serde_json::Value) {
+    if let Some(summary) = coverage_summary(report) {
+        println!("{summary}");
+        if let Some(files) = report["recovered_files"].as_array() {
+            for file in files {
+                println!(
+                    "  {}: recovered {} regions ({}/{} lines scored)",
+                    file["file"].as_str().unwrap_or("?"),
+                    file["regions"],
+                    file["lines"],
+                    file["total_lines"]
+                );
+            }
+        }
+    }
 }
 
 fn print_json(config: &Config, scoring: &Scoring, m: &Metrics) {
