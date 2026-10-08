@@ -263,6 +263,16 @@ pub fn tree(root: &Path, config_path: Option<&Path>, quote: bool) -> Result<Scan
         "ms": ms,
         "cqx": env!("CARGO_PKG_VERSION"),
     });
+    if let Some(parts) = report["coverage"].as_object() {
+        let scored_files: u64 = parts
+            .values()
+            .filter_map(|p| p["scored_files"].as_u64())
+            .sum();
+        report["scan"]["scored_files"] = serde_json::json!(scored_files);
+        report["scan"]["skipped"] = report["skipped"].clone();
+        report["scan"]["recovered"] = report["recovered"].clone();
+        report["scan"]["partial"] = report["partial"].clone();
+    }
 
     Ok(Scanned {
         scoring: cqx_score::evaluate(&config, &metrics),
@@ -409,6 +419,7 @@ fn print_report(here: &Scanned, against: Option<(&str, &Scanned)>) {
         here.ms as f64 / 1000.0
     );
 
+    cqx_score::print_coverage(&here.report);
     if let Some(skipped) = here.report["skipped_files"].as_array() {
         cqx_score::print_skipped_files(skipped);
     }

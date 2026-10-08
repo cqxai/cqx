@@ -49,6 +49,8 @@ impl Frontend for CSharp<'_> {
             .script(path.ends_with(".csx") || all.iter().any(|n| n.kind() == "global_statement"));
         for n in &all {
             let main = n.kind() == "method_declaration"
+                && n.child_by_field_name("parameters")
+                    .is_some_and(|n| !n.has_error())
                 && n.child_by_field_name("name")
                     .is_some_and(|n| text(source, n) == "Main")
                 && n.child_by_field_name("returns").is_some_and(|n| {
@@ -134,8 +136,15 @@ impl Frontend for CSharp<'_> {
         ) {
             return None;
         }
+        let name = n.child_by_field_name("name")?;
+        if name.has_error()
+            || n.child_by_field_name("parameters")
+                .is_some_and(|p| p.has_error())
+        {
+            return None;
+        }
         Some((
-            text(source, n.child_by_field_name("name")?).to_owned(),
+            text(source, name).to_owned(),
             n.child_by_field_name("body")?,
         ))
     }
@@ -152,7 +161,7 @@ impl Frontend for CSharp<'_> {
                         | "variable_declarator"
                         | "using_directive"
                 ) {
-                    if let Some(name) = n.child_by_field_name("name") {
+                    if let Some(name) = n.child_by_field_name("name").filter(|n| !n.has_error()) {
                         shadows.insert(c.text(name).trim_start_matches('@').to_owned());
                     }
                 }

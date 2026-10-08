@@ -184,3 +184,13 @@ fn a_directive_at_eof_needs_no_source_newline() {
         0
     );
 }
+
+#[test]
+fn recovery_scores_valid_methods_and_keeps_exact_rule_lines() {
+    let code = "using System;\nclass C {\n void Stop() { Environment.Exit(1); }\n @@@\n void Other() {}\n}\n";
+    let got = report(&[("src/C.cs", code)], "{}");
+    assert_eq!(got["skipped"], 0, "{got}");
+    assert_eq!(got["recovered"], 1);
+    assert_eq!(got["lines"], 5);
+    assert_eq!(findings(&got, "exit-in-library"), 1);
+}

@@ -153,6 +153,19 @@ fn frontend_language(n: &cqx_schema::Node) -> &str {
         .unwrap_or("rust")
 }
 
+/// Coverage uses product lines only, with the same exclusions as scoring.
+#[derive(Default, serde::Serialize)]
+pub struct Coverage {
+    pub files: u64,
+    pub scored_files: u64,
+    pub total_lines: u64,
+    pub scored_lines: u64,
+    pub skipped: u64,
+    pub recovered: u64,
+    pub recovered_regions: u64,
+    pub partial: bool,
+}
+
 pub struct Metrics {
     /// Product lines, in units of ten thousand — the denominator for densities.
     pub scale: f64,
@@ -160,6 +173,8 @@ pub struct Metrics {
     /// Actual product lines per language; the density floor is not a weight.
     pub language_lines: BTreeMap<String, u64>,
     pub skipped_files: Vec<serde_json::Value>,
+    pub recovered_files: Vec<serde_json::Value>,
+    pub coverage: BTreeMap<String, Coverage>,
     values: HashMap<String, Measure>,
 }
 
@@ -255,6 +270,8 @@ impl Metrics {
                 );
             }
             metrics.skipped_files.extend(part_metrics.skipped_files);
+            metrics.recovered_files.extend(part_metrics.recovered_files);
+            metrics.coverage.extend(part_metrics.coverage);
             metrics.lines += part_metrics.lines;
             metrics
                 .language_lines
@@ -262,6 +279,9 @@ impl Metrics {
         }
         metrics
             .skipped_files
+            .sort_by(|a, b| a["file"].as_str().cmp(&b["file"].as_str()));
+        metrics
+            .recovered_files
             .sort_by(|a, b| a["file"].as_str().cmp(&b["file"].as_str()));
         metrics.scale = (metrics.lines as f64 / 10_000.0).max(0.05);
         // Reader completion order must not select/reorder frontend findings.
@@ -283,6 +303,10 @@ impl Metrics {
             .nodes
             .iter()
             .filter_map(|n| {
+                let path = n.attrs.get("path")?.as_str()?;
+                if config.exclude.iter().any(|p| path.starts_with(p)) {
+                    return None;
+                }
                 let reason = n.attrs.get("skipped")?.as_str()?;
                 Some(serde_json::json!({"file": n.attrs.get("path")?, "reason": reason}))
             })
@@ -325,6 +349,53 @@ impl Metrics {
                 .unwrap_or(0);
             lines += n;
             files.push((path.to_string(), n));
+        }
+        let mut coverage: BTreeMap<String, Coverage> = BTreeMap::new();
+        let mut recovered_files = Vec::new();
+        for node in stream.nodes.iter().filter(|n| n.kind == NodeKind::File) {
+            let path = node
+                .attrs
+                .get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let regions = node
+                .attrs
+                .get("recovered_regions")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let scored = node
+                .attrs
+                .get("lines")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let total = node
+                .attrs
+                .get("total_lines")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(scored);
+            if regions > 0 && !excluded(path) {
+                recovered_files.push(
+                    serde_json::json!({"file": path, "language": frontend_language(node),
+                    "regions": regions, "lines": scored, "total_lines": total}),
+                );
+            }
+            if excluded(path) || test_files.contains(node.id.0.as_str()) {
+                continue;
+            }
+            let part = coverage.entry(frontend_language(node).into()).or_default();
+            part.files += 1;
+            part.total_lines += total;
+            if node.attrs.contains_key("skipped") {
+                part.skipped += 1;
+            } else {
+                part.scored_files += 1;
+                part.scored_lines += scored;
+                part.recovered += u64::from(regions > 0);
+                part.recovered_regions += regions;
+            }
+        }
+        for part in coverage.values_mut() {
+            part.partial = part.total_lines > 0 && part.scored_lines * 2 < part.total_lines;
         }
         files.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
         // A tiny codebase would otherwise divide its way to an infinite density.
@@ -811,6 +882,8 @@ impl Metrics {
             scale,
             lines,
             skipped_files,
+            recovered_files,
+            coverage,
             language_lines: BTreeMap::new(),
             values,
         };

@@ -518,6 +518,7 @@ fn print_report(
     m: &Metrics,
 ) {
     println!("CodeQuality Score · {} product lines", m.lines);
+    print_coverage(&report_json(config, m));
     print_skipped_files(&m.skipped_files);
     if let Some(p) = &config.loaded_from {
         println!("configuration: {}", p.display());
@@ -663,7 +664,68 @@ fn build_report(config: &Config, scoring: &Scoring, m: &Metrics) -> serde_json::
     if !m.skipped_files.is_empty() {
         report["skipped_files"] = serde_json::json!(m.skipped_files);
     }
+    // C-family coverage is explicit even for a single-language or wholly
+    // skipped scan. Older reports for other frontends retain their shape.
+    if m.coverage
+        .keys()
+        .any(|l| matches!(l.as_str(), "c" | "cpp" | "csharp"))
+    {
+        report["coverage"] = serde_json::json!(m.coverage);
+        report["skipped"] = serde_json::json!(m.skipped_files.len());
+        report["recovered"] = serde_json::json!(m.recovered_files.len());
+        report["partial"] = serde_json::json!(m.coverage.values().any(|p| p.partial));
+        report["recovered_files"] = serde_json::json!(m.recovered_files);
+    }
     report
+}
+
+/// The same coverage headline and per-file recovery details for scan/score.
+pub fn coverage_summary(report: &serde_json::Value) -> Option<String> {
+    let parts = report.get("coverage")?.as_object()?;
+    let scored_files: u64 = parts
+        .values()
+        .filter_map(|p| p["scored_files"].as_u64())
+        .sum();
+    let partial = if report["partial"].as_bool() == Some(true) {
+        " · PARTIAL"
+    } else {
+        ""
+    };
+    Some(format!(
+        "{scored_files} product files scored · {} skipped · {} recovered{}",
+        report["skipped"], report["recovered"], partial
+    ))
+}
+
+pub fn print_coverage(report: &serde_json::Value) {
+    if let Some(summary) = coverage_summary(report) {
+        println!("{summary}");
+        if let Some(parts) = report["coverage"].as_object() {
+            for (language, part) in parts {
+                println!(
+                    "  {language}: {}/{} product lines scored{}",
+                    part["scored_lines"],
+                    part["total_lines"],
+                    if part["partial"] == true {
+                        " · PARTIAL (below 50%)"
+                    } else {
+                        ""
+                    }
+                );
+            }
+        }
+        if let Some(files) = report["recovered_files"].as_array() {
+            for file in files {
+                println!(
+                    "  {}: recovered {} regions ({}/{} lines scored)",
+                    file["file"].as_str().unwrap_or("?"),
+                    file["regions"],
+                    file["lines"],
+                    file["total_lines"]
+                );
+            }
+        }
+    }
 }
 
 fn print_json(config: &Config, scoring: &Scoring, m: &Metrics) {

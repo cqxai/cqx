@@ -1,4 +1,5 @@
 //! C/C++ syntax rules. No preprocessor, compiler, or inferred taint contracts.
+mod normalize;
 use cqx_schema::EdgeKind;
 use cqx_syntax::{nodes, text, Context, Frontend, Language, Node, Stats};
 use cqx_vfs::Vfs;
@@ -74,6 +75,9 @@ struct C<'a> {
     cpp_headers: bool,
 }
 impl Frontend for C<'_> {
+    fn normalize<'a>(&self, source: &'a str) -> std::borrow::Cow<'a, str> {
+        normalize::source(source)
+    }
     fn language(&self) -> &'static str {
         if self.cpp {
             "cpp"
@@ -107,7 +111,7 @@ impl Frontend for C<'_> {
             if n.kind() == "function_definition" {
                 let main = n
                     .child_by_field_name("declarator")
-                    .is_some_and(|n| function_name(source, n) == "main");
+                    .is_some_and(|n| !n.has_error() && function_name(source, n) == "main");
                 entries.declaration(n.byte_range(), main);
             } else if n.kind() == "lambda_expression" {
                 entries.declaration(n.byte_range(), false);
@@ -154,8 +158,12 @@ impl Frontend for C<'_> {
         if node.kind() != "function_definition" {
             return None;
         }
+        let declarator = node.child_by_field_name("declarator")?;
+        if declarator.has_error() {
+            return None;
+        }
         Some((
-            function_name(source, node.child_by_field_name("declarator")?),
+            function_name(source, declarator),
             node.child_by_field_name("body")?,
         ))
     }
@@ -301,7 +309,10 @@ fn prepare_file(c: &mut Context<'_, '_, '_>) {
             n.kind(),
             "function_definition" | "parameter_declaration" | "init_declarator"
         ) {
-            if let Some(d) = n.child_by_field_name("declarator") {
+            if let Some(d) = n
+                .child_by_field_name("declarator")
+                .filter(|d| !d.has_error())
+            {
                 let name = function_name(c.source, d);
                 if n.kind() == "parameter_declaration" {
                     parameters.insert(name.clone());
@@ -316,7 +327,7 @@ fn prepare_file(c: &mut Context<'_, '_, '_>) {
                 .unwrap_or(n.end_byte());
             let children: Vec<_> = nodes(n)
                 .into_iter()
-                .filter(|n| n.end_byte() <= body_start)
+                .filter(|n| !n.has_error() && n.end_byte() <= body_start)
                 .collect();
             if children.iter().any(|a| {
                 a.kind().contains("attribute")

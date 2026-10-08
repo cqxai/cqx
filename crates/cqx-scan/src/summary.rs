@@ -57,6 +57,10 @@ pub fn build(here: &Scanned, against: Option<(&str, &Scanned)>) -> String {
         env!("CARGO_PKG_VERSION")
     ));
 
+    if let Some(coverage) = cqx_score::coverage_summary(&here.report) {
+        out.push_str(&format!("\n{coverage}\n"));
+    }
+
     // The rules that cost something, worst first. A reader who wants the
     // places opens the Files changed tab, where they already are.
     let empty = Vec::new();

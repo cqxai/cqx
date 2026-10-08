@@ -291,3 +291,195 @@ fn unicode_findings_use_character_columns() {
 fn ordinary_comments_and_nolint_block_ends_stay_quiet() {
     assert_eq!(count("cpp", "// This describes how NOLINT suppressions work.\n// NOLINTBEGIN(readability-magic-numbers) -- external protocol constants\nint value = 17;\n// NOLINTEND(readability-magic-numbers)\n", "undocumented-suppressions"), 0);
 }
+
+#[test]
+fn upstream_macro_excerpts_score_at_least_95_percent_and_keep_exact_findings() {
+    for (path, source, language) in [
+        (
+            "lapi.c",
+            include_str!("../../../fixtures/c-recovery/lapi.c"),
+            "c",
+        ),
+        (
+            "cJSON.c",
+            include_str!("../../../fixtures/c-recovery/cJSON.c"),
+            "c",
+        ),
+        (
+            "tinyxml2.hpp",
+            include_str!("../../../fixtures/c-recovery/tinyxml2.hpp"),
+            "cpp",
+        ),
+    ] {
+        let got = report(&[(path, source)], "{}");
+        assert!(
+            got["lines"].as_u64().unwrap() * 100 >= source.lines().count() as u64 * 95,
+            "{path}: {got}"
+        );
+        assert_eq!(got["skipped"], 0, "{path}");
+        assert_eq!(got["coverage"][language]["partial"], false);
+        if path == "cJSON.c" {
+            let rule = got["rules"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|r| r["rule"] == "unsafe-buffer-calls")
+                .unwrap();
+            assert_eq!(rule["total_findings"], 1);
+            assert_eq!(rule["findings"][0]["file"], path);
+            assert_eq!(rule["findings"][0]["line"], 6);
+            assert_eq!(rule["findings"][0]["col"][0], 4);
+        }
+    }
+}
+
+#[test]
+fn recovery_keeps_valid_calls_and_drops_error_subtrees_and_incomplete_body_hashes() {
+    let code = "#include <stdio.h>\nvoid f(void) {\n  @@@ sprintf(b, \"bad\");\n  sprintf(b, \"good\");\n}\n";
+    let got = report(&[("lib.c", code)], "{}");
+    assert_eq!(got["skipped"], 0, "{got}");
+    assert_eq!(got["recovered"], 1, "{got}");
+    assert_eq!(got["recovered_files"][0]["regions"], 1);
+    // The parser recovers the call after @@@ separately: that complete call is
+    // still safe to inspect. The malformed tokens themselves yield no facts.
+    assert_eq!(findings(&got, "c", "unsafe-buffer-calls"), 2);
+    let body = format!(
+        "void f(void) {{\n @@@\n {}\n}}\nvoid g(void) {{\n @@@\n {}\n}}",
+        "consume(1);".repeat(50),
+        "consume(1);".repeat(50)
+    );
+    assert_eq!(
+        findings(&report(&[("lib.c", &body)], "{}"), "c", "duplicated-bodies"),
+        0
+    );
+}
+
+#[test]
+fn partial_coverage_includes_wholly_skipped_languages_and_respects_exclusions() {
+    let got = report(
+        &[
+            ("good.c", "int ok;\n"),
+            ("bad.c", "@\n".repeat(20).as_str()),
+            ("third_party/bad.c", "@\n"),
+        ],
+        "{}",
+    );
+    assert_eq!(got["coverage"]["c"]["total_lines"], 21);
+    assert_eq!(got["coverage"]["c"]["scored_lines"], 1);
+    assert_eq!(got["coverage"]["c"]["partial"], true);
+    assert_eq!(got["partial"], true);
+    assert_eq!(got["skipped"], 1);
+    let all_bad = report(&[("bad.cpp", "@\n@\n")], "{}");
+    assert_eq!(all_bad["coverage"]["cpp"]["scored_lines"], 0);
+    assert_eq!(all_bad["partial"], true);
+    let excluded = report(
+        &[("good.c", "int ok;\n"), ("ignored.c", "@\n")],
+        r#"{"exclude":["ignored.c"]}"#,
+    );
+    assert_eq!(excluded["coverage"]["c"]["total_lines"], 1);
+    assert_eq!(excluded["partial"], false);
+}
+
+#[test]
+fn declaration_decorations_linkage_and_conditionals_keep_lines_and_calls() {
+    for lang in ["c", "cpp"] {
+        let code = "#include <stdio.h>\n#ifdef __cplusplus\nextern \"C\" {\n#endif\nEXPORT_API int f(void) { char b[10]; sprintf(b, \"ok\"); return 0; }\n#ifdef __cplusplus\n}\n#endif\n";
+        let got = report(
+            &[(if lang == "c" { "lib.c" } else { "lib.cpp" }, code)],
+            "{}",
+        );
+        assert_eq!(findings(&got, lang, "unsafe-buffer-calls"), 1, "{got}");
+        assert_eq!(got["lines"], 8);
+        assert_eq!(got["recovered"], 0);
+        let rule = got["rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["language"] == lang && r["rule"] == "unsafe-buffer-calls")
+            .unwrap();
+        assert_eq!(rule["findings"][0]["line"], 5);
+        assert_eq!(rule["findings"][0]["col"][0], 37);
+        let conditional = "#include <stdio.h>\n#if defined(EXPORT)\nEXPORT_API\n#endif\nvoid f(void) { char b[10]; sprintf(b, \"ok\"); }\n";
+        let got = report(
+            &[(if lang == "c" { "lib.c" } else { "lib.cpp" }, conditional)],
+            "{}",
+        );
+        assert_eq!(got["lines"], 5);
+        assert_eq!(got["recovered"], 0);
+        assert_eq!(findings(&got, lang, "unsafe-buffer-calls"), 1);
+    }
+    assert_eq!(
+        count(
+            "c",
+            "__declspec(dllexport) int f(void) { return 0; }",
+            "unsafe-buffer-calls"
+        ),
+        0
+    );
+    assert_eq!(
+        count(
+            "cpp",
+            "__attribute__((visibility(\"default\"))) int f() { return 0; }",
+            "unsafe-buffer-calls"
+        ),
+        0
+    );
+}
+
+#[test]
+fn normalization_leaves_raw_strings_comments_definitions_and_expression_calls_intact() {
+    let code = r###"#include <stdio.h>
+#define LUA_API __declspec(dllexport)
+// LUA_API int ignored(void) { sprintf(b, "fake"); }
+LUA_API void f(void) {
+ const char *s = R"tag(";
+LUA_API int ignored(void) { sprintf(b, "fake"); }
+)tag";
+ CALL(type); // a macro expression is still a call
+ char b[10]; sprintf(b, "%s", s);
+}
+"###;
+    let got = report(&[("lib.cpp", code)], "{}");
+    assert_eq!(got["lines"], code.lines().count());
+    assert_eq!(got["recovered"], 0, "{got}");
+    assert_eq!(findings(&got, "cpp", "unsafe-buffer-calls"), 1);
+}
+
+#[test]
+fn incomplete_calls_do_not_emit_rules_but_their_valid_siblings_do() {
+    let got = report(
+        &[(
+            "lib.c",
+            "#include <stdio.h>\nvoid f(void) {\n sprintf(b, );\n sprintf(b, \"ok\");\n}\n",
+        )],
+        "{}",
+    );
+    assert_eq!(got["recovered"], 1, "{got}");
+    assert_eq!(findings(&got, "c", "unsafe-buffer-calls"), 1, "{got}");
+}
+
+#[test]
+fn file_recovery_threshold_is_ten_percent_of_product_lines() {
+    let keep = format!("{}int good;\n", "@\n".repeat(9));
+    let got = report(&[("lib.c", &keep)], "{}");
+    assert_eq!(got["lines"], 1, "{got}");
+    assert_eq!(got["skipped"], 0);
+    assert_eq!(got["recovered"], 1);
+    let skip = format!("{}int good;\n", "@\n".repeat(10));
+    let got = report(&[("lib.c", &skip)], "{}");
+    assert_eq!(got["lines"], 0);
+    assert_eq!(got["skipped"], 1);
+    assert_eq!(got["coverage"]["c"]["total_lines"], 11);
+    assert_eq!(got["partial"], true);
+}
+
+#[test]
+fn uppercase_return_types_with_qualifiers_are_not_export_macros() {
+    for lang in ["c", "cpp"] {
+        let got = report(&[(if lang == "c" { "lib.c" } else { "lib.cpp" },
+            "#include <stdio.h>\ntypedef int STATUS;\nSTATUS const f(void) { char b[10]; sprintf(b, \"ok\"); return 0; }\n")], "{}");
+        assert_eq!(got["lines"], 3);
+        assert_eq!(got["recovered"], 0, "{got}");
+        assert_eq!(findings(&got, lang, "unsafe-buffer-calls"), 1);
+    }
+}
