@@ -363,7 +363,23 @@
     },
     "version": 1
   },
+  "coverage": {
+    "php": {
+      "files": 3,
+      "partial": false,
+      "percent": 100.0,
+      "recovered": 0,
+      "recovered_regions": 0,
+      "scored_files": 2,
+      "scored_lines": 4,
+      "skipped": 1,
+      "total_lines": 4
+    }
+  },
   "lines": 4,
+  "partial": false,
+  "recovered": 0,
+  "recovered_files": [],
   "rules": [
     {
       "capped": false,
@@ -769,6 +785,7 @@
     "quality": 100,
     "security": 85
   },
+  "skipped": 1,
   "skipped_files": [
     {
       "file": "src/Broken.php",

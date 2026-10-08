@@ -229,7 +229,23 @@
     },
     "version": 1
   },
+  "coverage": {
+    "rust": {
+      "files": 1,
+      "partial": false,
+      "percent": 100.0,
+      "recovered": 0,
+      "recovered_regions": 0,
+      "scored_files": 1,
+      "scored_lines": 59,
+      "skipped": 0,
+      "total_lines": 59
+    }
+  },
   "lines": 59,
+  "partial": false,
+  "recovered": 0,
+  "recovered_files": [],
   "rules": [
     {
       "capped": false,
@@ -502,5 +518,6 @@
     "modularity": 100,
     "quality": 60,
     "security": 100
-  }
+  },
+  "skipped": 0
 }

@@ -340,8 +340,8 @@ fn recovery_keeps_valid_calls_and_drops_error_subtrees_and_incomplete_body_hashe
     assert_eq!(got["skipped"], 0, "{got}");
     assert_eq!(got["recovered"], 1, "{got}");
     assert_eq!(got["recovered_files"][0]["regions"], 1);
-    // The parser recovers the call after @@@ separately: that complete call is
-    // still safe to inspect. The malformed tokens themselves yield no facts.
+    // Scored lines exclude the entire damaged line, but facts are node-based:
+    // both calls are outside ERROR. The @@@ ERROR subtree contributes none.
     assert_eq!(findings(&got, "c", "unsafe-buffer-calls"), 2);
     let body = format!(
         "void f(void) {{\n @@@\n {}\n}}\nvoid g(void) {{\n @@@\n {}\n}}",
@@ -481,5 +481,55 @@ fn uppercase_return_types_with_qualifiers_are_not_export_macros() {
         assert_eq!(got["lines"], 3);
         assert_eq!(got["recovered"], 0, "{got}");
         assert_eq!(findings(&got, lang, "unsafe-buffer-calls"), 1);
+    }
+}
+
+#[test]
+fn partial_coverage_boundary_is_ninety_percent() {
+    for (good, percent, partial) in [(8, 80.0, true), (9, 90.0, false), (10, 100.0, false)] {
+        let code = if good == 10 {
+            "int ok;\n".repeat(good)
+        } else {
+            format!("{}{}", "int ok;\n".repeat(good), "@\n".repeat(10 - good))
+        };
+        let got = report(&[("lib.c", &code)], "{}");
+        assert_eq!(got["coverage"]["c"]["percent"], percent, "{got}");
+        assert_eq!(got["coverage"]["c"]["partial"], partial);
+        assert_eq!(got["partial"], partial);
+    }
+}
+
+#[test]
+fn decorated_classes_keep_method_findings_and_native_attributes() {
+    for decoration in ["TINYXML2_LIB", "__declspec(dllexport)"] {
+        let code = format!("#include <stdio.h>\nclass {decoration} XMLDocument {{\n void f() const {{ char b[10]; sprintf(b, \"ok\"); }}\n}};\n");
+        let got = report(&[("lib.cpp", &code)], "{}");
+        assert_eq!(got["recovered"], 0, "{got}");
+        assert_eq!(got["coverage"]["cpp"]["percent"], 100.0);
+        assert_eq!(findings(&got, "cpp", "unsafe-buffer-calls"), 1, "{got}");
+        let rule = got["rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["rule"] == "unsafe-buffer-calls")
+            .unwrap();
+        assert_eq!(rule["findings"][0]["line"], 3);
+    }
+}
+
+#[test]
+fn unbalanced_conditional_linkage_recovers_calls_outside_errors() {
+    for path in ["lib.c", "lib.cpp"] {
+        for code in [
+            "#include <stdio.h>\n#if defined(__cplusplus)\nextern \"C\" {\n#endif\nvoid f(void) { char b[10]; sprintf(b, \"ok\"); }\n#if defined(__cplusplus)\n}\n",
+            "#include <stdio.h>\n#if defined(__cplusplus)\nextern \"C\" {\nvoid f(void) { char b[10]; sprintf(b, \"ok\"); }\n}\n",
+        ] {
+            let language = if path.ends_with(".cpp") { "cpp" } else { "c" };
+            let got = report(&[(path, code)], "{}");
+            assert_eq!(got["skipped"], 0, "{got}");
+            assert_eq!(findings(&got, language, "unsafe-buffer-calls"), 1, "{got}");
+            let rule = got["rules"].as_array().unwrap().iter().find(|r| r["rule"] == "unsafe-buffer-calls").unwrap();
+            assert_eq!(rule["findings"][0]["line"], if code.contains("#endif") { 5 } else { 4 });
+        }
     }
 }

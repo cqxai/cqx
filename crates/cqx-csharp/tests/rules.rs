@@ -194,3 +194,25 @@ fn recovery_scores_valid_methods_and_keeps_exact_rule_lines() {
     assert_eq!(got["lines"], 5);
     assert_eq!(findings(&got, "exit-in-library"), 1);
 }
+
+#[test]
+fn conditional_symbols_keep_valid_calls_without_expanding_c_macros() {
+    let code = "#define FEATURE\n#if FEATURE\nclass C { void Stop() { Environment.Exit(1); } }\n#else\nclass D { void Stop() { Environment.Exit(2); } }\n#endif\n";
+    let got = report(&[("Library.cs", code)], "{}");
+    assert_eq!(got["skipped"], 0, "{got}");
+    assert_eq!(got["coverage"]["csharp"]["percent"], 100.0);
+    assert_eq!(findings(&got, "exit-in-library"), 2);
+    let rule = got["rules"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["rule"] == "exit-in-library")
+        .unwrap();
+    assert_eq!(rule["findings"][0]["line"], 3);
+    assert_eq!(rule["findings"][1]["line"], 5);
+    let damaged = "class C {\n EXPORT_API void Broken() { Environment.Exit(1); }\n void Valid() { Environment.Exit(2); }\n}\n";
+    let got = report(&[("Library.cs", damaged)], "{}");
+    assert_eq!(got["recovered"], 1, "{got}");
+    assert_eq!(findings(&got, "exit-in-library"), 2, "{got}");
+    assert!(got["coverage"]["csharp"]["percent"].as_f64().unwrap() < 100.0);
+}

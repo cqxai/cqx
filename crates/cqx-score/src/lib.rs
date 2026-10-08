@@ -664,18 +664,11 @@ fn build_report(config: &Config, scoring: &Scoring, m: &Metrics) -> serde_json::
     if !m.skipped_files.is_empty() {
         report["skipped_files"] = serde_json::json!(m.skipped_files);
     }
-    // C-family coverage is explicit even for a single-language or wholly
-    // skipped scan. Older reports for other frontends retain their shape.
-    if m.coverage
-        .keys()
-        .any(|l| matches!(l.as_str(), "c" | "cpp" | "csharp"))
-    {
-        report["coverage"] = serde_json::json!(m.coverage);
-        report["skipped"] = serde_json::json!(m.skipped_files.len());
-        report["recovered"] = serde_json::json!(m.recovered_files.len());
-        report["partial"] = serde_json::json!(m.coverage.values().any(|p| p.partial));
-        report["recovered_files"] = serde_json::json!(m.recovered_files);
-    }
+    report["coverage"] = serde_json::json!(m.coverage);
+    report["skipped"] = serde_json::json!(m.skipped_files.len());
+    report["recovered"] = serde_json::json!(m.recovered_files.len());
+    report["partial"] = serde_json::json!(m.coverage.values().any(|p| p.partial));
+    report["recovered_files"] = serde_json::json!(m.recovered_files);
     report
 }
 
@@ -691,29 +684,29 @@ pub fn coverage_summary(report: &serde_json::Value) -> Option<String> {
     } else {
         ""
     };
-    Some(format!(
+    let mut summary = format!(
         "{scored_files} product files scored · {} skipped · {} recovered{}",
         report["skipped"], report["recovered"], partial
-    ))
+    );
+    for (language, part) in parts {
+        summary.push_str(&format!(
+            "\n  {language}: {}/{} product lines scored ({:.2}%){}",
+            part["scored_lines"],
+            part["total_lines"],
+            part["percent"].as_f64().unwrap_or(100.0),
+            if part["partial"] == true {
+                " · PARTIAL (below 90%)"
+            } else {
+                ""
+            }
+        ));
+    }
+    Some(summary)
 }
 
 pub fn print_coverage(report: &serde_json::Value) {
     if let Some(summary) = coverage_summary(report) {
         println!("{summary}");
-        if let Some(parts) = report["coverage"].as_object() {
-            for (language, part) in parts {
-                println!(
-                    "  {language}: {}/{} product lines scored{}",
-                    part["scored_lines"],
-                    part["total_lines"],
-                    if part["partial"] == true {
-                        " · PARTIAL (below 50%)"
-                    } else {
-                        ""
-                    }
-                );
-            }
-        }
         if let Some(files) = report["recovered_files"].as_array() {
             for file in files {
                 println!(

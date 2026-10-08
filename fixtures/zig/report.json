@@ -303,7 +303,23 @@
     },
     "version": 1
   },
+  "coverage": {
+    "zig": {
+      "files": 2,
+      "partial": false,
+      "percent": 100.0,
+      "recovered": 0,
+      "recovered_regions": 0,
+      "scored_files": 1,
+      "scored_lines": 2,
+      "skipped": 1,
+      "total_lines": 2
+    }
+  },
   "lines": 2,
+  "partial": false,
+  "recovered": 0,
+  "recovered_files": [],
   "rules": [
     {
       "capped": false,
@@ -644,6 +660,7 @@
     "quality": 100,
     "security": 85
   },
+  "skipped": 1,
   "skipped_files": [
     {
       "file": "src/broken.zig",

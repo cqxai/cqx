@@ -131,17 +131,50 @@ fn mask(bytes: &mut [u8], range: Range<usize>) {
     }
 }
 
+// Only known declaration containers permit normalization inside their braces.
+// Everything else is an expression/body scope, including declarators with
+// const/noexcept/override, trailing return types, lambdas and nested blocks.
+// Prefer preserving an ambiguous declaration to rewriting a body statement.
+fn declaration_scope(header: &[Token<'_>]) -> bool {
+    let mut declaration = false;
+    let mut i = 0;
+    while i < header.len() {
+        match header[i].text {
+            "__declspec" | "__attribute__" | "alignas"
+                if header.get(i + 1).is_some_and(|t| t.text == "(") =>
+            {
+                let Some(end) = close(header, i + 1, "(", ")") else {
+                    return false;
+                };
+                i = end;
+            }
+            "(" | "=" => return false,
+            "class" | "struct" | "union" | "enum" | "namespace" => declaration = true,
+            "extern" if header.get(i + 1).is_some_and(|t| t.text == "\"C\"") => {
+                declaration = true;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    declaration
+}
+
 pub fn source(source: &str) -> Cow<'_, str> {
     let t = tokens(source);
     let mut masks = Vec::new();
     let mut expression_scopes = Vec::new();
+    let mut header_start = 0;
     for (i, token) in t.iter().enumerate() {
         if token.text == "}" {
             expression_scopes.pop();
         }
         let expression = expression_scopes.last().copied().unwrap_or(false);
         if token.text == "{" {
-            expression_scopes.push(expression || i > 0 && t[i - 1].text == ")");
+            expression_scopes.push(expression || !declaration_scope(&t[header_start..i]));
+        }
+        if matches!(token.text, ";" | "{" | "}") {
+            header_start = i + 1;
         }
         if expression {
             continue;
@@ -246,6 +279,29 @@ pub fn source(source: &str) -> Cow<'_, str> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn qualified_function_bodies_and_nested_blocks_are_never_normalized() {
+        for declarator in [
+            "void f() const",
+            "void f() noexcept",
+            "void f() const noexcept(true) override final",
+            "auto f() -> int",
+            "auto f() const noexcept -> Result<T>",
+            "struct Result f() const",
+            "Widget::Widget() : member(0)",
+        ] {
+            let body = "{\n FOO(x) bar(a);\n FOO int bar(a);\n {\n FOO(x) bar(a);\n FOO int bar(a);\n }\n}";
+            let input = format!("class TINYXML2_LIB Widget {{\n {declarator} {body}\n}};");
+            let normalized = super::source(&input);
+            assert!(normalized.contains(body), "{declarator}: {normalized}");
+            assert!(!normalized.contains("TINYXML2_LIB"));
+        }
+        let input = "EXPORT_API void f() noexcept {\n FOO(x) bar(a);\n FOO int bar(a);\n}\nEXPORT_API void g();";
+        let normalized = super::source(input);
+        assert!(normalized.contains("FOO(x) bar(a);\n FOO int bar(a);"));
+        assert!(!normalized.contains("EXPORT_API"));
+    }
+
     #[test]
     fn qualified_uppercase_return_types_keep_their_ast_type() {
         let input = "typedef int STATUS;\nSTATUS const f(void) { return 0; }";

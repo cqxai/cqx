@@ -110,6 +110,10 @@ fn cli_stats_json_and_summary_expose_recovery_and_partial_coverage() {
     let text = String::from_utf8(out.stdout).unwrap();
     assert!(text.contains("1 skipped · 1 recovered · PARTIAL"), "{text}");
     assert!(text.contains("lib.c: recovered 1 regions"), "{text}");
+    assert!(
+        text.contains("4/25 product lines scored (16.00%) · PARTIAL (below 90%)"),
+        "{text}"
+    );
     assert!(fs::read_to_string(summary)
         .unwrap()
         .contains("1 skipped · 1 recovered · PARTIAL"));
@@ -122,6 +126,7 @@ fn cli_stats_json_and_summary_expose_recovery_and_partial_coverage() {
     assert_eq!(p["scan"]["scored_files"], 1);
     assert_eq!(p["coverage"]["c"]["total_lines"], 25);
     assert_eq!(p["scan"]["partial"], true);
+    assert_eq!(p["coverage"]["c"]["percent"], 16.0);
     assert_eq!(p["recovered_files"][0]["file"], "lib.c");
     let rule = p["rules"]
         .as_array()

@@ -318,7 +318,8 @@
   "coverage": {
     "csharp": {
       "files": 2,
-      "partial": false,
+      "partial": true,
+      "percent": 50.0,
       "recovered": 0,
       "recovered_regions": 0,
       "scored_files": 1,
@@ -328,7 +329,7 @@
     }
   },
   "lines": 1,
-  "partial": false,
+  "partial": true,
   "recovered": 0,
   "recovered_files": [],
   "rules": [

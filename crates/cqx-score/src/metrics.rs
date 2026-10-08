@@ -160,10 +160,33 @@ pub struct Coverage {
     pub scored_files: u64,
     pub total_lines: u64,
     pub scored_lines: u64,
+    pub percent: f64,
     pub skipped: u64,
     pub recovered: u64,
     pub recovered_regions: u64,
     pub partial: bool,
+}
+
+impl Coverage {
+    fn refresh(&mut self) {
+        self.percent = if self.total_lines == 0 {
+            100.0
+        } else {
+            self.scored_lines as f64 * 100.0 / self.total_lines as f64
+        };
+        self.partial = self.percent < 90.0;
+    }
+
+    fn merge(&mut self, other: Self) {
+        self.files += other.files;
+        self.scored_files += other.scored_files;
+        self.total_lines += other.total_lines;
+        self.scored_lines += other.scored_lines;
+        self.skipped += other.skipped;
+        self.recovered += other.recovered;
+        self.recovered_regions += other.recovered_regions;
+        self.refresh();
+    }
 }
 
 pub struct Metrics {
@@ -271,7 +294,13 @@ impl Metrics {
             }
             metrics.skipped_files.extend(part_metrics.skipped_files);
             metrics.recovered_files.extend(part_metrics.recovered_files);
-            metrics.coverage.extend(part_metrics.coverage);
+            for (language, coverage) in part_metrics.coverage {
+                metrics
+                    .coverage
+                    .entry(language)
+                    .or_default()
+                    .merge(coverage);
+            }
             metrics.lines += part_metrics.lines;
             metrics
                 .language_lines
@@ -395,7 +424,7 @@ impl Metrics {
             }
         }
         for part in coverage.values_mut() {
-            part.partial = part.total_lines > 0 && part.scored_lines * 2 < part.total_lines;
+            part.refresh();
         }
         files.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
         // A tiny codebase would otherwise divide its way to an infinite density.
@@ -966,5 +995,80 @@ impl Metrics {
                     .map(|(i, _)| i.clone());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod coverage_tests {
+    use super::*;
+
+    #[test]
+    fn coverage_merge_sums_shards_and_recomputes_percentage() {
+        let mut first = Coverage {
+            files: 2,
+            scored_files: 1,
+            total_lines: 100,
+            scored_lines: 80,
+            skipped: 1,
+            recovered: 1,
+            recovered_regions: 2,
+            ..Coverage::default()
+        };
+        first.refresh();
+        assert!(first.partial);
+        first.merge(Coverage {
+            files: 1,
+            scored_files: 1,
+            total_lines: 100,
+            scored_lines: 100,
+            recovered: 1,
+            recovered_regions: 3,
+            ..Coverage::default()
+        });
+        assert_eq!((first.files, first.scored_files, first.skipped), (3, 2, 1));
+        assert_eq!((first.total_lines, first.scored_lines), (200, 180));
+        assert_eq!((first.recovered, first.recovered_regions), (2, 5));
+        assert_eq!(first.percent, 90.0);
+        assert!(!first.partial);
+    }
+
+    #[test]
+    fn every_language_has_uniform_coverage_including_skipped_and_zero_lines() {
+        let config = Config::from_text(None).unwrap();
+        let languages = std::iter::once("rust").chain(config.frontend_languages());
+        let mut stream = Stream::default();
+        for language in languages {
+            stream.nodes.push(
+                cqx_schema::Node::new(cqx_schema::Id(format!("file:{language}")), NodeKind::File)
+                    .attr("language", language)
+                    .attr("path", format!("{language}/lib"))
+                    .attr("lines", 9)
+                    .attr("total_lines", 10),
+            );
+        }
+        stream.nodes.push(
+            cqx_schema::Node::new(cqx_schema::Id("file:bad".into()), NodeKind::File)
+                .attr("language", "c")
+                .attr("path", "bad.c")
+                .attr("lines", 0)
+                .attr("total_lines", 10)
+                .attr("skipped", "broken"),
+        );
+        let report = crate::report_json(&config, &Metrics::compute(&stream, &config));
+        for language in std::iter::once("rust").chain(config.frontend_languages()) {
+            let part = &report["coverage"][language];
+            assert_eq!(part["scored_lines"], 9, "{language}: {report}");
+            assert_eq!(part["total_lines"], if language == "c" { 20 } else { 10 });
+            assert_eq!(part["percent"], if language == "c" { 45.0 } else { 90.0 });
+            assert_eq!(part["partial"], language == "c");
+            assert_eq!(part["skipped"], u64::from(language == "c"));
+            assert_eq!(part["recovered"], 0);
+        }
+        let empty = crate::report_json(&config, &Metrics::compute(&Stream::default(), &config));
+        assert_eq!(empty["coverage"], serde_json::json!({}));
+        let mut zero = Coverage::default();
+        zero.refresh();
+        assert_eq!(zero.percent, 100.0);
+        assert!(!zero.partial);
     }
 }

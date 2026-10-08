@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "cqx score/scan report",
+  "type": "object",
+  "description": "Score report; scan reports add scan inventory metadata. Language names are frontend keys (rust, typescript, go, java, kotlin, swift, zig, python, php, c, cpp, csharp). All present product languages, including wholly skipped languages, use identical coverage entries. Empty scans emit an empty coverage object.",
+  "required": [
+    "scores",
+    "rules",
+    "lines",
+    "coverage",
+    "skipped",
+    "recovered",
+    "partial",
+    "recovered_files"
+  ],
+  "properties": {
+    "scores": {
+      "type": "object"
+    },
+    "rules": {
+      "type": "array"
+    },
+    "lines": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "scored_lines",
+          "total_lines",
+          "percent",
+          "skipped",
+          "recovered",
+          "partial",
+          "files",
+          "scored_files",
+          "recovered_regions"
+        ],
+        "properties": {
+          "scored_lines": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_lines": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "skipped": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "recovered": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "files": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scored_files": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "recovered_regions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "percent": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "100 * scored_lines / total_lines; 100 if total_lines is zero. Uses product lines after the same exclusions as scoring."
+          },
+          "partial": {
+            "type": "boolean",
+            "description": "True when percent is strictly below 90; exactly 90 is not partial."
+          }
+        }
+      }
+    },
+    "skipped": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Skipped files after config exclusions, including analyzed test files."
+    },
+    "recovered": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Recovered files after config exclusions, including analyzed test files."
+    },
+    "partial": {
+      "type": "boolean",
+      "description": "True if any product language coverage is partial."
+    },
+    "recovered_files": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "scan": {
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "integer",
+          "description": "Input inventory; may include test/config files."
+        },
+        "scored_files": {
+          "type": "integer",
+          "description": "Sum of coverage scored_files across product languages."
+        },
+        "partial": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
