@@ -1,7 +1,7 @@
 //! cqx — composition only.
 //!
 //! This crate registers commands and dispatches. It holds no handler bodies:
-//! adding a command means touching an owner crate, which is the point (rfd#61).
+//! adding a command means touching an owner crate, which is the point (APS 61).
 
 use deka_cli_core::{Context, FlagSpec, Registry, RegistryBuilder};
 
