@@ -2,7 +2,7 @@
   "name": "@cqxai/cli",
   "version": "0.1.22",
   "description": "Read any Rust repository and see what it does at runtime: every process it can spawn, every environment variable it reads, and every check that was written and then ignored.",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",

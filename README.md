@@ -805,3 +805,7 @@ python3 scripts/prove-wasm-package.py .target/wasm-dist
 
 The first command only assembles local files; release promotion remains the
 existing tag/release workflow. Omit `--legacy` to assemble later selective releases.
+
+## License
+
+[MIT](LICENSE)

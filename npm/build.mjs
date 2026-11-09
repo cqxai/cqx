@@ -74,7 +74,7 @@ for (const p of PLATFORMS) {
         name: pkg,
         version,
         description: `The cqx binary for ${p.os} ${p.cpu}. Installed by @cqxai/cli; not meant to be depended on directly.`,
-        license: 'Apache-2.0',
+        license: 'MIT',
         repository: { type: 'git', url: 'git+https://github.com/cqxai/cqx.git' },
         homepage: 'https://cqx.dev',
         // What makes npm skip this package on every other machine.
