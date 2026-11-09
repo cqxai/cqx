@@ -6,7 +6,7 @@ exclude = ["vendor/rezel-lang-python", "vendor/python-unicode", "vendor/rezel-la
 [workspace.package]
 version = "0.1.26"
 edition = "2021"
-license = "Apache-2.0"
+license = "MIT"
 repository = "https://github.com/cqxai/cqx"
 
 [workspace.dependencies]
